@@ -55,11 +55,30 @@ The skill lives in `video-use/`. User footage lives wherever they put it. All se
     └── final.mp4
 ```
 
+## Knowledge base (read this first)
+
+This install maintains a knowledge base at `<repo>/kb/` — architecture, the transcript data
+contract, a helper reference, verified gotchas, environment state, and a worklog of local
+changes. The repo directory is the one containing this file (typically
+`~/.claude/skills/video-use/`, a symlink to the clone).
+
+**Read `kb/index.md` before starting**, and follow its pointers as needed — it records things
+already learned the hard way on this machine, including which ASR providers are configured and
+a `brew`-related trap that silently breaks subtitle burn-in.
+
+**At the end of a task, update it:** append to `kb/worklog.md` and fold durable lessons into the
+matching topic file. Record only what was verified, mark unproven suspicions as such, and keep
+`kb/index.md` short. `bash kb/check-env.sh` re-verifies the environment claims.
+
 ## Setup
 
 First-time install lives in `install.md` (clone, deps, ffmpeg, skill registration, API key). Don't re-run it every session; on cold start just verify:
 
-- `ELEVENLABS_API_KEY` resolves — either in the environment or in `.env` at the video-use repo root. If missing, ask the user to paste one and write it to `.env` (never to the user's `<videos_dir>`).
+- A transcription key resolves — either in the environment or in `.env` at the video-use repo root. If missing, ask the user to paste one and write it to `.env` (never to the user's `<videos_dir>`). Two providers are wired up:
+    - `ELEVENLABS_API_KEY` → `transcribe.py` (Scribe). Tags audio events: `(laughter)`, `(applause)`, `(sigh)`.
+    - `DEEPGRAM_API_KEY` → `transcribe_deepgram.py` (nova-3). Same on-disk schema, so everything downstream is identical. No audio-event tags — the `(laughs)` beat signals in Cut craft are unavailable, so lean on silence gaps and the visual drill-down instead.
+
+    Whichever key is present, use that transcriber. If both, prefer Scribe for multi-speaker or reaction-heavy material where audio events carry beats; either is fine for a single talking head.
 - `ffmpeg` + `ffprobe` on PATH.
 - Python deps installed (`uv sync` or `pip install -e .` inside the repo).
 - Node.js + npm available if the session needs HyperFrames or Remotion slots. HyperFrames currently requires Node.js 22+.
@@ -72,6 +91,10 @@ Helpers (`helpers/transcribe.py`, `helpers/render.py`, etc.) live alongside this
 ## Helpers
 
 - **`transcribe.py <video>`** — single-file Scribe call. `--num-speakers N` optional. Cached.
+- **`transcribe_deepgram.py <video>`** — Deepgram nova-3 alternative to the above. Emits the identical
+  `{words:[{type,text,start,end,speaker_id}]}` schema, so `pack_transcripts.py` and `render.py --build-subtitles`
+  consume it unchanged. `filler_words=true` and `punctuate=true`; `smart_format` deliberately off (Hard Rule 8).
+  `--convert <deepgram.json>` converts an existing response offline, no API call. Cached identically.
 - **`transcribe_batch.py <videos_dir>`** — 4-worker parallel transcription. Use for multi-take.
 - **`pack_transcripts.py --edit-dir <dir>`** — `transcripts/*.json` → `takes_packed.md` (phrase-level, break on silence ≥ 0.5s).
 - **`timeline_view.py <video> <start> <end>`** — filmstrip + waveform PNG. On-demand visual drill-down. **Not a scan tool** — use it at decision points, not constantly.

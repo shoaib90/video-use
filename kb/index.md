@@ -1,0 +1,54 @@
+# video-use knowledge base — index
+
+Working knowledge of how this repo actually behaves on **this machine**. Maintained by Claude.
+Read this at the **start** of any video-use task; append findings at the **end**.
+
+Upstream: [browser-use/video-use](https://github.com/browser-use/video-use). Clone lives at `~/Documents/video-use`.
+
+## Read this first
+
+The one-line mental model: **the LLM never watches the video, it reads it.** A word-level
+transcript is the primary surface; PNG composites are pulled only at decision points.
+Cuts are chosen in text, then executed by ffmpeg.
+
+```
+Transcribe ──> Pack ──> reason over text ──> EDL ──> Render ──> Self-eval ──┐
+                                                        ^                  │
+                                                        └── fix + re-render ┘ (max 3)
+```
+
+## Map
+
+| File | What's in it | Read when |
+|---|---|---|
+| [architecture.md](architecture.md) | Pipeline stages, data flow, why each artifact exists | Orienting, or changing pipeline shape |
+| [data-contract.md](data-contract.md) | **The transcript JSON schema** — the repo's real seam | Swapping ASR providers, debugging captions |
+| [helpers.md](helpers.md) | Per-script reference: flags, behaviour, EDL schema | Before invoking any helper |
+| [environment.md](environment.md) | This machine: paths, keys, versions, what's installed | Cold start, "is X available?" |
+| [gotchas.md](gotchas.md) | Verified traps that cost real debugging time | Anything fails unexpectedly |
+| [worklog.md](worklog.md) | Dated log of local changes + why | Understanding a local divergence |
+| [check-env.sh](check-env.sh) | Re-verifies everything in environment.md | Cold start, or something broke |
+
+## Hard rules (never violate — these cause silent failures)
+
+Full list in `SKILL.md`. The four that bite hardest:
+
+1. **Subtitles applied LAST** in the filter chain, after every overlay. Otherwise overlays hide captions.
+2. **Per-segment extract → lossless `-c copy` concat.** Not a single-pass filtergraph, or you double-encode.
+3. **30ms audio fades at every boundary.** Otherwise audible pops at each cut.
+4. **Never cut inside a word.** Snap to word boundaries; pad 30–200ms for ASR timestamp drift.
+
+Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
+
+## Fast facts
+
+- Run helpers as `uv run python helpers/<name>.py` — there are no console scripts.
+- `pytest` is not a declared dep: `uv run --with pytest python -m pytest tests/`.
+- Local changes live on git branch `local`; `main` stays clean for `git pull --ff-only`.
+- Transcription is **paid per call** and cached per source. Never re-transcribe unnecessarily.
+
+## Maintaining this KB
+
+At the end of a task, append to [worklog.md](worklog.md) and fold any durable, reusable
+lesson into the right topic file. Rules: record only what was **verified**, note how it was
+verified, and keep this index short — it loads into every session.
