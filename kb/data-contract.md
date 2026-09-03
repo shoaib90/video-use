@@ -43,10 +43,17 @@ filename must match the EDL source name.**
 
 Anything that yields word-level timestamps can drive this pipeline. Implemented:
 
-| Provider | Helper | Key | Audio events |
-|---|---|---|---|
-| ElevenLabs Scribe | `transcribe.py` | `ELEVENLABS_API_KEY` | yes — `(laughter)`, `(applause)`, `(sigh)` |
-| Deepgram nova-3 | `transcribe_deepgram.py` | `DEEPGRAM_API_KEY` | **no** |
+| Provider | Helper | Cost | Diarization | Audio events |
+|---|---|---|---|---|
+| ElevenLabs Scribe | `transcribe.py` | paid | yes | yes — `(laughter)`, `(applause)`, `(sigh)` |
+| Deepgram nova-3 | `transcribe_deepgram.py` | paid | yes | no |
+| whisper.cpp (local) | `transcribe_whisper.py` | **free** | **no** | no |
+
+**Which to use.** Deepgram is the configured default — it diarizes, which multi-speaker
+material needs. Use whisper for free iteration, offline work, or as a cross-check: it has been
+seen to preserve a leading filler that Deepgram dropped. Never use whisper alone on
+multi-speaker footage — no speaker labels means no `S0`/`S1` tags in `takes_packed.md`, and
+speaker handoffs become invisible.
 
 ### Deepgram mapping (as implemented)
 
@@ -66,6 +73,19 @@ normalization Hard Rule 8 forbids.
 
 `--convert <deepgram.json>` runs the mapping offline with no API call. Use it to test changes
 for free.
+
+### whisper.cpp mapping (as implemented)
+
+`whisper-cli -oj -ml 1` emits one token per segment as
+`transcription[].{offsets:{from,to}, text}` with offsets in **milliseconds**. The adapter
+divides by 1000, and glues standalone-punctuation tokens (`-ml 1` splits `,` and `.` into their
+own segments) onto the preceding word so `text` carries punctuation as the contract expects.
+`speaker_id` is **omitted** — `pack_transcripts.py` renders an empty speaker tag when absent,
+which is the correct degradation.
+
+Caveats: whisper normalizes some spoken numbers ("ninety percent" → "90%"), against the spirit
+of Hard Rule 8, and smaller models make real word errors (`base.en` produced "w usted" for
+"wasted"). Prefer `small.en` or better; treat its transcript as a draft surface.
 
 ## Adding a third provider
 

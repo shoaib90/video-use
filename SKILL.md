@@ -77,8 +77,9 @@ First-time install lives in `install.md` (clone, deps, ffmpeg, skill registratio
 - A transcription key resolves — either in the environment or in `.env` at the video-use repo root. If missing, ask the user to paste one and write it to `.env` (never to the user's `<videos_dir>`). Two providers are wired up:
     - `ELEVENLABS_API_KEY` → `transcribe.py` (Scribe). Tags audio events: `(laughter)`, `(applause)`, `(sigh)`.
     - `DEEPGRAM_API_KEY` → `transcribe_deepgram.py` (nova-3). Same on-disk schema, so everything downstream is identical. No audio-event tags — the `(laughs)` beat signals in Cut craft are unavailable, so lean on silence gaps and the visual drill-down instead.
+    - **No key needed** → `transcribe_whisper.py` (local whisper.cpp). Free and offline, same schema, but **no speaker diarization** and it normalizes some spoken numbers. Use it for free iteration, for offline work, and as a cross-check — it catches leading filler words Deepgram has been seen to drop. Never use it alone on multi-speaker footage.
 
-    Whichever key is present, use that transcriber. If both, prefer Scribe for multi-speaker or reaction-heavy material where audio events carry beats; either is fine for a single talking head.
+    Prefer Deepgram or Scribe for the real cut (they diarize); prefer Scribe when audio events carry beats. Iterate with whisper to avoid burning credits. `kb/gotchas.md` records each provider's measured failure mode.
 - `ffmpeg` + `ffprobe` on PATH.
 - Python deps installed (`uv sync` or `pip install -e .` inside the repo).
 - Node.js + npm available if the session needs HyperFrames or Remotion slots. HyperFrames currently requires Node.js 22+.
@@ -91,6 +92,7 @@ Helpers (`helpers/transcribe.py`, `helpers/render.py`, etc.) live alongside this
 ## Helpers
 
 - **`transcribe.py <video>`** — single-file Scribe call. `--num-speakers N` optional. Cached.
+- **`transcribe_whisper.py <video>`** — local whisper.cpp. Free, offline, no key, no diarization. Defaults to the `small.en` model.
 - **`transcribe_deepgram.py <video>`** — Deepgram nova-3 alternative to the above. Emits the identical
   `{words:[{type,text,start,end,speaker_id}]}` schema, so `pack_transcripts.py` and `render.py --build-subtitles`
   consume it unchanged. `filler_words=true` and `punctuate=true`; `smart_format` deliberately off (Hard Rule 8).

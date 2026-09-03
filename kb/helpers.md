@@ -24,6 +24,18 @@ Drop-in for the above; emits the identical schema. See [data-contract.md](data-c
 `--num-speakers` is accepted for parity but **ignored** — Deepgram auto-detects and takes no hint.
 `--convert` does the mapping offline, no API call, no video needed.
 
+## transcribe_whisper.py — local whisper.cpp  *(local addition)*
+```
+transcribe_whisper.py <video> [--model ~/.cache/whisper-models/ggml-small.en.bin]
+                              [--language en] [--threads N]
+transcribe_whisper.py --convert <whisper_cli_out.json>
+```
+**Free, offline, no key.** Same schema as the others. Runs `whisper-cli -oj -ml 1`, converts
+millisecond offsets, and glues standalone punctuation onto the preceding word.
+**No diarization** — omits `speaker_id`, so `takes_packed.md` has no S0/S1 tags. Don't use it
+alone on multi-speaker footage. Defaults to `small.en`; see gotchas.md for why not `base.en`.
+Good for free iteration and as a cross-check on dropped filler words.
+
 ## transcribe_batch.py
 ```
 transcribe_batch.py <videos_dir>

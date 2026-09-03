@@ -5,6 +5,34 @@ re-derive it or mistake a deliberate change for a bug.
 
 ---
 
+## 2026-09-03 (later) — Fully equipped: animation engines + local ASR
+
+User asked to install everything needed so no capability is missing mid-edit.
+
+**All three animation engines installed and verified.** Manim 0.21.0 (rendered a real test
+scene, not just imported) — it needed `brew install pkgconf cairo pango cmake` plus an exported
+`PKG_CONFIG_PATH` or `pycairo` fails to build. HyperFrames v0.8.27 (npx cache warmed).
+Remotion 4.0.520 confirmed reachable; it scaffolds per-slot so nothing to pre-install.
+
+Caught a self-inflicted trap doing this: the first `uv sync --extra animations` reported exit 0
+while actually failing, because I piped it to `tail`. Recorded in gotchas.md — it applies to
+every ffmpeg shell-out in this repo too.
+
+**Added a third ASR provider: `helpers/transcribe_whisper.py`** (local whisper.cpp, free,
+offline, no key). Discovered `ffmpeg-full` pulls in `whisper-cpp` 1.9.2, so the binary was
+already present — only models needed downloading. Probed the plumbing for free using the
+bundled `for-tests-ggml-tiny.bin` before committing to a 465MB download.
+
+**Measured all three providers against known ground truth** rather than assuming — see the
+comparison table in gotchas.md. Each has a distinct flaw: Deepgram drops a leading filler,
+whisper normalizes numbers, `base.en` makes outright word errors. This changed a decision:
+`small.en` is now the helper's default, and the earlier "Deepgram drops fillers" note was
+rewritten from speculation into a measured finding with the caveat that it's still one synthetic
+clip.
+
+**Not installed:** nothing outstanding. `ELEVENLABS_API_KEY` remains unset — that's a
+credential, not an install, so audio-event tagging still needs the user.
+
 ## 2026-09-03 — Initial setup, Deepgram provider, ffmpeg fix
 
 **Install.** Cloned upstream into `~/Documents/video-use` (not the `~/Developer/video-use` that

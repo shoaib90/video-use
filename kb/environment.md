@@ -53,15 +53,31 @@ project needs them.
 
 Never echo key values into tool output. Never write a key anywhere but `.env` at the repo root.
 
-## Optional / lazy deps
+## Animation engines — all three installed
 
-Installed on first actual use, not during setup:
+| Engine | Status | Invoke |
+|---|---|---|
+| Manim | **0.21.0 installed**, render verified | `uv run manim -ql --format=mp4 scene.py Scene` |
+| HyperFrames | **v0.8.27**, npx cache warmed | `npx --yes hyperframes ...` |
+| Remotion | 4.0.520 reachable, scaffolded per-slot | `npx create-video@latest` |
 
-- **Manim** — `uv sync --extra animations`. Repo vendors `skills/manim-video/` (read its SKILL.md).
-- **HyperFrames** — `npx --yes hyperframes ...` inside the animation slot dir.
-- **Remotion** — `npx create-video@latest`, or install project-local inside the slot.
+Manim needed system libs that aren't obvious: `brew install pkgconf cairo pango cmake`, and
+`PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig` exported, or `pycairo` fails to build.
+Repo vendors `skills/manim-video/` — read its SKILL.md before building a Manim slot.
 
-Install these **inside `<edit>/animations/slot_<id>/`**, never at the repo root.
+Scaffold Remotion/HyperFrames **inside `<edit>/animations/slot_<id>/`**, never at the repo root.
+
+## Local ASR models
+
+`whisper-cpp` 1.9.2 (arrived with `ffmpeg-full`). Models in `~/.cache/whisper-models/`:
+
+| Model | Size | Use |
+|---|---|---|
+| `ggml-small.en.bin` | 465 MB | **default** for `transcribe_whisper.py` |
+| `ggml-base.en.bin` | 141 MB | faster, but makes word errors — see gotchas.md |
+
+ffmpeg 9 also has a built-in `whisper` filter (`-h filter=whisper`), unused so far — the
+`whisper-cli` path gives cleaner word-level JSON.
 
 ## Available beyond the CLI
 

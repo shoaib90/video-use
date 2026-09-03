@@ -45,7 +45,11 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
 - Run helpers as `uv run python helpers/<name>.py` — there are no console scripts.
 - `pytest` is not a declared dep: `uv run --with pytest python -m pytest tests/`.
 - Local changes live on git branch `local`; `main` stays clean for `git pull --ff-only`.
-- Transcription is **paid per call** and cached per source. Never re-transcribe unnecessarily.
+- Three ASR providers wired up: Deepgram (default, diarizes), whisper.cpp (free, local, no
+  diarization), ElevenLabs (unconfigured). Each has a different flaw — see [gotchas.md](gotchas.md).
+- Paid transcription is cached per source. Never re-transcribe unnecessarily; iterate with whisper.
+- All three animation engines installed: Manim, HyperFrames, Remotion.
+- Piping to `tail` masks exit codes. Use `set -o pipefail`.
 
 ## Maintaining this KB
 

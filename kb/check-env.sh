@@ -25,5 +25,17 @@ echo
 echo "== skill registration =="
 [ -L "$HOME/.claude/skills/video-use" ] && echo "registered -> $(readlink "$HOME/.claude/skills/video-use")" || echo "NOT registered"
 echo
+echo "== animation engines =="
+uv run python -c "import manim;print('manim',manim.__version__)" 2>/dev/null || echo "manim MISSING"
+printf 'hyperframes %s\n' "$(npm view hyperframes version 2>/dev/null || echo unreachable)"
+printf 'remotion    %s\n' "$(npm view remotion version 2>/dev/null || echo unreachable)"
+echo
+echo "== local ASR =="
+command -v whisper-cli >/dev/null && echo "whisper-cli present" || echo "whisper-cli MISSING"
+for m in small.en base.en; do
+  f="$HOME/.cache/whisper-models/ggml-$m.bin"
+  [ -f "$f" ] && echo "model $m $(du -h "$f" | cut -f1)" || echo "model $m absent"
+done
+echo
 echo "== tests =="
 uv run --with pytest python -m pytest tests/ -q 2>&1 | tail -1

@@ -28,21 +28,28 @@ project needing subtitles. Everything else in the pipeline works fine on the sli
 
 ---
 
-## Deepgram drops a leading filler word
+## Each ASR provider has a different characteristic flaw
 
-**Symptom:** input speech "Um, so ninety percent…" transcribed as "So ninety percent…" — the
-`Um,` vanished, and the `So` token absorbed its span (0.00–0.72s, unusually long).
-A mid-sentence `uh,` in the same clip **was** preserved.
+Measured 2026-09-03 on one clip of macOS `say` TTS. Ground truth:
+*"Um, so ninety percent of what a web agent does is, uh, completely wasted. We fixed this."*
 
-**Confirmed:** live `nova-3` call with `filler_words=true`, 2026-09-03.
+| Provider | Output | Flaw |
+|---|---|---|
+| Deepgram nova-3 | `So ninety percent … is, uh, completely wasted.` | **dropped the leading `Um,`** (absorbed into a 0.72s `So` token) |
+| whisper `small.en` | `Um, so 90% … is, ah, completely wasted,` | keeps `Um,`; **normalizes** `ninety percent`→`90%`; `uh`→`ah` |
+| whisper `base.en` | `Um, so 90% … completely w usted.` | as above **plus a real word error** ("w usted") |
 
-**Caveat — not yet proven against real footage.** The test audio was macOS `say` TTS, which
-articulates "Um," poorly. A human "um" may well survive. Re-check on the first real clip
-before drawing conclusions.
+**Takeaways.**
+- Deepgram is the production default: best mid-sentence verbatim fidelity, and it diarizes.
+- Its dropped leading filler matters — cutting fillers is a headline feature, and a filler the
+  ASR never reports is invisible to the cut logic and survives into the video. When leading
+  fillers matter, cross-check with whisper (it's free) or look at the waveform in `timeline_view`.
+- Never use `base.en`; `small.en` is the floor for local work.
+- whisper's number normalization is in tension with Hard Rule 8 — don't burn captions from a
+  whisper transcript without reading them first.
 
-**Why it matters:** cutting fillers is a headline feature. If leading fillers are dropped by the
-ASR, they're invisible to the cut logic — they stay in the video. Scribe tags them reliably, so
-prefer `transcribe.py` for filler-heavy material if both keys are present.
+**Caveat:** one clip, synthetic TTS speech. `say`'s "Um," is a poor proxy for a human one.
+Re-measure on the first real footage before treating any of this as settled.
 
 ---
 
@@ -84,6 +91,20 @@ uv run --with pytest python -m pytest tests/
 `render.py` resolves a single output rate for every segment because the lossless `-c copy`
 concat (Hard Rule 2) breaks if segments differ. If an EDL mixes a 30fps and a 60fps source,
 the default (first source's rate) is applied to all — pass `--fps` explicitly when mixing.
+
+---
+
+## Piping a command to `tail` masks its exit code
+
+Bit me during setup: `uv sync --extra animations 2>&1 | tail -25` reported **exit 0** while the
+install had actually failed (`pycairo` couldn't find cairo). The 0 came from `tail`, not `uv`.
+
+Use `set -o pipefail`, or redirect and check separately:
+```bash
+uv sync --extra animations > /tmp/log 2>&1; echo "EXIT=$?"; tail -6 /tmp/log
+```
+Relevant well beyond this repo, but especially here — several helpers shell out to ffmpeg, and a
+masked non-zero status looks exactly like success.
 
 ---
 
