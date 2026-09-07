@@ -5,6 +5,30 @@ re-derive it or mistake a deliberate change for a bug.
 
 ---
 
+## 2026-09-07 (later) — Quality controls; user reported the output looked compressed
+
+They were right, and the cause was structural rather than just "it's a preview": render.py
+encodes the video twice and upstream hardcoded both CRFs plus a 1080p downscale, so a 4K source
+had no path to a high-quality delivery. Full write-up in gotchas.md.
+
+Added `--height` and `--crf`, moved the final default to CRF 16 / `slow`, and derived the
+composite CRF as `gen1 - 2`. Re-rendered the same EDL at 2160p CRF 16: 0.451 bits/px versus
+0.255 before, and a face-detail crop comparison shows clearly more beard/eyebrow detail.
+960 MB for 85s though — CRF 18–20 at 2160p is the sensible default; CRF 16 is a master.
+
+Also replaced the per-segment raw `filter` push-in with a numeric `zoom`, because the hardcoded
+crop values were 1080p-only and would silently break at any other height. Relative ffmpeg
+expressions can't fix it (rounding stops the crop round-tripping to exact dimensions, which
+breaks the concat), so `probe_scaled_dims()` now mirrors the scale expression and the crop is
+computed from that.
+
+**Measured for planning a 12-clip batch:** ~0.74 KB of packed transcript per minute of footage,
+so ~55 min of source is ~41 KB ≈ 10.5K tokens — an hour of footage fits in context comfortably.
+Transcription is ~70s for that hour; **rendering is the bottleneck**, at ~15 min for one 85s 4K
+output. Iterate on 720p drafts, render 4K once.
+
+---
+
 ## 2026-09-07 — First real edit: "Weekend Rides" ep.1
 
 First actual footage. `IMG_3156.MOV`, 3:00 iPhone 4K of the user driving and introducing a

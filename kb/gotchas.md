@@ -121,6 +121,52 @@ Homebrew's ffmpeg. Untested here.
 
 ---
 
+## render.py encodes the video TWICE, and upstream exposes no quality control
+
+The pipeline is **two generations of H.264**:
+
+| Step | Action |
+|---|---|
+| extract per segment | **encode** (CRF 22 preview / was 20 final) |
+| concat | `-c copy` — lossless |
+| burn subtitles / overlays | **re-encode** (was hardcoded CRF 18) |
+| loudnorm | `-c:v copy` — lossless |
+
+The *extract* CRF is the quality ceiling; the composite encode can only add loss on top. Upstream
+hardcoded both and defaulted to a `scale=1920:-2` downscale, so a 4K source lost 3/4 of its
+pixels with no way to opt out. A user noticing "this looks compressed" is this, not the preview
+mode alone.
+
+Diagnostic that isolates it: compare **bits per pixel**, not bitrate. A 4K source at 50 Mbps and
+a 1080p output at 12.7 Mbps are both ≈0.25 bits/px — identical per-pixel quality, so the loss was
+pixels and generations, not bitrate starvation.
+
+Local fix (branch `local`): `--height` and `--crf` flags; final defaults to CRF 16 / `slow`; the
+composite CRF is derived as `gen1 - 2` so the second generation adds minimal further loss.
+Rendering the same edit at `--height 2160 --crf 16` gave 0.451 bits/px — 1.8× the source's own
+per-pixel budget, with no downscale generation at all.
+
+Cost: **960 MB for 85s** (89.8 Mbps). CRF 18-20 at 2160p is the practical sweet spot; reserve
+CRF 16 for masters.
+
+---
+
+## Per-segment reframes must be a number, not a filter string
+
+A `crop=1812:1018,scale=1920:1080` written for 1080p silently becomes wrong at any other output
+height, and *any* per-segment dimension mismatch breaks the `-c copy` concat (Rule 2).
+
+Relative expressions do **not** rescue this: `scale=iw*1.06` then `crop=iw/1.06` fails to
+round-trip to the exact original size once each step is rounded to even dimensions — 1920 comes
+back as 1918, and segments without a filter stay 1920, so the concat fails.
+
+The working shape (branch `local`) is a numeric `ranges[].zoom` (plus optional `zoom_x` bias)
+that render.py resolves against the *actual* post-scale dimensions via `probe_scaled_dims()`,
+which mirrors the scale expression exactly. Verified: all 13 segments of a mixed
+1.00×/1.06×/1.12× edit came out at exactly 3840×2160.
+
+---
+
 ## `--draft` renders 720p, so EDL `filter` values written for 1080p break
 
 `extract_segment` scales to `1280:-2` in draft mode but `1920:-2` for preview **and** final. A

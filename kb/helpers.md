@@ -78,6 +78,10 @@ render.py <edl.json> -o <out> [--preview] [--draft] [--build-subtitles]
                               [--no-subtitles] [--no-loudnorm] [--fps 30]
 ```
 - `--draft` 720p ultrafast CRF28 (cut-point checking) · `--preview` 1080p CRF22 (QC-able)
+- **`--height`** output height (2160/1440/1080…); default 1080, 720 with `--draft`
+- **`--crf`** x264 CRF for the *extract*, i.e. the quality ceiling. Default 16 final / 22 preview
+  / 28 draft. The composite encode is derived as `crf - 2`. See gotchas.md on the two-generation
+  encode — this flag is the one that actually controls output quality.
 - `--build-subtitles` generates `master.srt` from transcripts + EDL offsets inline
 - `--fps` forces the output rate; default preserves the first source's rate
 
@@ -115,10 +119,14 @@ These three fields are local extensions (not upstream). All optional and backwar
 
 - **`audio_filter`** — applied per segment *before* the 30ms fades, so the fades stay on the
   true edges (Rule 3). For denoise/EQ.
-- **`ranges[].filter`** — per-segment video filter, applied *after* the grade. Built for
-  push-in/reframe to disguise jump cuts on a static camera. **Output dimensions must be
-  identical across every segment** or the `-c copy` concat (Rule 2) fails — so a `crop` must
-  always be followed by a `scale` back to the common size.
+- **`ranges[].zoom`** (number ≥ 1.0, plus optional **`zoom_x`** 0–1 horizontal bias, default
+  0.45) — per-segment push-in to disguise jump cuts on a static camera. Resolution-independent:
+  render.py resolves it against the real post-scale dimensions, so the same EDL is correct at
+  720p and 2160p. **Prefer this over a raw `filter`.**
+- **`ranges[].filter`** — raw per-segment video filter, applied *after* the grade and after any
+  zoom. Escape hatch. **Output dimensions must be identical across every segment** or the
+  `-c copy` concat (Rule 2) fails — so a `crop` must always be followed by a `scale` back to the
+  common size, which also makes it resolution-specific.
 - **`subtitle_style`** — `words_per_chunk` (default 2), `case` (`"upper"` default, or
   `"sentence"`), and `force_style` (ASS override string). `"sentence"` keeps the ASR's own
   capitalization but capitalizes any cue that opens the file or follows sentence-final

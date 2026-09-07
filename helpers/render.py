@@ -172,6 +172,43 @@ def is_portrait_source(video: Path) -> bool:
         return False
 
 
+def display_dims(video: Path) -> tuple[int, int]:
+    """Displayed (width, height) of a source, accounting for rotation side-data.
+
+    ffmpeg autorotates display-matrix side data before filters run, so these are
+    the dimensions the filter chain actually sees.
+    """
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=width,height:stream_side_data=rotation",
+         "-of", "json", str(video)],
+        capture_output=True, text=True, check=True,
+    )
+    stream = (json.loads(out.stdout).get("streams") or [{}])[0]
+    w, h = int(stream["width"]), int(stream["height"])
+    rotation = 0
+    for side_data in stream.get("side_data_list") or []:
+        if side_data.get("rotation") is not None:
+            rotation = side_data["rotation"]
+            break
+    if int(round(float(rotation))) % 360 in (90, 270):
+        w, h = h, w
+    return w, h
+
+
+def probe_scaled_dims(video: Path, target_h: int, portrait: bool) -> tuple[int, int]:
+    """The exact (w, h) a source lands at after this module's scale filter.
+
+    Must mirror the scale expression in `extract_segment` exactly — the numeric
+    `zoom` crop is computed against these, and every segment has to end at the
+    same size or the `-c copy` concat (Rule 2) fails.
+    """
+    w, h = display_dims(video)
+    out_h = round(target_h * 16 / 9 / 2) * 2 if portrait else target_h
+    out_w = round(w / h * out_h / 2) * 2
+    return out_w, out_h
+
+
 def parse_fps(value: str) -> str:
     """Validate and canonicalize an ffmpeg frame rate."""
     text = value.strip()
@@ -242,6 +279,10 @@ def extract_segment(
     rate: str | None = None,
     extra_vf: str = "",
     audio_prefilter: str = "",
+    height: int | None = None,
+    crf: str | None = None,
+    zoom: float = 1.0,
+    zoom_x: float = 0.45,
 ) -> None:
     """Extract a cut range as its own MP4 with grade + 30ms audio fades baked in.
 
@@ -256,10 +297,13 @@ def extract_segment(
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     portrait = is_portrait_source(source)
-    if draft:
-        scale = "scale=-2:1280" if portrait else "scale=1280:-2"
+    # Explicit --height wins; otherwise the mode default (720p draft, else 1080p).
+    target_h = height if height is not None else (720 if draft else 1080)
+    if portrait:
+        # For portrait the long edge is the height; keep the same pixel count.
+        scale = f"scale=-2:{round(target_h * 16 / 9 / 2) * 2}"
     else:
-        scale = "scale=-2:1920" if portrait else "scale=1920:-2"
+        scale = f"scale=-2:{target_h}"
 
     vf_parts: list[str] = []
     if is_hdr_source(source):
@@ -267,7 +311,20 @@ def extract_segment(
     vf_parts.append(scale)
     if grade_filter:
         vf_parts.append(grade_filter)
-    # Per-segment reframe (e.g. push-in to disguise a jump cut) goes after the grade.
+    # Per-segment reframe (push-in to disguise a jump cut on a static camera).
+    # Expressed as a plain number so it stays correct at any output resolution:
+    # crop to 1/zoom of the frame, then scale back to the exact frame size. The
+    # scale-back is mandatory — every segment must share dimensions or the
+    # `-c copy` concat (Rule 2) fails.
+    if zoom and abs(zoom - 1.0) > 1e-6:
+        if zoom < 1.0:
+            raise ValueError(f"zoom must be >= 1.0 (got {zoom}); it crops in, never out")
+        out_w, out_h = probe_scaled_dims(source, target_h, portrait)
+        cw = max(2, (int(out_w / zoom) // 2) * 2)
+        ch = max(2, (int(out_h / zoom) // 2) * 2)
+        cx = int((out_w - cw) * min(max(zoom_x, 0.0), 1.0))
+        cy = (out_h - ch) // 2
+        vf_parts.append(f"crop={cw}:{ch}:{cx}:{cy},scale={out_w}:{out_h}")
     if extra_vf:
         vf_parts.append(extra_vf)
     vf = ",".join(vf_parts)
@@ -280,11 +337,12 @@ def extract_segment(
         af = f"{audio_prefilter},{af}"
 
     if draft:
-        preset, crf = "ultrafast", "28"
+        preset, default_crf = "ultrafast", "28"
     elif preview:
-        preset, crf = "medium", "22"
+        preset, default_crf = "medium", "22"
     else:
-        preset, crf = "fast", "20"
+        preset, default_crf = "slow", "16"
+    crf = crf if crf is not None else default_crf
 
     # Frame rate: use the rate the caller resolved once for the whole render
     # (every segment must share it — concat -c copy in Rule 2 requires a uniform
@@ -314,6 +372,8 @@ def extract_all_segments(
     preview: bool,
     draft: bool = False,
     fps: str | None = None,
+    height: int | None = None,
+    crf: str | None = None,
 ) -> list[Path]:
     """Extract every EDL range into edit_dir/clips_graded/seg_NN.mp4.
     Returns the ordered list of segment paths.
@@ -371,11 +431,16 @@ def extract_all_segments(
         if is_auto:
             print(f"        grade: {seg_filter or '(none)'}")
         seg_vf = r.get("filter") or ""
+        seg_zoom = float(r.get("zoom") or 1.0)
+        seg_zoom_x = float(r.get("zoom_x", 0.45))
+        if seg_zoom != 1.0:
+            print(f"        zoom:  {seg_zoom:.3f}x  (x-bias {seg_zoom_x})")
         if seg_vf:
             print(f"        vf:    {seg_vf}")
         extract_segment(src_path, start, duration, seg_filter, out_path,
                         preview=preview, draft=draft, rate=out_rate,
-                        extra_vf=seg_vf, audio_prefilter=audio_prefilter)
+                        extra_vf=seg_vf, audio_prefilter=audio_prefilter,
+                        height=height, crf=crf, zoom=seg_zoom, zoom_x=seg_zoom_x)
         seg_paths.append(out_path)
 
     return seg_paths
@@ -640,6 +705,8 @@ def build_final_composite(
     out_path: Path,
     edit_dir: Path,
     force_style: str = SUB_FORCE_STYLE,
+    crf: str = "18",
+    preset: str = "fast",
 ) -> None:
     """Final pass: base → overlays (PTS-shifted) → subtitles LAST → out.
 
@@ -699,7 +766,7 @@ def build_final_composite(
         "-filter_complex", filter_complex,
         "-map", out_label,
         "-map", "0:a",
-        "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+        "-c:v", "libx264", "-preset", preset, "-crf", crf,
         "-pix_fmt", "yuv420p",
         "-c:a", "copy",
         "-movflags", "+faststart",
@@ -743,6 +810,23 @@ def main() -> None:
         help="Skip audio loudness normalization. Default is on (-14 LUFS, -1 dBTP, LRA 11).",
     )
     ap.add_argument(
+        "--height",
+        type=int,
+        default=None,
+        help="Output height in pixels (e.g. 2160, 1440, 1080). Default 1080 "
+             "(720 with --draft). Width follows the source aspect. Delivering at "
+             "the source height skips the downscale entirely.",
+    )
+    ap.add_argument(
+        "--crf",
+        type=str,
+        default=None,
+        help="x264 CRF for the per-segment extract - the FIRST of two video "
+             "encodes, so it is the quality ceiling. Lower is better. Default 16 "
+             "for final, 22 for --preview, 28 for --draft. The composite encode "
+             "is set 2 below this automatically.",
+    )
+    ap.add_argument(
         "--fps",
         type=parse_fps,
         default=None,
@@ -762,8 +846,16 @@ def main() -> None:
 
     # 1. Extract per-segment (auto-grade per range if EDL grade is "auto")
     segment_paths = extract_all_segments(
-        edl, edit_dir, preview=args.preview, draft=args.draft, fps=args.fps
+        edl, edit_dir, preview=args.preview, draft=args.draft, fps=args.fps,
+        height=args.height, crf=args.crf,
     )
+    # The composite is a SECOND generation on top of the extract. Keep its CRF
+    # below the extract's so it adds as little further loss as possible.
+    gen1_crf = int(args.crf) if args.crf is not None else (
+        28 if args.draft else 22 if args.preview else 16
+    )
+    gen2_crf = str(max(10, gen1_crf - 2))
+    gen2_preset = "ultrafast" if args.draft else ("fast" if args.preview else "slow")
 
     # 2. Concat → base
     if args.draft:
@@ -793,12 +885,12 @@ def main() -> None:
     if args.no_loudnorm:
         # Composite directly to final output
         build_final_composite(base_path, overlays, subs_path, out_path, edit_dir,
-                              force_style=sub_force_style)
+                              force_style=sub_force_style, crf=gen2_crf, preset=gen2_preset)
     else:
         # Composite to a temp file, then run loudnorm → final output
         tmp_composite = out_path.with_suffix(".prenorm.mp4")
         build_final_composite(base_path, overlays, subs_path, tmp_composite, edit_dir,
-                              force_style=sub_force_style)
+                              force_style=sub_force_style, crf=gen2_crf, preset=gen2_preset)
         print("loudness normalization → social-ready (-14 LUFS / -1 dBTP / LRA 11)")
         apply_loudnorm_two_pass(tmp_composite, out_path, preview=args.draft)
         tmp_composite.unlink(missing_ok=True)
