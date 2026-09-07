@@ -240,6 +240,8 @@ def extract_segment(
     preview: bool = False,
     draft: bool = False,
     rate: str | None = None,
+    extra_vf: str = "",
+    audio_prefilter: str = "",
 ) -> None:
     """Extract a cut range as its own MP4 with grade + 30ms audio fades baked in.
 
@@ -265,11 +267,17 @@ def extract_segment(
     vf_parts.append(scale)
     if grade_filter:
         vf_parts.append(grade_filter)
+    # Per-segment reframe (e.g. push-in to disguise a jump cut) goes after the grade.
+    if extra_vf:
+        vf_parts.append(extra_vf)
     vf = ",".join(vf_parts)
 
     # 30ms audio fades at both edges (Rule 3) — prevent pops
     fade_out_start = max(0.0, duration - 0.03)
     af = f"afade=t=in:st=0:d=0.03,afade=t=out:st={fade_out_start:.3f}:d=0.03"
+    # Denoise/EQ runs BEFORE the fades so the 30ms fades stay on the true edges (Rule 3).
+    if audio_prefilter:
+        af = f"{audio_prefilter},{af}"
 
     if draft:
         preset, crf = "ultrafast", "28"
@@ -316,6 +324,9 @@ def extract_all_segments(
     """
     resolved = resolve_grade_filter(edl.get("grade"))
     is_auto = resolved == "__AUTO__"
+    audio_prefilter = edl.get("audio_filter") or ""
+    if audio_prefilter:
+        print(f"audio prefilter (pre-fade): {audio_prefilter}")
     clips_dir = edit_dir / (
         "clips_draft" if draft else ("clips_preview" if preview else "clips_graded")
     )
@@ -359,7 +370,12 @@ def extract_all_segments(
         print(f"  [{i:02d}] {src_name}  {start:7.2f}-{end:7.2f}  ({duration:5.2f}s)  {note}")
         if is_auto:
             print(f"        grade: {seg_filter or '(none)'}")
-        extract_segment(src_path, start, duration, seg_filter, out_path, preview=preview, draft=draft, rate=out_rate)
+        seg_vf = r.get("filter") or ""
+        if seg_vf:
+            print(f"        vf:    {seg_vf}")
+        extract_segment(src_path, start, duration, seg_filter, out_path,
+                        preview=preview, draft=draft, rate=out_rate,
+                        extra_vf=seg_vf, audio_prefilter=audio_prefilter)
         seg_paths.append(out_path)
 
     return seg_paths
@@ -426,6 +442,10 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
     transcripts_dir = edit_dir / "transcripts"
     sources = edl["sources"]
 
+    style = edl.get("subtitle_style") or {}
+    words_per_chunk = max(1, int(style.get("words_per_chunk", 2)))
+    case_mode = str(style.get("case", "upper")).lower()
+
     entries: list[tuple[float, float, str]] = []
     seg_offset = 0.0
 
@@ -454,7 +474,7 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
             current.append(w)
             # Break if the current text ends in punctuation or we hit 2 words
             ends_in_punct = bool(text) and text[-1] in PUNCT_BREAK
-            if len(current) >= 2 or ends_in_punct:
+            if len(current) >= words_per_chunk or ends_in_punct:
                 chunks.append(current)
                 current = []
         if current:
@@ -471,13 +491,29 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
             text = re.sub(r"\s+", " ", text).strip()
             # Strip trailing punctuation for cleaner uppercase look
             text = text.rstrip(",;:")
-            text = text.upper()
+            if case_mode == "upper":
+                text = text.upper()
             entries.append((out_start, out_end, text))
 
         seg_offset += seg_duration
 
     # Sort and write as SRT
     entries.sort(key=lambda e: e[0])
+
+    # Sentence case: the ASR capitalizes mid-sentence words lowercase, which is
+    # correct for a continuation line but wrong when a cut makes that word the
+    # start of a sentence. Capitalize a cue that opens the file or follows one
+    # ending in sentence-final punctuation.
+    if case_mode == "sentence":
+        fixed: list[tuple[float, float, str]] = []
+        prev_text = ""
+        for a, b, t in entries:
+            if t and (not prev_text or prev_text.rstrip()[-1:] in ".!?"):
+                t = t[0].upper() + t[1:]
+            fixed.append((a, b, t))
+            prev_text = t
+        entries = fixed
+
     lines: list[str] = []
     for i, (a, b, t) in enumerate(entries, start=1):
         lines.append(str(i))
@@ -603,6 +639,7 @@ def build_final_composite(
     subtitles_path: Path | None,
     out_path: Path,
     edit_dir: Path,
+    force_style: str = SUB_FORCE_STYLE,
 ) -> None:
     """Final pass: base → overlays (PTS-shifted) → subtitles LAST → out.
 
@@ -643,7 +680,7 @@ def build_final_composite(
     if has_subs:
         subs_abs = str(subtitles_path.resolve()).replace(":", r"\:").replace("'", r"\'")
         filter_parts.append(
-            f"{current}subtitles='{subs_abs}':force_style='{SUB_FORCE_STYLE}'[outv]"
+            f"{current}subtitles='{subs_abs}':force_style='{force_style}'[outv]"
         )
         out_label = "[outv]"
     else:
@@ -752,13 +789,16 @@ def main() -> None:
 
     # 4. Composite (overlays + subtitles LAST) → intermediate (pre-loudnorm) path
     overlays = edl.get("overlays") or []
+    sub_force_style = (edl.get("subtitle_style") or {}).get("force_style") or SUB_FORCE_STYLE
     if args.no_loudnorm:
         # Composite directly to final output
-        build_final_composite(base_path, overlays, subs_path, out_path, edit_dir)
+        build_final_composite(base_path, overlays, subs_path, out_path, edit_dir,
+                              force_style=sub_force_style)
     else:
         # Composite to a temp file, then run loudnorm → final output
         tmp_composite = out_path.with_suffix(".prenorm.mp4")
-        build_final_composite(base_path, overlays, subs_path, tmp_composite, edit_dir)
+        build_final_composite(base_path, overlays, subs_path, tmp_composite, edit_dir,
+                              force_style=sub_force_style)
         print("loudness normalization → social-ready (-14 LUFS / -1 dBTP / LRA 11)")
         apply_loudnorm_two_pass(tmp_composite, out_path, preview=args.draft)
         tmp_composite.unlink(missing_ok=True)

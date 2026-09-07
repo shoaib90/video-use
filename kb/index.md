@@ -50,6 +50,11 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
 - Paid transcription is cached per source. Never re-transcribe unnecessarily; iterate with whisper.
 - All three animation engines installed: Manim, HyperFrames, Remotion.
 - Piping to `tail` masks exit codes. Use `set -o pipefail`.
+- **On a first transcription, run the free whisper pass alongside the paid one.** It has caught
+  real errors (names, opening lines) that would otherwise be burned into captions.
+- **Self-eval audio numerically**, not by eye: compare the max sample-to-sample step at each cut
+  boundary against a continuous-speech reference. A pop shows as a step well above it.
+- Default shell is zsh — it does **not** word-split unquoted `$var`.
 
 ## Maintaining this KB
 

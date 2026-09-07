@@ -5,6 +5,42 @@ re-derive it or mistake a deliberate change for a bug.
 
 ---
 
+## 2026-09-07 — First real edit: "Weekend Rides" ep.1
+
+First actual footage. `IMG_3156.MOV`, 3:00 iPhone 4K of the user driving and introducing a
+weekend-drive vlog series. Cut to 85.5s. Full decision record lives with the footage at
+`~/Downloads/edit/project.md`; only the reusable lessons are here.
+
+**What the analysis found that mattered:** the source held *two* intro attempts — 0–75s at 28%
+speech density (a false start with four silences over 6s) and 75–180s at 78%. Recognising that
+split was the whole edit. Quantifying density per region, rather than reading the transcript
+top to bottom, is what surfaced it.
+
+**Provider cross-check earned its keep.** Deepgram misheard the user's name and the opening
+line; whisper got both right. Running the free local pass alongside the paid one is now the
+default move on any first transcription — it costs nothing and it caught two errors that would
+have been burned into captions. Where both engines agreed on something nonsensical
+("digital area" for "digital diary"), asking the user was the only correct move.
+
+**Extended `render.py`** with three optional EDL fields — `ranges[].filter`,
+`audio_filter`, and `subtitle_style` — needed for per-segment push-in, pre-fade denoise, and
+sentence-case captions. Documented in helpers.md. Also taught the SRT builder to capitalize a
+cue that opens the file or follows sentence-final punctuation, since a cut can promote a
+mid-sentence word to sentence start.
+
+**Self-eval was worth doing properly.** A numeric sample-step check across all 12 boundaries
+beat eyeballing waveform PNGs for pop detection, and is now the preferred method — see below.
+The visual pass still matters for captions, grade and framing.
+
+**A verification actually changed a decision.** The plan called for trimming a 1.69s hesitation
+in the opening line; `timeline_view` showed no clean silence inside the word span, so the cut
+would have risked clipping a word to save 0.75s. Kept it. That is the drill-down doing its job
+rather than rubber-stamping the plan.
+
+**New traps recorded in gotchas.md:** `--draft` at 720p breaks 1080p-sized EDL filters; iPhone
+MOVs carry a spatial audio track that ffmpeg's defaults prefer, HLG HDR, *and* rotation
+metadata; isolating a snippet makes ASR worse; zsh does not word-split unquoted expansions.
+
 ## 2026-09-03 (later) — Fully equipped: animation engines + local ASR
 
 User asked to install everything needed so no capability is missing mid-edit.

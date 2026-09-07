@@ -95,6 +95,33 @@ render.py <edl.json> -o <out> [--preview] [--draft] [--build-subtitles]
 ```
 - `sources` paths resolve relative to the **edit dir**.
 - `grade`: `"auto"` for per-segment analysis, a preset name, or a raw ffmpeg filter string.
+  Prefer a **fixed string over `"auto"`** for a static single-camera shot: auto analyses each
+  range independently, so in principle it can flicker between cuts.
 - `ranges[].beat` / `.note` are free-text labels echoed in render logs — use them, they make
   the output readable.
 - Transcript filenames must match the `sources` **keys** for captions to attach.
+
+### Local additions to the EDL schema
+
+These three fields are local extensions (not upstream). All optional and backward-compatible.
+
+```json
+{
+  "audio_filter": "highpass=f=100,afftdn=nr=24:nf=-25",
+  "subtitle_style": { "words_per_chunk": 6, "case": "sentence", "force_style": "FontName=..." },
+  "ranges": [ { "…": "…", "filter": "crop=1812:1018:24:31,scale=1920:1080" } ]
+}
+```
+
+- **`audio_filter`** — applied per segment *before* the 30ms fades, so the fades stay on the
+  true edges (Rule 3). For denoise/EQ.
+- **`ranges[].filter`** — per-segment video filter, applied *after* the grade. Built for
+  push-in/reframe to disguise jump cuts on a static camera. **Output dimensions must be
+  identical across every segment** or the `-c copy` concat (Rule 2) fails — so a `crop` must
+  always be followed by a `scale` back to the common size.
+- **`subtitle_style`** — `words_per_chunk` (default 2), `case` (`"upper"` default, or
+  `"sentence"`), and `force_style` (ASS override string). `"sentence"` keeps the ASR's own
+  capitalization but capitalizes any cue that opens the file or follows sentence-final
+  punctuation — needed because a cut can make a mid-sentence word start a sentence.
+- `force_style`'s `MarginV` is relative to `PlayResY=288`. The shipped default of 90 is tuned
+  for **vertical** video; for 16:9 landscape ~28 sits the caption about 10% up from the bottom.

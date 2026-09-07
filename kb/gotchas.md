@@ -94,6 +94,101 @@ the default (first source's rate) is applied to all — pass `--fps` explicitly 
 
 ---
 
+## `speechnorm` destroys speech/noise separation on noisy footage
+
+Measured on a car-interior vlog (road noise, 4.4 dB raw speech-to-noise separation):
+
+| Chain | noise floor | speech | separation |
+|---|---|---|---|
+| raw | −18.9 dB | −14.5 dB | **4.4 dB** |
+| `highpass=90,afftdn=nr=14` | −23.5 | −18.4 | 5.1 dB |
+| `highpass=100,afftdn=nr=24` | −24.3 | −18.9 | 5.4 dB |
+| `highpass=110,afftdn=nr=30,deesser` | −25.5 | −19.5 | **6.0 dB** |
+| `anlmdn` | −24.1 | −18.8 | 5.3 dB |
+| `afftdn + speechnorm=e=12.5` | −13.7 | −13.7 | **0.0 dB** ← |
+
+`speechnorm` (and aggressive `dynaudnorm`) lift quiet passages toward the target, which on noisy
+footage means **lifting the road noise to the same level as the voice**. Never use them to
+"fix" a noisy talking head. `loudnorm` is program-level and does not have this failure mode.
+
+Also: broadband noise that overlaps speech frequencies barely responds to spectral denoise —
+the best chain here bought only **+1.6 dB**. The real win on such footage is *cutting the dead
+air*, which deletes the passages where noise is exposed and unmasked. During speech the voice
+masks it.
+
+`arnndn` (RNN denoise) would likely do better but needs a `.rnnn` model file; none ships with
+Homebrew's ffmpeg. Untested here.
+
+---
+
+## `--draft` renders 720p, so EDL `filter` values written for 1080p break
+
+`extract_segment` scales to `1280:-2` in draft mode but `1920:-2` for preview **and** final. A
+per-segment `crop=1812:1018,...` sized for 1080p therefore fails on a 720p draft (crop larger
+than input).
+
+Preview and final share the same 1920×1080 geometry, so pixel-exact crops are safe there. To
+cut-check cheaply with a draft, strip the filters first:
+
+```python
+for r in edl["ranges"]: r["filter"] = ""
+```
+
+Resolution-independent expressions are not a clean fix: `scale=iw*Z` then `crop=iw/Z` fails to
+round-trip to the exact original dimensions, and any per-segment dimension mismatch breaks the
+`-c copy` concat.
+
+---
+
+## iPhone `.MOV` files carry three traps at once
+
+Verified on a 2026 iPhone 4K clip:
+
+1. **Two audio tracks** — AAC stereo *and* a 4-channel `apple_apac` spatial track. ffmpeg's
+   default audio selection picks the stream with the **most channels**, i.e. the spatial one.
+   The `transcribe_*.py` helpers map `0:a:0` explicitly, so they get the stereo track; anything
+   you write by hand must do the same or `--audio-track`.
+2. **HLG HDR, 10-bit** (`color_transfer=arib-std-b67`, `bt2020`, `yuv420p10le`). `render.py`
+   detects this via `is_hdr_source` and applies `TONEMAP_CHAIN`. Skip the tonemap and you get a
+   washed-out grey image.
+3. **Rotation metadata** — `rotation=-90` with stored dimensions 2160×3840, which *displays* as
+   3840×2160 landscape. Never infer orientation from `width`/`height` alone; `is_portrait_source`
+   accounts for the rotation side-data.
+
+Plus a fistful of `codec_type=data` streams that are safe to ignore.
+
+---
+
+## Isolating a snippet makes ASR *worse*, not better
+
+Tempting move when a phrase is garbled: cut out those 6 seconds and re-transcribe just them.
+Measured result — the isolated pass was markedly worse than the full-file pass:
+
+| | full file | 6s snippet alone |
+|---|---|---|
+| name | "Sh oa ib" (correct) | "Virak" |
+| phrase | "The palace is decided, it's just that I take my car" | "For the palace I could decide it knew that I take my card" |
+
+Language models use surrounding context. To disambiguate a phrase, run a **different** engine
+over the **whole** file instead, and if two engines agree on something that makes no sense, ask
+the user rather than guessing — a burned-in caption is not the place for a guess.
+
+---
+
+## zsh does not word-split unquoted parameter expansions
+
+The default shell here is zsh. This bash idiom silently misbehaves:
+
+```bash
+for w in "10 8 label"; do set -- $w; echo "$3"; done   # $3 is EMPTY in zsh
+```
+
+zsh keeps `$w` as one word, so `$1` becomes the whole string. Use an explicit function with
+positional args, a proper array, or `${=w}` to force splitting. Bit me twice in one session,
+both times producing empty output that looked like a tool failure rather than a shell bug.
+
+---
+
 ## Piping a command to `tail` masks its exit code
 
 Bit me during setup: `uv sync --extra animations 2>&1 | tail -25` reported **exit 0** while the
