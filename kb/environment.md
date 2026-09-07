@@ -40,6 +40,39 @@ Revert with `brew unlink ffmpeg-full && brew link ffmpeg`. Do not "fix" the unli
 A `brew upgrade` may relink the slim `ffmpeg` and silently break subtitle burn-in. If
 captions start failing, re-check `ffmpeg -filters | grep subtitles` first.
 
+## Git / upstream
+
+| Remote | URL |
+|---|---|
+| `origin` | `browser-use/video-use` (upstream, read-only in practice) |
+| `fork` | `git@github.com:shoaib90/video-use.git` |
+
+Branches:
+
+- **`local`** — the working branch. Carries everything, including `kb/` and `CLAUDE.md`.
+  Backed up to `fork/local`. **This is the branch to work on.**
+- **`main`** — tracks upstream, kept clean so `git pull --ff-only` works. Rebase `local` onto it after pulling.
+- **`pr/*`** — one focused branch per upstream PR, each built from clean `main` so no local-only
+  file can leak. Verified with `git diff --name-only main..<branch> | grep -E '^(kb/|CLAUDE.md|uv.lock)'`.
+
+Open upstream PRs (2026-09-07):
+
+| PR | Branch | Contents |
+|---|---|---|
+| [#158](https://github.com/browser-use/video-use/pull/158) | `pr/output-quality` | `--height`, `--crf`, derived gen-2 CRF, numeric `zoom`, `audio_filter` |
+| [#159](https://github.com/browser-use/video-use/pull/159) | `pr/configurable-subtitles` | `subtitle_style` (chunking/case/force_style) + sentence-case fix |
+| [#160](https://github.com/browser-use/video-use/pull/160) | `pr/deepgram-transcriber` | `transcribe_deepgram.py` |
+
+**Held back deliberately:** `transcribe_whisper.py`. `SKILL.md`'s anti-patterns list names
+"running Whisper locally" explicitly, so upstream is unlikely to want it. Ours runs on Metal in
+~4s and serves as a free cross-check rather than the primary, which is a different proposition —
+but it stays local unless upstream asks.
+
+**Never upstream:** `kb/`, `CLAUDE.md`. Machine-specific.
+
+#158 and #159 both touch `build_final_composite`'s signature and `main()`, so whichever merges
+second needs a trivial rebase.
+
 ## Credentials
 
 | Key | Status | Used by |

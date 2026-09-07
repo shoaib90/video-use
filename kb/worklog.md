@@ -5,6 +5,29 @@ re-derive it or mistake a deliberate change for a bug.
 
 ---
 
+## 2026-09-07 — Forked and opened three upstream PRs
+
+User authorised pushing to GitHub. Forked to `shoaib90/video-use`, pushed `local` as a backup
+(it existed only on this disk until now), and opened PRs #158/#159/#160. Details in
+[environment.md](environment.md).
+
+**Method worth reusing.** Each PR branch was built from clean `main` and the changes *replayed*
+onto it, rather than cherry-picked out of `local`'s bundled commits. `local`'s commits mix
+render.py changes with `kb/` updates, and `build_final_composite`/`main()` are touched by two
+different concerns, so hunk-level splitting would have produced fragile branches. Replaying from
+main gave three self-contained branches, each verified independently: tests pass, `--help`
+parses, and `git diff --name-only main..<branch>` shows no `kb/`, `CLAUDE.md` or `uv.lock`.
+
+**Backward compatibility was proved, not asserted.** For the subtitle PR, the generated SRT is
+byte-identical to main's implementation on the same transcript and EDL when no `subtitle_style`
+is present — checked by running both versions and `diff`ing. That claim is now in the PR body,
+which is much stronger than "should be compatible".
+
+Gotcha: switching off a `pr/*` branch failed because `uv.lock` is tracked on `local` but
+untracked elsewhere. `rm uv.lock` before checkout.
+
+---
+
 ## 2026-09-07 (later) — Quality controls; user reported the output looked compressed
 
 They were right, and the cause was structural rather than just "it's a preview": render.py
