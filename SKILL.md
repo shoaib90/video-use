@@ -59,7 +59,9 @@ The skill lives in `video-use/`. User footage lives wherever they put it. All se
 
 First-time install lives in `install.md` (clone, deps, ffmpeg, skill registration, API key). Don't re-run it every session; on cold start just verify:
 
-- `ELEVENLABS_API_KEY` resolves — either in the environment or in `.env` at the video-use repo root. If missing, ask the user to paste one and write it to `.env` (never to the user's `<videos_dir>`).
+- A transcription key resolves — either in the environment or in `.env` at the video-use repo root. If missing, ask the user to paste one and write it to `.env` (never to the user's `<videos_dir>`). Either provider works:
+    - `ELEVENLABS_API_KEY` → `transcribe.py` (Scribe). Tags audio events: `(laughter)`, `(applause)`, `(sigh)`.
+    - `DEEPGRAM_API_KEY` → `transcribe_deepgram.py` (nova-3). Same on-disk schema, so everything downstream is identical, and it diarizes. But it returns **no audio-event tokens**, so the `(laughs)`/`(applause)` beat signals in *Cut craft* are unavailable — lean on silence gaps and `timeline_view` instead. Prefer Scribe for reaction-heavy or multi-speaker material where audio events carry the beats.
 - `ffmpeg` + `ffprobe` on PATH.
 - Python deps installed (`uv sync` or `pip install -e .` inside the repo).
 - Node.js + npm available if the session needs HyperFrames or Remotion slots. HyperFrames currently requires Node.js 22+.
@@ -72,6 +74,7 @@ Helpers (`helpers/transcribe.py`, `helpers/render.py`, etc.) live alongside this
 ## Helpers
 
 - **`transcribe.py <video>`** — single-file Scribe call. `--num-speakers N` optional. Cached.
+- **`transcribe_deepgram.py <video>`** — Deepgram nova-3 alternative to the above, for anyone who already has a Deepgram key. Emits the identical `{words:[{type,text,start,end,speaker_id}]}` schema, so `pack_transcripts.py` and `render.py --build-subtitles` consume it unchanged. `--convert <response.json>` maps an existing response offline with no API call. Cached identically. **No audio-event tags** — see Setup.
 - **`transcribe_batch.py <videos_dir>`** — 4-worker parallel transcription. Use for multi-take.
 - **`pack_transcripts.py --edit-dir <dir>`** — `transcripts/*.json` → `takes_packed.md` (phrase-level, break on silence ≥ 0.5s).
 - **`timeline_view.py <video> <start> <end>`** — filmstrip + waveform PNG. On-demand visual drill-down. **Not a scan tool** — use it at decision points, not constantly.
