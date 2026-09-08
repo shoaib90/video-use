@@ -427,6 +427,13 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
 
     - `words_per_chunk` (default 2) - words per caption line, still breaking
       early on any punctuation in between.
+    - `break_on` (default ".,!?;:") - which punctuation forces an early break.
+      Narrow it to ".!?" so a mid-sentence comma stops splitting a phrase.
+    - `balance` (default False) - split each run between breaks into equal-length
+      cues instead of greedily filling to the cap, so a sentence's remainder is
+      not stranded alone on the last line.
+    - `min_words` (default 1) - fold a cue shorter than this into the one before
+      it.
     - `case` (default "upper") - "upper" shouts every line, which suits a
       fast-cut social edit. "sentence" leaves the ASR's own capitalization
       alone, which is what a narrative or documentary read wants.
@@ -446,6 +453,21 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
     if words_per_chunk < 1:
         raise ValueError(
             f"subtitle_style.words_per_chunk must be >= 1, got {words_per_chunk}"
+        )
+
+    break_on = set(str(style.get("break_on", "".join(sorted(PUNCT_BREAK)))))
+    balance = bool(style.get("balance", False))
+
+    raw_min = style.get("min_words", 1)
+    try:
+        min_words = int(raw_min)
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"subtitle_style.min_words must be an integer, got {raw_min!r}"
+        ) from None
+    if min_words < 1:
+        raise ValueError(
+            f"subtitle_style.min_words must be >= 1, got {min_words}"
         )
 
     # Validate before generating anything. An unrecognized value used to fall
@@ -478,21 +500,46 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
         transcript = json.loads(tr_path.read_text())
         words_in_seg = _words_in_range(transcript, seg_start, seg_end)
 
-        # Group into N-word chunks, break on punctuation
-        chunks: list[list[dict]] = []
+        # Split into runs at punctuation first, then divide each run into cues.
+        runs: list[list[dict]] = []
         current: list[dict] = []
         for w in words_in_seg:
             text = (w.get("text") or "").strip()
             if not text:
                 continue
             current.append(w)
-            # Break if the current text ends in punctuation or we hit 2 words
-            ends_in_punct = bool(text) and text[-1] in PUNCT_BREAK
-            if len(current) >= words_per_chunk or ends_in_punct:
-                chunks.append(current)
+            if text[-1] in break_on:
+                runs.append(current)
                 current = []
         if current:
-            chunks.append(current)
+            runs.append(current)
+
+        chunks: list[list[dict]] = []
+        for run in runs:
+            if balance:
+                # Greedy filling packs each cue to the cap and strands the run's
+                # remainder on the last line ("...becoming right" / "now."). Use
+                # the same number of cues, sized evenly.
+                k = max(1, -(-len(run) // words_per_chunk))
+                base, extra = divmod(len(run), k)
+                i = 0
+                for j in range(k):
+                    n = base + (1 if j < extra else 0)
+                    chunks.append(run[i:i + n])
+                    i += n
+            else:
+                for i in range(0, len(run), words_per_chunk):
+                    chunks.append(run[i:i + words_per_chunk])
+
+        # A run shorter than min_words still yields a stranded cue.
+        if min_words > 1:
+            merged: list[list[dict]] = []
+            for chunk in chunks:
+                if merged and len(chunk) < min_words:
+                    merged[-1].extend(chunk)
+                else:
+                    merged.append(chunk)
+            chunks = merged
 
         for chunk in chunks:
             local_start = max(seg_start, chunk[0].get("start", seg_start))
