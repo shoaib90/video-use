@@ -482,6 +482,31 @@ It is not. **Always brace a variable that is followed by `:` in a filter string.
 
 ---
 
+## A post-pass that runs after a capped loop can be a silent no-op
+
+`subtitle_style.balance` was meant to split each punctuation-delimited run into
+equal-length cues. It was written as a pass over the chunk list produced by the
+greedy loop — but that loop had already capped every chunk at `words_per_chunk`,
+so `ceil(len(chunk)/words_per_chunk)` was always 1 and the pass did nothing.
+
+It looked like it worked: cue count dropped 138 → 84, the one- and two-word
+orphans disappeared, the frames read well. All of that came from the two *other*
+options changed in the same edit (`break_on` and `min_words`). The no-op was
+invisible because it was only ever measured in combination.
+
+Two general lessons:
+
+- **Measure a new option on its own**, not bundled with others, or you will
+  attribute another option's effect to it. Isolating the three here took one
+  extra minute and was the only thing that revealed it.
+- A transformation placed *after* a step that already normalises its input often
+  has nothing left to do. Check where in the pipeline the pass actually sits.
+
+Caught by a unit test asserting exact cue lengths (`[7, 7]` vs `[8, 6]`). A
+cue-count assertion would have passed — both shapes have two cues.
+
+---
+
 ## Never write inside this repo
 
 Hard Rule 12: all session output goes to `<videos_dir>/edit/`. The scratch/test artifacts from
