@@ -87,6 +87,16 @@ def resolve_grade_filter(grade_field: str | None) -> str:
     return grade_field
 
 
+def probe_duration(path: Path) -> float:
+    """Container duration of a rendered file, in seconds."""
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
+        capture_output=True, text=True, check=True,
+    )
+    return float(out.stdout.strip())
+
+
 def resolve_path(maybe_path: str, base: Path) -> Path:
     """Resolve a path that may be absolute or relative to `base`."""
     p = Path(maybe_path)
@@ -579,13 +589,21 @@ def _words_in_range(transcript: dict, t_start: float, t_end: float) -> list[dict
     return out
 
 
-def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
+def build_master_srt(edl: dict, edit_dir: Path, out_path: Path,
+                     segment_paths: list[Path] | None = None) -> None:
     """Build an output-timeline SRT from per-source transcripts.
 
     Chunking and case come from the optional `subtitle_style` block on the EDL:
 
     - `words_per_chunk` (default 2) - words per caption line, still breaking
       early on any punctuation in between.
+    - `break_on` (default ".,!?;:") - which punctuation forces an early break.
+      Narrow it to ".!?" so mid-sentence commas stop splitting a phrase.
+    - `balance` (default False) - split each run between breaks into equal-length
+      cues instead of greedily filling to the cap, so a sentence's remainder is
+      not stranded alone on the last line.
+    - `min_words` (default 1) - fold any cue shorter than this back into the one
+      before it.
     - `case` (default "upper") - "upper" shouts every line, which suits a
       fast-cut social edit. "sentence" leaves the ASR's own capitalization
       alone, which is what a narrative or documentary read wants.
@@ -607,6 +625,21 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
             f"subtitle_style.words_per_chunk must be >= 1, got {words_per_chunk}"
         )
 
+    break_on = set(str(style.get("break_on", "".join(sorted(PUNCT_BREAK)))))
+    balance = bool(style.get("balance", False))
+
+    raw_min = style.get("min_words", 1)
+    try:
+        min_words = int(raw_min)
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"subtitle_style.min_words must be an integer, got {raw_min!r}"
+        ) from None
+    if min_words < 1:
+        raise ValueError(
+            f"subtitle_style.min_words must be >= 1, got {min_words}"
+        )
+
     # Validate before generating anything. An unrecognized value used to fall
     # through applying neither transformation, which silently emitted the raw
     # ASR capitalization -- not the documented "upper" default, and not an error.
@@ -619,14 +652,34 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
     transcripts_dir = edit_dir / "transcripts"
     sources = edl["sources"]
 
+    # Rule 5's offset must be where the segment actually STARTS in the concat, and
+    # an extract is quantised to whole frames, so `end - start` is not it. Summing
+    # the EDL's floats drifts a fraction of a frame per segment and puts captions
+    # progressively early (0.7s over 30 segments, measured). When the rendered
+    # segments are available, measure them; otherwise fall back to the EDL.
+    measured: list[float] | None = None
+    if segment_paths:
+        if len(segment_paths) != len(edl["ranges"]):
+            print(f"  warning: {len(segment_paths)} clips for {len(edl['ranges'])} ranges;"
+                  f" falling back to EDL durations for caption offsets")
+        else:
+            try:
+                measured = [probe_duration(p) for p in segment_paths]
+                drift = sum(measured) - sum(float(r["end"]) - float(r["start"])
+                                            for r in edl["ranges"])
+                print(f"  caption offsets from measured segments (drift vs EDL: {drift:+.3f}s)")
+            except Exception as exc:
+                print(f"  warning: could not measure segments ({exc}); using EDL durations")
+                measured = None
+
     entries: list[tuple[float, float, str]] = []
     seg_offset = 0.0
 
-    for r in edl["ranges"]:
+    for seg_i, r in enumerate(edl["ranges"]):
         src_name = r["source"]
         seg_start = float(r["start"])
         seg_end = float(r["end"])
-        seg_duration = seg_end - seg_start
+        seg_duration = measured[seg_i] if measured else (seg_end - seg_start)
 
         tr_path = transcripts_dir / f"{src_name}.json"
         if not tr_path.exists():
@@ -645,13 +698,38 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
             if not text:
                 continue
             current.append(w)
-            # Break if the current text ends in punctuation or we hit 2 words
-            ends_in_punct = bool(text) and text[-1] in PUNCT_BREAK
+            ends_in_punct = bool(text) and text[-1] in break_on
             if len(current) >= words_per_chunk or ends_in_punct:
                 chunks.append(current)
                 current = []
         if current:
             chunks.append(current)
+
+        # Greedy filling packs every cue to the cap and leaves the sentence's
+        # remainder alone on the last line ("...becoming right" / "now."). Split
+        # each run instead into equal-length cues: same cue count, no run-out.
+        if balance:
+            balanced: list[list[dict]] = []
+            for run in chunks:
+                k = max(1, -(-len(run) // words_per_chunk))
+                base, extra = divmod(len(run), k)
+                i = 0
+                for j in range(k):
+                    n = base + (1 if j < extra else 0)
+                    balanced.append(run[i:i + n])
+                    i += n
+            chunks = balanced
+
+        # A run shorter than min_words still yields a stranded cue. Fold it back
+        # into the one before it.
+        if min_words > 1:
+            merged: list[list[dict]] = []
+            for chunk in chunks:
+                if merged and len(chunk) < min_words:
+                    merged[-1].extend(chunk)
+                else:
+                    merged.append(chunk)
+            chunks = merged
 
         for chunk in chunks:
             local_start = max(seg_start, chunk[0].get("start", seg_start))
@@ -980,7 +1058,7 @@ def main() -> None:
     if not args.no_subtitles:
         if args.build_subtitles:
             subs_path = edit_dir / "master.srt"
-            build_master_srt(edl, edit_dir, subs_path)
+            build_master_srt(edl, edit_dir, subs_path, segment_paths)
         elif edl.get("subtitles"):
             subs_path = resolve_path(edl["subtitles"], edit_dir)
             if not subs_path.exists():
