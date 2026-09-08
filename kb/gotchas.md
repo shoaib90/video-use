@@ -124,8 +124,10 @@ Measured 2026-09-03 on one clip of macOS `say` TTS. Ground truth:
 **Confirmed on real footage (2026-09-08).** On a 25-clip talking-head shoot Deepgram
 transcribed "Here's what I **do** know" as "what I **don't** know" — one word that inverts the
 thesis of the whole section, and there was only one take of the line. whisper `small.en` read it
-correctly, as did the script. The free local cross-check paid for itself: without it the line
-would have been cut as a mis-speak, or the wrong word burned into a caption.
+correctly, as did the script, and **the speaker later confirmed "do"** — so this is a measured
+Deepgram error on real human speech, not an inference from two agreeing sources. The free local
+cross-check paid for itself: without it the line would have been cut as a mis-speak, or the wrong
+word burned into a caption.
 
 **Caveat:** the table above is one clip, synthetic TTS speech. `say`'s "Um," is a poor proxy for a human one.
 Re-measure on the first real footage before treating any of this as settled.
