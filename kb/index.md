@@ -50,8 +50,14 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
 - Paid transcription is cached per source. Never re-transcribe unnecessarily; iterate with whisper.
 - All three animation engines installed: Manim, HyperFrames, Remotion.
 - Piping to `tail` masks exit codes. Use `set -o pipefail`.
+- **Check what language is actually spoken before transcribing a batch.** `--language en` on
+  code-switched (e.g. Hinglish) audio returns confident English gibberish and drops ~a third of
+  the words — and since the cut is reasoned from the transcript, it corrupts the *edit*, not just
+  the captions. Use `--language multi`; `detect_language` picks one language and fails at this.
 - **On a first transcription, run the free whisper pass alongside the paid one.** It has caught
   real errors (names, opening lines) that would otherwise be burned into captions.
+- **Look at one frame from every clip during inventory.** Catches upside-down rotation metadata
+  and mixed orientations, neither of which shows up in `ffprobe` dimensions.
 - **Self-eval audio numerically**, not by eye: compare the max sample-to-sample step at each cut
   boundary against a continuous-speech reference. A pop shows as a step well above it.
 - Default shell is zsh — it does **not** word-split unquoted `$var`.

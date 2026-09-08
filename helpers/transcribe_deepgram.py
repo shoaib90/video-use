@@ -182,7 +182,7 @@ def describe_provider(payload: dict) -> str:
 
 
 def check_cached(out_path: Path, model: str, spacing_threshold: float,
-                 force: bool, verbose: bool) -> bool:
+                 language: str | None, force: bool, verbose: bool) -> bool:
     """Decide whether an existing transcript can be reused.
 
     The on-disk path is shared with transcribe.py, because everything
@@ -211,6 +211,14 @@ def check_cached(out_path: Path, model: str, spacing_threshold: float,
     else:
         if payload.get("_model") != model:
             mismatches.append(f"model {payload.get('_model')!r} != requested {model!r}")
+        # Language changes the transcript completely on code-switched audio:
+        # `en` mangles Hindi into nonsense English, `multi` transcribes both.
+        # It therefore belongs in the cache identity like model does.
+        cached_lang = payload.get("_language")
+        if cached_lang != language:
+            mismatches.append(
+                f"language {cached_lang!r} != requested {language!r}"
+            )
         cached_threshold = payload.get("_spacing_threshold")
         if cached_threshold is not None and float(cached_threshold) != float(spacing_threshold):
             mismatches.append(
@@ -252,7 +260,8 @@ def transcribe_one(
     transcripts_dir.mkdir(parents=True, exist_ok=True)
     out_path = transcript_path(edit_dir, video, audio_track)
 
-    if out_path.exists() and check_cached(out_path, model, spacing_threshold, force, verbose):
+    if out_path.exists() and check_cached(out_path, model, spacing_threshold,
+                                          language, force, verbose):
         return out_path
 
     if verbose:
@@ -287,6 +296,7 @@ def transcribe_one(
     # Stamp the identity of this result so the cache can be validated on reuse.
     payload["_model"] = model
     payload["_spacing_threshold"] = spacing_threshold
+    payload["_language"] = language
     out_path.write_text(json.dumps(payload, indent=2))
     dt = time.time() - t0
 

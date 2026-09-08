@@ -5,6 +5,36 @@ re-derive it or mistake a deliberate change for a bug.
 
 ---
 
+## 2026-09-08 — Detour-1: 14 clips into one 4:26 journey; the Hinglish lesson
+
+First multi-clip edit. Full decision record with the footage at
+`~/Documents/Ambitious/Editing/Detour-1/edit/project.md`; the reusable lessons are in
+gotchas.md.
+
+**The lesson that matters:** I transcribed 14 clips with `--language en`. The speaker was
+speaking Hinglish. The ASR returned confident English nonsense rather than failing, I planned an
+entire cut from it, and only found out because the user corrected three lines I had flagged as
+garbled — and wrote his corrections in Hindi. Re-transcribing with `multi` recovered +37% more
+words and revealed a rain thread spanning five clips that the first plan had no idea existed.
+The cut went 3:05 → 4:26 and its ending changed completely.
+
+Generalisable: when the transcript *is* the reasoning surface, a language mismatch is not a
+caption bug, it is a corrupted analysis. Verify the language on clip one, not clip fourteen.
+
+**Also caught by looking at frames rather than metadata:** one clip of fourteen had `rotation=+90`
+where the rest had `-90`, so it rendered upside down while every dimension check passed. And the
+arrival payoff was shot in portrait, which `render.py` scales to different output dimensions than
+landscape — that silently breaks the `-c copy` concat, so those clips were pre-rendered to
+pillarboxed 3840×2160 under their original source names to keep caption lookup working.
+
+**Worked well:** per-segment `auto` grade across 90 minutes of falling light (the dark arrival got
+a gamma lift the daylight clips did not) — the opposite call from the single-clip edit, for the
+right reason. The numeric pop check scaled fine to 58 boundaries, all clean. And the
+resolution-independent `zoom` meant the 720p draft and 2160p final shared one EDL, which the
+earlier hardcoded crops would have made impossible.
+
+---
+
 ## 2026-09-08 (later) — Resolved fork PR #2's conflicts
 
 #1 had been merged into the fork's `main`, which conflicted #2 exactly where predicted: both

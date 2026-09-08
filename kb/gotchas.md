@@ -28,6 +28,79 @@ project needing subtitles. Everything else in the pipeline works fine on the sli
 
 ---
 
+## Establish the spoken language BEFORE transcribing — `en` silently destroys code-switched audio
+
+The single most expensive mistake so far. A Bangalore vlog was transcribed with
+`--language en`. The speaker was actually speaking **Hinglish** — Hindi and English mixed
+mid-sentence. Deepgram did not error, warn, or return low confidence. It produced fluent,
+plausible English nonsense:
+
+| `--language en` | `--language multi` (truth) |
+|---|---|
+| "Within me a golf course car" | "एक भी दिन नहीं लेके गया मैं अभी तक office car" |
+| "A beach a very rare thing" | "अभी छब्बीस kilometer या छब्बीस minute ही दिखा रहा है" |
+| "It's Cape Cod, hopefully" | "इसके बाद hopefully" |
+
+Re-transcribing with `multi` recovered **+37% more words** (983 → 1352 across 14 clips).
+
+**Why it matters far beyond captions:** the cut is *reasoned from the transcript*. Mistranscribed
+passages were judged as "garbled, drop it" or read with the wrong meaning entirely — one was
+planned as a scenery beat when it was actually a joke about the navigation ETA. An entire
+narrative thread (rain, set up four clips before its payoff) was invisible, so the first cut plan
+missed the spine of the video and came out 3:05 instead of 4:26.
+
+**Rules:**
+- On the first clip of any new source, **check what language is actually being spoken** before
+  transcribing the batch. One clip's transcript read against a frame is enough.
+- For code-switched audio use `--language multi`. **`detect_language=true` does not work** for
+  this: it commits to a single language per file (it picked `en` and mangled the Hindi).
+- Treat fluent-but-nonsensical output as a language-mismatch signal, not speaker error. Real
+  speech disfluency looks like repetition and false starts; a language mismatch looks like
+  confident, grammatical gibberish.
+- `language` is part of the transcript's cache identity (`_language`), so a re-run with a
+  different language is refused rather than silently returning the old file.
+
+**Captions for mixed script work fine.** Devanagari + Latin in one cue renders correctly through
+libass; `FontName=Kohinoor Devanagari` balances the two scripts best, and Helvetica falls back
+correctly but renders Devanagari slightly small against the Latin. macOS has plenty of
+Devanagari faces (`fc-list :lang=hi family`).
+
+---
+
+## render.py scales portrait and landscape sources to DIFFERENT sizes, so mixing them breaks concat
+
+`extract_segment` picks its scale axis from `is_portrait_source()`: a portrait source becomes
+2160×3840, a landscape one 3840×2160. Put both in one EDL and the `-c copy` concat (Rule 2)
+fails, because segments must share dimensions.
+
+This is not hypothetical — a phone shoot will mix orientations the moment the user turns the
+phone, and on the trip that produced this note the *arrival payoff* was the portrait clip.
+
+Fix without touching render.py: pre-render the odd-orientation clips to the majority geometry
+into `<edit>/prepped/`, pillarboxed over a blurred scaled copy of themselves:
+
+```
+split[bg][fg];[bg]scale=3840:2160:force_original_aspect_ratio=increase,crop=3840:2160,gblur=sigma=32[b];
+[fg]scale=-2:2160[f];[b][f]overlay=(W-w)/2:0
+```
+
+Then point the EDL `sources` entry at the prepped file **under the original source name**, so
+`render.py`'s caption lookup (`transcripts/<source_key>.json`) still resolves and the word
+timings still line up — the prep must not retime or trim.
+
+---
+
+## iPhone rotation metadata is not always consistent within one shoot
+
+On a 14-clip shoot, thirteen clips carried `rotation=-90` and one carried `+90` — a 180°
+difference. Both are quarter-turns, so both *display* as landscape and any width/height check
+passes; the odd one just comes out **upside down**. Nothing in `ffprobe`'s dimensions reveals it.
+
+Look at a frame from every clip during inventory. It is the only way to catch this, and it is
+cheap next to discovering it in a finished render.
+
+---
+
 ## Each ASR provider has a different characteristic flaw
 
 Measured 2026-09-03 on one clip of macOS `say` TTS. Ground truth:
