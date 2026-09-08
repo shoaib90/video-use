@@ -690,35 +690,36 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path,
         transcript = json.loads(tr_path.read_text())
         words_in_seg = _words_in_range(transcript, seg_start, seg_end)
 
-        # Group into N-word chunks, break on punctuation
-        chunks: list[list[dict]] = []
+        # Split into runs at punctuation first, then divide each run into cues.
+        runs: list[list[dict]] = []
         current: list[dict] = []
         for w in words_in_seg:
             text = (w.get("text") or "").strip()
             if not text:
                 continue
             current.append(w)
-            ends_in_punct = bool(text) and text[-1] in break_on
-            if len(current) >= words_per_chunk or ends_in_punct:
-                chunks.append(current)
+            if text[-1] in break_on:
+                runs.append(current)
                 current = []
         if current:
-            chunks.append(current)
+            runs.append(current)
 
-        # Greedy filling packs every cue to the cap and leaves the sentence's
-        # remainder alone on the last line ("...becoming right" / "now."). Split
-        # each run instead into equal-length cues: same cue count, no run-out.
-        if balance:
-            balanced: list[list[dict]] = []
-            for run in chunks:
+        chunks: list[list[dict]] = []
+        for run in runs:
+            if balance:
+                # Greedy filling packs each cue to the cap and strands the run's
+                # remainder on the last line ("...becoming right" / "now."). Use
+                # the same number of cues, sized evenly.
                 k = max(1, -(-len(run) // words_per_chunk))
                 base, extra = divmod(len(run), k)
                 i = 0
                 for j in range(k):
                     n = base + (1 if j < extra else 0)
-                    balanced.append(run[i:i + n])
+                    chunks.append(run[i:i + n])
                     i += n
-            chunks = balanced
+            else:
+                for i in range(0, len(run), words_per_chunk):
+                    chunks.append(run[i:i + words_per_chunk])
 
         # A run shorter than min_words still yields a stranded cue. Fold it back
         # into the one before it.
