@@ -5,6 +5,36 @@ re-derive it or mistake a deliberate change for a bug.
 
 ---
 
+## 2026-09-08 — Addressed review on all three PRs
+
+Automated review raised 7 findings across #158/#159/#160. **All 7 were valid** — none were
+false positives, which is worth remembering before dismissing review output.
+
+The substantive one was the scaled-dimension prediction (see gotchas.md): my arithmetic matched
+ffmpeg on every case I tested, and was still the wrong approach. Fixed by measuring rather than
+predicting. The other serious one was the shared transcript cache crossing providers, which meant
+the Deepgram helper could return Scribe's transcript and never call Deepgram.
+
+Smaller: `--height` accepted odd/negative values; `--crf 16.5` is valid for x264 but crashed
+`main()` *after* extraction had already run; an unrecognised `subtitle_style.case` silently
+emitted raw ASR capitalization; and `--language` omitted promised auto-detection without sending
+`detect_language`. While fixing that last one I found Deepgram reports the detected language on
+`results.channels[0].detected_language`, not `results.language` or `metadata.language` where the
+code was looking — so `language_code` was null even once detection was on.
+
+Fixes were replayed onto `local` too, and the same cache bug was ported to
+`transcribe_whisper.py`, which matters for the upcoming multi-clip job: running whisper against
+an edit dir that already holds Deepgram transcripts would otherwise have silently returned the
+Deepgram files.
+
+**Two process notes.** Cherry-picking the fixes onto `local` was the wrong instinct — `local`'s
+`render.py` contains both change-sets combined, so the picks conflicted; replaying the edits was
+cleaner. And a `git checkout local` silently *failed* (untracked `uv.lock` blocking it) while the
+following cherry-picks ran on the branch I thought I had left. Always confirm the branch actually
+changed before acting on it.
+
+---
+
 ## 2026-09-07 — Forked and opened three upstream PRs
 
 User authorised pushing to GitHub. Forked to `shoaib90/video-use`, pushed `local` as a backup

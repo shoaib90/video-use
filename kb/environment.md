@@ -55,7 +55,13 @@ Branches:
 - **`pr/*`** — one focused branch per upstream PR, each built from clean `main` so no local-only
   file can leak. Verified with `git diff --name-only main..<branch> | grep -E '^(kb/|CLAUDE.md|uv.lock)'`.
 
-Open upstream PRs (2026-09-07):
+PRs are raised **twice**: against upstream for contribution, and against the fork so they can be
+reviewed and merged into this copy independently. Fork PRs
+[#1](https://github.com/shoaib90/video-use/pull/1) /
+[#2](https://github.com/shoaib90/video-use/pull/2) /
+[#3](https://github.com/shoaib90/video-use/pull/3) mirror the upstream three.
+
+Open upstream PRs (2026-09-07, review comments addressed):
 
 | PR | Branch | Contents |
 |---|---|---|

@@ -46,10 +46,63 @@ from transcribe import (  # noqa: E402
 
 DEFAULT_MODEL = Path.home() / ".cache" / "whisper-models" / "ggml-small.en.bin"
 
+# Stamped into every transcript this module writes. transcript_path() is shared
+# with the other transcribers (downstream expects exactly one
+# transcripts/<stem>.json per source), so the provider has to live in the file
+# rather than the filename -- otherwise running this tool would happily return
+# Deepgram's or Scribe's transcript and never invoke whisper.
+PROVIDER = "whisper.cpp"
+
 # Tokens that whisper emits as standalone segments under -ml 1; they belong on
 # the end of the preceding word so `text` carries punctuation (render.py breaks
 # caption chunks on trailing punctuation).
 _PUNCT_ONLY = set(".,!?;:%)]}\"'…-–—")
+
+
+def describe_provider(payload: dict) -> str:
+    """Human-readable provider of an existing transcript.
+
+    transcribe.py writes Scribe's response verbatim with no marker, so a missing
+    `_provider` means Scribe.
+    """
+    provider = payload.get("_provider") or "elevenlabs-scribe"
+    model = payload.get("_model")
+    return f"{provider} ({model})" if model else str(provider)
+
+
+def check_cached(out_path: Path, model_name: str, force: bool, verbose: bool) -> bool:
+    """Whether an existing transcript at `out_path` can be reused.
+
+    Mirrors transcribe_deepgram.check_cached. Kept as a small local copy rather
+    than a shared import so the Deepgram helper stays byte-identical to the
+    version proposed upstream.
+    """
+    if force:
+        return False
+    try:
+        payload = json.loads(out_path.read_text())
+    except (json.JSONDecodeError, OSError) as exc:
+        raise RuntimeError(
+            f"{out_path} exists but could not be read ({exc}). "
+            "Delete it or pass --force to overwrite."
+        ) from None
+
+    mismatches: list[str] = []
+    if payload.get("_provider") != PROVIDER:
+        mismatches.append(f"written by {describe_provider(payload)}, not {PROVIDER}")
+    elif payload.get("_model") != model_name:
+        mismatches.append(f"model {payload.get('_model')!r} != requested {model_name!r}")
+
+    if not mismatches:
+        if verbose:
+            print(f"cached: {out_path.name} ({describe_provider(payload)})")
+        return True
+
+    raise RuntimeError(
+        f"{out_path.name} already exists but {'; '.join(mismatches)}.\n"
+        "Refused rather than silently returning the wrong file. Pass --force to "
+        "re-transcribe and overwrite, or delete the file first."
+    )
 
 
 def resolve_model(explicit: Path | None) -> Path:
@@ -150,14 +203,13 @@ def transcribe_one(
     verbose: bool = True,
     audio_track: int = 0,
     spacing_threshold: float = 0.05,
+    force: bool = False,
 ) -> Path:
     transcripts_dir = edit_dir / "transcripts"
     transcripts_dir.mkdir(parents=True, exist_ok=True)
     out_path = transcript_path(edit_dir, video, audio_track)
 
-    if out_path.exists():
-        if verbose:
-            print(f"cached: {out_path.name}")
+    if out_path.exists() and check_cached(out_path, model.stem, force, verbose):
         return out_path
 
     if verbose:
@@ -188,6 +240,9 @@ def transcribe_one(
         raw = call_whisper(audio, model, language, threads)
 
     payload = to_contract_schema(raw, spacing_threshold)
+    # Stamp identity so the cache can be validated on reuse.
+    payload["_model"] = model.stem
+    payload["_spacing_threshold"] = spacing_threshold
     out_path.write_text(json.dumps(payload, indent=2))
 
     if verbose:
@@ -209,6 +264,9 @@ def main() -> None:
     ap.add_argument("--threads", type=int, default=None)
     ap.add_argument("--audio-track", type=int, default=0)
     ap.add_argument("--spacing-threshold", type=float, default=0.05)
+    ap.add_argument("--force", action="store_true",
+                    help="Always re-transcribe and overwrite any existing transcript, "
+                         "including one written by another provider.")
     ap.add_argument("--convert", type=Path, default=None,
                     help="Convert an existing whisper-cli JSON to the pipeline schema and print it.")
     args = ap.parse_args()
@@ -225,15 +283,21 @@ def main() -> None:
     if not video.exists():
         sys.exit(f"video not found: {video}")
 
-    transcribe_one(
-        video=video,
-        edit_dir=(args.edit_dir or (video.parent / "edit")).resolve(),
-        model=resolve_model(args.model),
-        language=args.language,
-        threads=args.threads,
-        audio_track=args.audio_track,
-        spacing_threshold=args.spacing_threshold,
-    )
+    try:
+        transcribe_one(
+            video=video,
+            edit_dir=(args.edit_dir or (video.parent / "edit")).resolve(),
+            model=resolve_model(args.model),
+            language=args.language,
+            threads=args.threads,
+            audio_track=args.audio_track,
+            spacing_threshold=args.spacing_threshold,
+            force=args.force,
+        )
+    except RuntimeError as exc:
+        # Cache mismatch, silent track, or a whisper-cli failure are operator
+        # errors, not bugs. Report them plainly rather than as a traceback.
+        sys.exit(f"error: {exc}")
 
 
 if __name__ == "__main__":

@@ -51,6 +51,11 @@ from transcribe import (  # noqa: E402
 
 DEEPGRAM_URL = "https://api.deepgram.com/v1/listen"
 
+# Stamped into every transcript this module writes. The on-disk path is shared
+# with transcribe.py (downstream expects exactly one transcripts/<stem>.json per
+# source), so the provider has to live in the file rather than the filename.
+PROVIDER = "deepgram"
+
 
 def load_api_key() -> str:
     """Same resolution order as transcribe.py: .env at repo root, then env."""
@@ -83,6 +88,10 @@ def call_deepgram(
     }
     if language:
         params["language"] = language
+    else:
+        # The CLI documents auto-detection when --language is omitted; without
+        # this Deepgram just applies its default language instead of detecting.
+        params["detect_language"] = "true"
 
     with open(audio_path, "rb") as f:
         resp = requests.post(
@@ -142,17 +151,85 @@ def to_scribe_schema(dg: dict, spacing_threshold: float = 0.05) -> dict:
         prev_end = end
 
     transcript_text = alternatives[0].get("transcript", "")
-    detected = (dg.get("results") or {}).get("language") or (
-        dg.get("metadata") or {}
-    ).get("language")
+    # With detect_language=true the result lands on the channel, not on
+    # `results` or `metadata` (verified against a live nova-3 response).
+    channel = channels[0]
+    detected = (
+        channel.get("detected_language")
+        or (dg.get("results") or {}).get("language")
+        or (dg.get("metadata") or {}).get("language")
+    )
 
     return {
         "text": transcript_text,
         "words": words,
         "language_code": detected,
-        "_provider": "deepgram",
+        "_language_confidence": channel.get("language_confidence"),
+        "_provider": PROVIDER,
         "_raw_metadata": dg.get("metadata") or {},
     }
+
+
+def describe_provider(payload: dict) -> str:
+    """Human-readable provider of an existing transcript.
+
+    transcribe.py writes Scribe's response verbatim with no provider marker, so
+    a missing `_provider` means Scribe.
+    """
+    provider = payload.get("_provider") or "elevenlabs-scribe"
+    model = payload.get("_model")
+    return f"{provider} ({model})" if model else str(provider)
+
+
+def check_cached(out_path: Path, model: str, spacing_threshold: float,
+                 force: bool, verbose: bool) -> bool:
+    """Decide whether an existing transcript can be reused.
+
+    The on-disk path is shared with transcribe.py, because everything
+    downstream expects exactly one transcripts/<stem>.json per source. That
+    makes the path alone a bad cache key: a Scribe transcript would be returned
+    verbatim by this tool without ever contacting Deepgram, and re-running with
+    a different --model or --spacing-threshold would hand back a stale file.
+
+    So the identity of the cached result is read out of the file itself.
+    Returns True to reuse it; raises on a mismatch unless `force` is set,
+    which always re-transcribes.
+    """
+    if force:
+        return False
+    try:
+        payload = json.loads(out_path.read_text())
+    except (json.JSONDecodeError, OSError) as exc:
+        raise RuntimeError(
+            f"{out_path} exists but could not be read ({exc}). "
+            "Delete it or pass --force to overwrite."
+        ) from None
+
+    mismatches: list[str] = []
+    if payload.get("_provider") != PROVIDER:
+        mismatches.append(f"written by {describe_provider(payload)}, not {PROVIDER}")
+    else:
+        if payload.get("_model") != model:
+            mismatches.append(f"model {payload.get('_model')!r} != requested {model!r}")
+        cached_threshold = payload.get("_spacing_threshold")
+        if cached_threshold is not None and float(cached_threshold) != float(spacing_threshold):
+            mismatches.append(
+                f"spacing-threshold {cached_threshold} != requested {spacing_threshold}"
+            )
+
+    if not mismatches:
+        if verbose:
+            print(f"cached: {out_path.name} ({describe_provider(payload)})")
+        return True
+
+    reason = "; ".join(mismatches)
+    raise RuntimeError(
+        f"{out_path.name} already exists but {reason}.\n"
+        "Transcription costs money, so this is refused rather than silently "
+        "returning the wrong file (Hard Rule 9 caches per source, not per "
+        "provider). Pass --force to re-transcribe and overwrite, or delete the "
+        "file first."
+    )
 
 
 def transcribe_one(
@@ -164,15 +241,18 @@ def transcribe_one(
     verbose: bool = True,
     audio_track: int = 0,
     spacing_threshold: float = 0.05,
+    force: bool = False,
 ) -> Path:
-    """Transcribe a single video. Returns path to transcript JSON. Cached."""
+    """Transcribe a single video. Returns path to transcript JSON.
+
+    Cached per source, but the cache is validated against this provider and its
+    options - see check_cached().
+    """
     transcripts_dir = edit_dir / "transcripts"
     transcripts_dir.mkdir(parents=True, exist_ok=True)
     out_path = transcript_path(edit_dir, video, audio_track)
 
-    if out_path.exists():
-        if verbose:
-            print(f"cached: {out_path.name}")
+    if out_path.exists() and check_cached(out_path, model, spacing_threshold, force, verbose):
         return out_path
 
     if verbose:
@@ -204,6 +284,9 @@ def transcribe_one(
         raw = call_deepgram(audio, api_key, model=model, language=language)
 
     payload = to_scribe_schema(raw, spacing_threshold)
+    # Stamp the identity of this result so the cache can be validated on reuse.
+    payload["_model"] = model
+    payload["_spacing_threshold"] = spacing_threshold
     out_path.write_text(json.dumps(payload, indent=2))
     dt = time.time() - t0
 
@@ -233,6 +316,10 @@ def main() -> None:
                     help="Zero-based audio track to transcribe.")
     ap.add_argument("--spacing-threshold", type=float, default=0.05,
                     help="Synthesize a 'spacing' token for inter-word gaps >= this. Default 0.05.")
+    ap.add_argument("--force", action="store_true",
+                    help="Always re-transcribe and overwrite any existing transcript, "
+                         "including one written by another provider or with different "
+                         "options. Costs money.")
     ap.add_argument("--convert", type=Path, default=None,
                     help="Offline mode: convert an existing Deepgram JSON file to the "
                          "pipeline schema and print it. No API call, no video needed.")
@@ -255,15 +342,21 @@ def main() -> None:
 
     edit_dir = (args.edit_dir or (video.parent / "edit")).resolve()
 
-    transcribe_one(
-        video=video,
-        edit_dir=edit_dir,
-        api_key=load_api_key(),
-        model=args.model,
-        language=args.language,
-        audio_track=args.audio_track,
-        spacing_threshold=args.spacing_threshold,
-    )
+    try:
+        transcribe_one(
+            video=video,
+            edit_dir=edit_dir,
+            api_key=load_api_key(),
+            model=args.model,
+            language=args.language,
+            audio_track=args.audio_track,
+            spacing_threshold=args.spacing_threshold,
+            force=args.force,
+        )
+    except RuntimeError as exc:
+        # Cache mismatches and API/silent-track failures are expected operator
+        # errors, not bugs. Report them plainly rather than as a traceback.
+        sys.exit(f"error: {exc}")
 
 
 if __name__ == "__main__":

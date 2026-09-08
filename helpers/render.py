@@ -22,10 +22,12 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import re
 import subprocess
 import sys
+import tempfile
 from fractions import Fraction
 from pathlib import Path
 
@@ -196,17 +198,78 @@ def display_dims(video: Path) -> tuple[int, int]:
     return w, h
 
 
-def probe_scaled_dims(video: Path, target_h: int, portrait: bool) -> tuple[int, int]:
-    """The exact (w, h) a source lands at after this module's scale filter.
+def scale_expr(target_h: int, portrait: bool) -> str:
+    """The aspect-preserving scale filter this module applies to every segment."""
+    if portrait:
+        return f"scale=-2:{round(target_h * 16 / 9 / 2) * 2}"
+    return f"scale=-2:{target_h}"
 
-    Must mirror the scale expression in `extract_segment` exactly — the numeric
-    `zoom` crop is computed against these, and every segment has to end at the
-    same size or the `-c copy` concat (Rule 2) fails.
+
+@functools.lru_cache(maxsize=64)
+def probe_scaled_dims(video: Path, target_h: int, portrait: bool) -> tuple[int, int]:
+    """The exact (w, h) a source lands at after `scale_expr`, measured not guessed.
+
+    Every segment must end at the same dimensions or the `-c copy` concat
+    (Rule 2) fails, and the numeric `zoom` crop is computed against these. We
+    therefore ask ffmpeg rather than reimplementing its rounding: `-2` rounds to
+    even *and* accounts for sample aspect ratio, so arithmetic over coded
+    dimensions would silently diverge on any anamorphic source.
     """
-    w, h = display_dims(video)
-    out_h = round(target_h * 16 / 9 / 2) * 2 if portrait else target_h
-    out_w = round(w / h * out_h / 2) * 2
-    return out_w, out_h
+    with tempfile.TemporaryDirectory() as tmp:
+        probe_png = Path(tmp) / "scaled.png"
+        try:
+            subprocess.run(
+                ["ffmpeg", "-v", "error", "-y", "-i", str(video),
+                 "-vf", scale_expr(target_h, portrait),
+                 "-frames:v", "1", str(probe_png)],
+                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+            )
+            out = subprocess.run(
+                ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                 "-show_entries", "stream=width,height", "-of", "csv=p=0:nk=1",
+                 str(probe_png)],
+                capture_output=True, text=True, check=True,
+            )
+            w_str, h_str = out.stdout.strip().split(",")
+            return int(w_str), int(h_str)
+        except (subprocess.CalledProcessError, ValueError, OSError) as exc:
+            w, h = display_dims(video)
+            out_h = round(target_h * 16 / 9 / 2) * 2 if portrait else target_h
+            out_w = round(w / h * out_h / 2) * 2
+            print(f"  warning: could not measure scaled dims for {video.name} "
+                  f"({type(exc).__name__}); falling back to {out_w}x{out_h}")
+            return out_w, out_h
+
+
+def even_positive_height(value: str) -> int:
+    """argparse type for --height: a positive, even pixel height."""
+    try:
+        height = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"height must be an integer, got {value!r}") from None
+    if height <= 0:
+        raise argparse.ArgumentTypeError(f"height must be positive, got {height}")
+    if height % 2:
+        raise argparse.ArgumentTypeError(
+            f"height must be even (yuv420p requires it), got {height}; try {height + 1}"
+        )
+    return height
+
+
+def crf_value(value: str) -> str:
+    """argparse type for --crf. x264 accepts fractional CRF, so 16.5 is valid."""
+    try:
+        crf = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"crf must be a number, got {value!r}") from None
+    if not 0.0 <= crf <= 51.0:
+        raise argparse.ArgumentTypeError(f"crf must be within x264's 0-51 range, got {crf}")
+    return value
+
+
+def format_crf(crf: float) -> str:
+    """Render a CRF for the ffmpeg command line without a spurious '.0'."""
+    return str(int(crf)) if crf == int(crf) else f"{crf:g}"
 
 
 def parse_fps(value: str) -> str:
@@ -299,11 +362,12 @@ def extract_segment(
     portrait = is_portrait_source(source)
     # Explicit --height wins; otherwise the mode default (720p draft, else 1080p).
     target_h = height if height is not None else (720 if draft else 1080)
-    if portrait:
-        # For portrait the long edge is the height; keep the same pixel count.
-        scale = f"scale=-2:{round(target_h * 16 / 9 / 2) * 2}"
-    else:
-        scale = f"scale=-2:{target_h}"
+    # Scale to explicitly measured dimensions rather than letting `-2` derive the
+    # width per invocation: a zoomed segment has a cropped (and therefore slightly
+    # different) input aspect, so `-2` could hand it a width 2px off its unzoomed
+    # siblings and break the `-c copy` concat (Rule 2).
+    out_w, out_h = probe_scaled_dims(source, target_h, portrait)
+    scale = f"scale={out_w}:{out_h}"
 
     vf_parts: list[str] = []
     if is_hdr_source(source):
@@ -319,7 +383,6 @@ def extract_segment(
     if zoom and abs(zoom - 1.0) > 1e-6:
         if zoom < 1.0:
             raise ValueError(f"zoom must be >= 1.0 (got {zoom}); it crops in, never out")
-        out_w, out_h = probe_scaled_dims(source, target_h, portrait)
         cw = max(2, (int(out_w / zoom) // 2) * 2)
         ch = max(2, (int(out_h / zoom) // 2) * 2)
         cx = int((out_w - cw) * min(max(zoom_x, 0.0), 1.0))
@@ -473,6 +536,9 @@ def concat_segments(segment_paths: list[Path], out_path: Path, edit_dir: Path) -
 
 PUNCT_BREAK = set(".,!?;:")
 
+# Recognized values for subtitle_style.case.
+SUBTITLE_CASE_MODES = frozenset({"upper", "sentence"})
+
 
 def _srt_timestamp(seconds: float) -> str:
     total_ms = int(round(seconds * 1000))
@@ -508,8 +574,25 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
     sources = edl["sources"]
 
     style = edl.get("subtitle_style") or {}
-    words_per_chunk = max(1, int(style.get("words_per_chunk", 2)))
+
+    raw_chunk = style.get("words_per_chunk", 2)
+    try:
+        words_per_chunk = int(raw_chunk)
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"subtitle_style.words_per_chunk must be an integer, got {raw_chunk!r}"
+        ) from None
+    if words_per_chunk < 1:
+        raise ValueError(
+            f"subtitle_style.words_per_chunk must be >= 1, got {words_per_chunk}"
+        )
+
     case_mode = str(style.get("case", "upper")).lower()
+    if case_mode not in SUBTITLE_CASE_MODES:
+        raise ValueError(
+            f"subtitle_style.case must be one of "
+            f"{', '.join(sorted(SUBTITLE_CASE_MODES))}; got {case_mode!r}"
+        )
 
     entries: list[tuple[float, float, str]] = []
     seg_offset = 0.0
@@ -811,7 +894,7 @@ def main() -> None:
     )
     ap.add_argument(
         "--height",
-        type=int,
+        type=even_positive_height,
         default=None,
         help="Output height in pixels (e.g. 2160, 1440, 1080). Default 1080 "
              "(720 with --draft). Width follows the source aspect. Delivering at "
@@ -819,7 +902,7 @@ def main() -> None:
     )
     ap.add_argument(
         "--crf",
-        type=str,
+        type=crf_value,
         default=None,
         help="x264 CRF for the per-segment extract - the FIRST of two video "
              "encodes, so it is the quality ceiling. Lower is better. Default 16 "
@@ -851,10 +934,10 @@ def main() -> None:
     )
     # The composite is a SECOND generation on top of the extract. Keep its CRF
     # below the extract's so it adds as little further loss as possible.
-    gen1_crf = int(args.crf) if args.crf is not None else (
-        28 if args.draft else 22 if args.preview else 16
+    gen1_crf = float(args.crf) if args.crf is not None else (
+        28.0 if args.draft else 22.0 if args.preview else 16.0
     )
-    gen2_crf = str(max(10, gen1_crf - 2))
+    gen2_crf = format_crf(max(10.0, gen1_crf - 2))
     gen2_preset = "ultrafast" if args.draft else ("fast" if args.preview else "slow")
 
     # 2. Concat → base

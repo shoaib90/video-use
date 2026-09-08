@@ -151,6 +151,53 @@ CRF 16 for masters.
 
 ---
 
+## Never predict another tool's rounding — measure it
+
+`probe_scaled_dims()` originally computed ffmpeg's `scale=-2` width in Python as
+`round(w/h*out_h/2)*2`, then used that as a hardcoded scale-back target for the zoom crop. Tested
+against ffmpeg across six non-16:9 aspects at three target heights: **it agreed every time**.
+
+It was still wrong, for a reason the test could not reach: `-2` also honours **sample aspect
+ratio**, which arithmetic over coded dimensions ignores completely. Any anamorphic source would
+have diverged, and a 2px mismatch between a zoomed segment and its siblings breaks the `-c copy`
+concat (Rule 2).
+
+The fix is to ask ffmpeg — one frame through the real scale filter, cached per (source, height) —
+and then use that measured value as an **explicit** `scale=W:H` for every segment. Zoomed and
+unzoomed siblings then match by construction rather than by agreement.
+
+Generalisable: when correctness depends on matching another program's output, measure its output.
+"My arithmetic agrees on the cases I tried" is not the same claim.
+
+*(Test-harness trap while checking this: a `testsrc` at odd dimensions fails to encode in
+yuv420p, leaving a 0-byte file, and `ffprobe` then reports the **previous** loop iteration's
+value — which looks exactly like a real mismatch. Check file size before trusting a probe.)*
+
+---
+
+## A cache keyed only on the file path silently crosses providers
+
+All three transcribers write to `transcripts/<stem>.json`, because everything downstream expects
+exactly one transcript per source. That makes the *path* a bad cache key:
+
+- A Scribe transcript already on disk made `transcribe_deepgram.py` print `cached:` and return
+  Scribe's JSON, **never contacting Deepgram at all**. The alternative provider could not
+  actually produce its own output without manually clearing the cache.
+- The key also ignored `--model` and `--spacing-threshold`, so re-running with different options
+  returned a stale file.
+
+Since the path must stay shared, identity lives *in* the file: every transcript is stamped with
+`_provider`, `_model` and `_spacing_threshold`, and `check_cached()` reads them back and refuses
+on a mismatch (naming what differs) rather than returning the wrong file. `--force` always
+re-transcribes. A missing `_provider` means Scribe, since `transcribe.py` writes its response
+verbatim.
+
+Both `transcribe_deepgram.py` and `transcribe_whisper.py` now do this. The whisper copy is
+deliberately a small duplicate rather than a shared import, so the Deepgram helper stays
+byte-identical to the version proposed upstream.
+
+---
+
 ## Per-segment reframes must be a number, not a filter string
 
 A `crop=1812:1018,scale=1920:1080` written for 1080p silently becomes wrong at any other output
