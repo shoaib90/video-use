@@ -121,7 +121,13 @@ Measured 2026-09-03 on one clip of macOS `say` TTS. Ground truth:
 - whisper's number normalization is in tension with Hard Rule 8 — don't burn captions from a
   whisper transcript without reading them first.
 
-**Caveat:** one clip, synthetic TTS speech. `say`'s "Um," is a poor proxy for a human one.
+**Confirmed on real footage (2026-09-08).** On a 25-clip talking-head shoot Deepgram
+transcribed "Here's what I **do** know" as "what I **don't** know" — one word that inverts the
+thesis of the whole section, and there was only one take of the line. whisper `small.en` read it
+correctly, as did the script. The free local cross-check paid for itself: without it the line
+would have been cut as a mis-speak, or the wrong word burned into a caption.
+
+**Caveat:** the table above is one clip, synthetic TTS speech. `say`'s "Um," is a poor proxy for a human one.
 Re-measure on the first real footage before treating any of this as settled.
 
 ---
@@ -397,6 +403,80 @@ uv sync --extra animations > /tmp/log 2>&1; echo "EXIT=$?"; tail -6 /tmp/log
 ```
 Relevant well beyond this repo, but especially here — several helpers shell out to ffmpeg, and a
 masked non-zero status looks exactly like success.
+
+---
+
+## Caption offsets drifted because Rule 5 summed EDL floats, not rendered segments
+
+**Fixed on `local`.** `build_master_srt` accumulated `seg_offset += (end - start)` from the
+EDL. But an extract is quantised to whole frames, so the real segment is a fraction of a frame
+longer than the float arithmetic says. The error accumulates: on a 30-segment, 3m34s edit the
+captions ran **0.598s early by the closing line** (0 at the first cue, growing monotonically).
+
+Hard Rule 5 is `output_time = word.start - segment_start + segment_offset`, and
+`segment_offset` has to be where the segment *actually* starts in the concat.
+
+`build_master_srt` now takes an optional `segment_paths` and measures them with `ffprobe`
+(the clips already exist when it is called — it runs after the concat). Without that argument
+it falls back to the old float sum, so nothing else changes.
+
+Two things that made this easy to miss:
+- The first cue is always correct. Only the tail is wrong, and by then nobody is checking sync.
+- It is invisible in a short test EDL. It needs ~20+ segments to grow past a frame or two.
+
+**Draft, preview and final produce bit-identical segment durations** (verified: 30 clips, max
+per-segment difference 0.0 ms). So a cheap `--draft` pass is a valid way to measure boundaries
+for a 4K final — which is also how to place an overlay's `start_in_output` correctly.
+
+---
+
+## An overlay's `start_in_output` must be measured, not summed
+
+Same root cause as above, different symptom. The Scene-3 b-roll montage was placed at the
+teaser's start computed from summed float durations: it landed **0.205s early**, sliding every
+shot change off its word and the bat SFX off its hit.
+
+Fix: render once (`--draft` is enough), measure the segment durations, feed the real boundary
+back into the EDL. And set the overlay's `duration` to exactly the span you want covered while
+cutting the *clip* slightly longer — an under-run silently reveals the base video, which in
+this case was the take where the speaker is holding his phone.
+
+---
+
+## Trimming a filler word leaves it in the captions
+
+`_words_in_range` selects any word that *overlaps* the segment, so a cut that lands inside a
+word keeps that word's text while discarding its audio. Trimming "uh," by cutting at 21.97
+when the token spans 21.79–22.02 removed the sound and left `uh, something that I've read…`
+burned into the frame.
+
+This is Hard Rule 6 ("never cut inside a word") having a consequence beyond audio. The fix is
+to snap the edge to the word boundary — `IN = target.start - pad` clamped to `prev.end + eps`,
+`OUT = last.end + pad` clamped to `next.start - eps`. Then the overlap test selects exactly the
+kept words, for free.
+
+Worth running as a standalone check over an EDL before rendering: for every edge, flag any word
+with `start < edge < end`. On a 30-segment cut this found 15, including two OUT points computed
+from a word's *start* instead of its *end* — one of which was chopping the last word of the
+video mid-syllable.
+
+---
+
+## zsh treats `$VAR:x` as a history modifier
+
+Second zsh trap in this KB (see also: no word-splitting). This silently corrupts ffmpeg filter
+strings:
+
+```zsh
+F=/System/Library/Fonts/Avenir.ttc
+echo "$F:textfile"     # -> Avenir.ttcextfile     (`:t` = tail of path, then "extfile")
+echo "${F}:textfile"   # -> /System/Library/Fonts/Avenir.ttc:textfile
+```
+
+The resulting ffmpeg error is `Either text, a valid file, a timecode or text source must be
+provided`, which reads like a drawtext quoting problem and sends you off escaping apostrophes.
+It is not. **Always brace a variable that is followed by `:` in a filter string.**
+
 
 ---
 

@@ -3,6 +3,62 @@
 Newest first. Records local divergence from upstream and *why*, so a future session doesn't
 re-derive it or mistake a deliberate change for a bug.
 
+
+---
+
+## 2026-09-08 (later) — YT1 Ep1: first scripted talking-head cut, 25 takes → 3:34
+
+Full decision record with the footage at `~/Documents/Ambitious/Editing/YT1/edit/project.md`.
+Different job shape from Detour-1: the shoot is **script-ordered**, one script beat per clip
+with 1–4 takes each, so this was take selection and dead-air trimming, not finding a story.
+Every good take end-to-end came to 3:34 — the delivery is much faster than the 7–8 min the
+script assumes, so nothing had to be dropped to hit the 4–5 min target.
+
+**Two render.py bugs found by self-eval, both fixed on `local`:**
+
+1. **Rule 5 caption offsets summed EDL floats instead of measuring the rendered segments**, so
+   captions drifted progressively early — 0.598s by the closing line on a 30-segment cut. This
+   is invisible on a short EDL and always correct at the first cue, which is why it survived.
+   `build_master_srt` now takes an optional `segment_paths` and probes them.
+2. **`subtitle_style` could not express a documentary caption**: it broke on every comma with
+   no minimum, producing cues like "I mean" and "now." Added `break_on`, `min_words` and
+   `balance` (split each sentence into equal cues instead of greedily filling). Defaults are
+   byte-identical — verified by diffing against a previously generated SRT — and 16 tests pass.
+
+**Three of my own errors, all caught by verification rather than by eye:**
+
+- Several OUT points were computed from a word's **start** rather than its **end**, chopping
+  "Let's build it together" mid-word. A boundary-vs-word validator found 15 collisions at once;
+  boundaries are now derived programmatically from word starts with computed padding.
+- A filler trimmed out of the audio stayed in the caption, because caption words are selected
+  by overlap (see gotchas.md).
+- The b-roll overlay was placed from summed floats and landed 0.205s early.
+
+The pattern behind all four: **summed float durations are not where things actually are.**
+The existing "never predict another tool's rounding" entry was about `scale=-2`; this is the
+same lesson in the time axis. Measure a real render, feed it back.
+
+**Technique worth reusing.** A VO-over-b-roll section is a **full-frame opaque overlay** on top
+of the talking-head base whose audio you want. It solved a real problem here: the speaker is
+visibly holding his phone in both teaser takes, and the script wants that passage as VO anyway.
+Set the overlay `duration` to exactly the span to cover but cut the clip longer — an under-run
+silently exposes the base.
+
+**Choosing music without being able to hear it.** Measured each bed's envelope in fifths and its
+HF-vs-total energy, then matched: flattest/darkest under dialogue, the one that starts
+near-silent and builds under the photo montage, the one that tapers at the end under the close
+(using its *last* 61s so the natural resolve lands the ending). Verified afterwards that the bed
+sits ~15 dB under speech, and that spot SFX actually landed — the bat hit measured +24.7 dB in a
+dialogue gap. The keyboard SFX looked absent in broadband RMS (+0.4 dB) and I raised it 6.5 dB
+before realising the measurement was wrong: in its own 3–9 kHz band it was already at +28 dB.
+**Measure a sound in the band it occupies**, not broadband, or you will over-boost it.
+
+**Also verified:** 0/29 audio pops; subtitles composite over the overlay in the real output;
+end card truly silent (−180 dB) per the script's "no outro music"; draft/preview/final segment
+durations are bit-identical, so a cheap `--draft` is a valid way to measure boundaries for a 4K
+final. `warm_cinematic` was tested and rejected for already-moody lamp-lit footage — it crushes
+shadows and drains skin; a lighter custom warm-punch won.
+
 ---
 
 ## 2026-09-08 — Detour-1: 14 clips into one 4:26 journey; the Hinglish lesson
