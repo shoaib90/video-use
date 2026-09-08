@@ -505,6 +505,13 @@ Two general lessons:
 Caught by a unit test asserting exact cue lengths (`[7, 7]` vs `[8, 6]`). A
 cue-count assertion would have passed — both shapes have two cues.
 
+**And once fixed, it was not the better choice for that edit.** `balance` trades
+even cue lengths for *more* cues, so more break points, and neither mode is
+phrase-aware — the balanced output split "grew / up with" and "gave / up" across
+cues where the 8-word greedy version kept them together. Use `balance` when the
+greedy tail is visibly stranding words; leave it off when the cap happens to land
+on phrase boundaries. Fixing a bug and shipping the fix are separate decisions.
+
 ---
 
 ## Never write inside this repo
