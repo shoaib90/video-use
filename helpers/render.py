@@ -551,6 +551,10 @@ def concat_segments(segment_paths: list[Path], out_path: Path, edit_dir: Path) -
 
 PUNCT_BREAK = set(".,!?;:")
 
+# Recognized values for subtitle_style.case. "upper" is the default and matches
+# the shipped bold-overlay look; "sentence" keeps the ASR's own capitalization.
+SUBTITLE_CASE_MODES = frozenset({"upper", "sentence"})
+
 
 def _srt_timestamp(seconds: float) -> str:
     total_ms = int(round(seconds * 1000))
@@ -590,8 +594,28 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
     Output times are computed as word.start - segment_start + segment_offset.
     """
     style = edl.get("subtitle_style") or {}
-    words_per_chunk = max(1, int(style.get("words_per_chunk", 2)))
+
+    raw_chunk = style.get("words_per_chunk", 2)
+    try:
+        words_per_chunk = int(raw_chunk)
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"subtitle_style.words_per_chunk must be an integer, got {raw_chunk!r}"
+        ) from None
+    if words_per_chunk < 1:
+        raise ValueError(
+            f"subtitle_style.words_per_chunk must be >= 1, got {words_per_chunk}"
+        )
+
+    # Validate before generating anything. An unrecognized value used to fall
+    # through applying neither transformation, which silently emitted the raw
+    # ASR capitalization -- not the documented "upper" default, and not an error.
     case_mode = str(style.get("case", "upper")).lower()
+    if case_mode not in SUBTITLE_CASE_MODES:
+        raise ValueError(
+            f"subtitle_style.case must be one of "
+            f"{', '.join(sorted(SUBTITLE_CASE_MODES))}; got {case_mode!r}"
+        )
     transcripts_dir = edit_dir / "transcripts"
     sources = edl["sources"]
 
