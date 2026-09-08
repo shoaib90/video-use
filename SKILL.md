@@ -74,12 +74,14 @@ matching topic file. Record only what was verified, mark unproven suspicions as 
 
 First-time install lives in `install.md` (clone, deps, ffmpeg, skill registration, API key). Don't re-run it every session; on cold start just verify:
 
-- A transcription key resolves — either in the environment or in `.env` at the video-use repo root. If missing, ask the user to paste one and write it to `.env` (never to the user's `<videos_dir>`). Two providers are wired up:
+- A transcription key resolves — either in the environment or in `.env` at the video-use repo root. If missing, ask the user to paste one and write it to `.env` (never to the user's `<videos_dir>`). Three providers are wired up:
     - `ELEVENLABS_API_KEY` → `transcribe.py` (Scribe). Tags audio events: `(laughter)`, `(applause)`, `(sigh)`.
-    - `DEEPGRAM_API_KEY` → `transcribe_deepgram.py` (nova-3). Same on-disk schema, so everything downstream is identical. No audio-event tags — the `(laughs)` beat signals in Cut craft are unavailable, so lean on silence gaps and the visual drill-down instead.
+    - `DEEPGRAM_API_KEY` → `transcribe_deepgram.py` (nova-3). Same on-disk schema, so everything downstream is identical, and it diarizes. But it returns **no audio-event tokens**, so the `(laughs)`/`(applause)` beat signals in *Cut craft* are unavailable — lean on silence gaps and `timeline_view` instead.
     - **No key needed** → `transcribe_whisper.py` (local whisper.cpp). Free and offline, same schema, but **no speaker diarization** and it normalizes some spoken numbers. Use it for free iteration, for offline work, and as a cross-check — it catches leading filler words Deepgram has been seen to drop. Never use it alone on multi-speaker footage.
 
-    Prefer Deepgram or Scribe for the real cut (they diarize); prefer Scribe when audio events carry beats. Iterate with whisper to avoid burning credits. `kb/gotchas.md` records each provider's measured failure mode.
+    Prefer Deepgram or Scribe for the real cut (they diarize); prefer Scribe for reaction-heavy material where audio events carry the beats. Iterate with whisper to avoid burning credits. `kb/gotchas.md` records each provider's measured failure mode.
+
+- **Establish what language is actually spoken before transcribing the batch.** Transcribe one clip, read it against a frame, and only then run the rest. A wrong `--language` does not error or flag low confidence — it returns fluent, grammatical nonsense and silently drops words. On code-switched speech (e.g. Hinglish, where Hindi and English alternate mid-sentence) pass `--language multi`; `detect_language` is no help because it commits to a single language per file. This matters far beyond captions: the cut is *reasoned from the transcript*, so a language mismatch corrupts the edit itself — mistranscribed passages get judged as "garbled, drop it", and whole narrative threads become invisible.
 - `ffmpeg` + `ffprobe` on PATH.
 - Python deps installed (`uv sync` or `pip install -e .` inside the repo).
 - Node.js + npm available if the session needs HyperFrames or Remotion slots. HyperFrames currently requires Node.js 22+.
@@ -96,11 +98,12 @@ Helpers (`helpers/transcribe.py`, `helpers/render.py`, etc.) live alongside this
 - **`transcribe_deepgram.py <video>`** — Deepgram nova-3 alternative to the above. Emits the identical
   `{words:[{type,text,start,end,speaker_id}]}` schema, so `pack_transcripts.py` and `render.py --build-subtitles`
   consume it unchanged. `filler_words=true` and `punctuate=true`; `smart_format` deliberately off (Hard Rule 8).
-  `--convert <deepgram.json>` converts an existing response offline, no API call. Cached identically.
+  `--language multi` for code-switched speech; `--convert <deepgram.json>` maps an existing response offline with
+  no API call. Cached per source **and** per provider/model/language. **No audio-event tags** — see Setup.
 - **`transcribe_batch.py <videos_dir>`** — 4-worker parallel transcription. Use for multi-take.
 - **`pack_transcripts.py --edit-dir <dir>`** — `transcripts/*.json` → `takes_packed.md` (phrase-level, break on silence ≥ 0.5s).
 - **`timeline_view.py <video> <start> <end>`** — filmstrip + waveform PNG. On-demand visual drill-down. **Not a scan tool** — use it at decision points, not constantly.
-- **`render.py <edl.json> -o <out>`** — per-segment extract → concat → overlays (PTS-shifted) → subtitles LAST. `--preview` for 720p fast. `--build-subtitles` to generate master.srt inline.
+- **`render.py <edl.json> -o <out>`** — per-segment extract → concat → overlays (PTS-shifted) → subtitles LAST. `--preview` for 720p fast. `--build-subtitles` to generate master.srt inline. `--height` sets the output height (default 1080) and `--crf` the extract quality (default 16 final / 22 preview) — see *Output quality* below.
 - **`grade.py <in> -o <out>`** — ffmpeg filter chain grade. Presets + `--filter '<raw>'` for custom.
 
 For animations, create `<edit>/animations/slot_<id>/` with `Bash` and spawn a sub-agent via the `Agent` tool.
@@ -219,6 +222,25 @@ Alignment=2,MarginV=35
 
 Invent a third style if neither fits. Hard rules: subtitles LAST (Rule 1), output-timeline offsets (Rule 5).
 
+### Driving it from the EDL
+
+`render.py --build-subtitles` reads an optional `subtitle_style` block, so a style is data rather than a code edit:
+
+```json
+"subtitle_style": {
+  "words_per_chunk": 6,
+  "case": "sentence",
+  "force_style": "FontName=Helvetica,FontSize=13,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=28"
+}
+```
+
+Defaults reproduce the shipped `bold-overlay` look exactly: `words_per_chunk` 2, `case` `"upper"`, and `SUB_FORCE_STYLE`.
+
+Two things worth knowing when you deviate:
+
+- `"case": "sentence"` keeps the ASR's own capitalization, but a cut can promote a mid-sentence word to the start of a sentence. The builder capitalizes any cue that opens the file or follows sentence-final punctuation, so that case is handled.
+- `force_style`'s `MarginV` is relative to `PlayResY=288`. The default of 90 is tuned for **vertical** video; for 16:9 landscape a value around 28 sits the caption roughly 10% up from the bottom.
+
 ## Animations (when requested)
 
 Animations match the content and the brand. **Get the palette, font, and visual language from the conversation** — never assume a default. If the user hasn't told you, propose a palette in the strategy phase and wait for confirmation before building anything.
@@ -288,7 +310,7 @@ One sub-agent = one file (unique filenames, parallel agents don't overwrite each
 
 ## Output spec
 
-Match the source unless the user asked for something specific. Common targets: `1920×1080@24` cinematic, `1920×1080@30` screen content, `1080×1920@30` vertical social, `3840×2160@24` 4K cinema, `1080×1080@30` square. `render.py` defaults the scale to 1080p from any source; pass `--filter` or edit the extract command for other targets. Worth asking the user which delivery format matters.
+Match the source unless the user asked for something specific. Common targets: `1920×1080@24` cinematic, `1920×1080@30` screen content, `1080×1920@30` vertical social, `3840×2160@24` 4K cinema, `1080×1080@30` square. `render.py` defaults the scale to 1080p from any source; pass `--height` for other targets (e.g. `--height 2160` to deliver at a 4K source's own resolution, `--height 1920` for vertical). Width follows the source aspect, so `--height` is the only resolution knob you need — do not hand-edit the extract command. Worth asking the user which delivery format matters.
 
 ## EDL format
 
@@ -312,6 +334,19 @@ Match the source unless the user asked for something specific. Common targets: `
 ```
 
 `grade` is a preset name or raw ffmpeg filter. `overlays` are rendered animation clips. `subtitles` is optional and applied LAST.
+
+`audio_filter` is an optional global audio chain (denoise, EQ) applied per segment **before** the 30ms fades, so the fades stay on the true segment edges (Hard Rule 3).
+
+`ranges[].zoom` is an optional per-segment push-in (a number ≥ 1.0, with `zoom_x` 0–1 biasing the crop horizontally, default 0.45). Use it to disguise jump cuts on a static single-camera shot: crop to 1/zoom of the frame, then scale back. It is a plain number rather than a filter string precisely so one EDL stays correct at every output resolution. `ranges[].filter` remains available as a raw per-segment escape hatch, but a hardcoded `crop` is only valid at one output height, and **any per-segment dimension mismatch breaks the lossless concat** (Hard Rule 2).
+
+## Output quality
+
+The video is encoded **twice**: once per segment on extract, then again to composite overlays and burn subtitles. The concat and the loudness pass are both `-c copy`, so those are lossless. This means the **extract CRF is the quality ceiling** — the composite encode can only add loss on top of it, never recover detail.
+
+- `--crf` sets that ceiling. Defaults: 16 final, 22 `--preview`, 28 `--draft`. The composite encode is derived as `crf - 2`.
+- `--height` sets the output height; the default 1080 downscales a 4K source and throws away three quarters of its pixels. Pass `--height 2160` to deliver at the source resolution and skip that generation entirely.
+
+If someone reports the output looking soft or compressed, check **bits per pixel**, not bitrate: a 50 Mbps 4K source and a 12.7 Mbps 1080p render are both ≈0.25 bits/px, which means the loss came from discarded pixels and stacked generations rather than bitrate starvation.
 
 ## Memory — `project.md`
 

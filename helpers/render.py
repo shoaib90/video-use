@@ -201,6 +201,7 @@ def display_dims(video: Path) -> tuple[int, int]:
 def scale_expr(target_h: int, portrait: bool) -> str:
     """The aspect-preserving scale filter this module applies to every segment."""
     if portrait:
+        # For portrait the long edge is the height; keep the same pixel count.
         return f"scale=-2:{round(target_h * 16 / 9 / 2) * 2}"
     return f"scale=-2:{target_h}"
 
@@ -214,6 +215,9 @@ def probe_scaled_dims(video: Path, target_h: int, portrait: bool) -> tuple[int, 
     therefore ask ffmpeg rather than reimplementing its rounding: `-2` rounds to
     even *and* accounts for sample aspect ratio, so arithmetic over coded
     dimensions would silently diverge on any anamorphic source.
+
+    The measured value is then used as an explicit scale target for every
+    segment, so zoomed and unzoomed siblings match by construction.
     """
     with tempfile.TemporaryDirectory() as tmp:
         probe_png = Path(tmp) / "scaled.png"
@@ -233,6 +237,8 @@ def probe_scaled_dims(video: Path, target_h: int, portrait: bool) -> tuple[int, 
             w_str, h_str = out.stdout.strip().split(",")
             return int(w_str), int(h_str)
         except (subprocess.CalledProcessError, ValueError, OSError) as exc:
+            # Fall back to arithmetic over displayed dimensions. Correct for
+            # square-pixel sources, which is everything a camera produces.
             w, h = display_dims(video)
             out_h = round(target_h * 16 / 9 / 2) * 2 if portrait else target_h
             out_w = round(w / h * out_h / 2) * 2
@@ -242,7 +248,11 @@ def probe_scaled_dims(video: Path, target_h: int, portrait: bool) -> tuple[int, 
 
 
 def even_positive_height(value: str) -> int:
-    """argparse type for --height: a positive, even pixel height."""
+    """argparse type for --height: a positive, even pixel height.
+
+    yuv420p needs even dimensions, so an odd or non-positive height would only
+    surface as an ffmpeg failure partway through extraction. Reject it up front.
+    """
     try:
         height = int(value)
     except ValueError:
@@ -257,7 +267,11 @@ def even_positive_height(value: str) -> int:
 
 
 def crf_value(value: str) -> str:
-    """argparse type for --crf. x264 accepts fractional CRF, so 16.5 is valid."""
+    """argparse type for --crf. x264 accepts fractional CRF, so 16.5 is valid.
+
+    Returned as a string because that is what the ffmpeg command line wants;
+    main() parses it back to a float to derive the composite CRF.
+    """
     try:
         crf = float(value)
     except ValueError:
@@ -360,7 +374,7 @@ def extract_segment(
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     portrait = is_portrait_source(source)
-    # Explicit --height wins; otherwise the mode default (720p draft, else 1080p).
+    # Explicit height wins; otherwise the mode default (720p draft, else 1080p).
     target_h = height if height is not None else (720 if draft else 1080)
     # Scale to explicitly measured dimensions rather than letting `-2` derive the
     # width per invocation: a zoomed segment has a cropped (and therefore slightly
@@ -376,10 +390,10 @@ def extract_segment(
     if grade_filter:
         vf_parts.append(grade_filter)
     # Per-segment reframe (push-in to disguise a jump cut on a static camera).
-    # Expressed as a plain number so it stays correct at any output resolution:
-    # crop to 1/zoom of the frame, then scale back to the exact frame size. The
-    # scale-back is mandatory — every segment must share dimensions or the
-    # `-c copy` concat (Rule 2) fails.
+    # Expressed as a plain number so one EDL stays correct at any output
+    # resolution: crop to 1/zoom of the frame, then scale back to the exact
+    # frame size. The scale-back is mandatory - every segment must share
+    # dimensions or the `-c copy` concat (Rule 2) fails.
     if zoom and abs(zoom - 1.0) > 1e-6:
         if zoom < 1.0:
             raise ValueError(f"zoom must be >= 1.0 (got {zoom}); it crops in, never out")
@@ -395,7 +409,8 @@ def extract_segment(
     # 30ms audio fades at both edges (Rule 3) — prevent pops
     fade_out_start = max(0.0, duration - 0.03)
     af = f"afade=t=in:st=0:d=0.03,afade=t=out:st={fade_out_start:.3f}:d=0.03"
-    # Denoise/EQ runs BEFORE the fades so the 30ms fades stay on the true edges (Rule 3).
+    # Denoise/EQ runs BEFORE the fades so the 30ms fades stay on the true
+    # segment edges (Rule 3).
     if audio_prefilter:
         af = f"{audio_prefilter},{af}"
 
@@ -536,7 +551,8 @@ def concat_segments(segment_paths: list[Path], out_path: Path, edit_dir: Path) -
 
 PUNCT_BREAK = set(".,!?;:")
 
-# Recognized values for subtitle_style.case.
+# Recognized values for subtitle_style.case. "upper" is the default and matches
+# the shipped bold-overlay look; "sentence" keeps the ASR's own capitalization.
 SUBTITLE_CASE_MODES = frozenset({"upper", "sentence"})
 
 
@@ -566,13 +582,17 @@ def _words_in_range(transcript: dict, t_start: float, t_end: float) -> list[dict
 def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
     """Build an output-timeline SRT from per-source transcripts.
 
-    - 2-word chunks (break on any punctuation in between)
-    - UPPERCASE text
-    - Output times computed as word.start - segment_start + segment_offset
-    """
-    transcripts_dir = edit_dir / "transcripts"
-    sources = edl["sources"]
+    Chunking and case come from the optional `subtitle_style` block on the EDL:
 
+    - `words_per_chunk` (default 2) - words per caption line, still breaking
+      early on any punctuation in between.
+    - `case` (default "upper") - "upper" shouts every line, which suits a
+      fast-cut social edit. "sentence" leaves the ASR's own capitalization
+      alone, which is what a narrative or documentary read wants.
+    - `force_style` - an ASS override string, read in main().
+
+    Output times are computed as word.start - segment_start + segment_offset.
+    """
     style = edl.get("subtitle_style") or {}
 
     raw_chunk = style.get("words_per_chunk", 2)
@@ -587,12 +607,17 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
             f"subtitle_style.words_per_chunk must be >= 1, got {words_per_chunk}"
         )
 
+    # Validate before generating anything. An unrecognized value used to fall
+    # through applying neither transformation, which silently emitted the raw
+    # ASR capitalization -- not the documented "upper" default, and not an error.
     case_mode = str(style.get("case", "upper")).lower()
     if case_mode not in SUBTITLE_CASE_MODES:
         raise ValueError(
             f"subtitle_style.case must be one of "
             f"{', '.join(sorted(SUBTITLE_CASE_MODES))}; got {case_mode!r}"
         )
+    transcripts_dir = edit_dir / "transcripts"
+    sources = edl["sources"]
 
     entries: list[tuple[float, float, str]] = []
     seg_offset = 0.0
@@ -612,7 +637,7 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
         transcript = json.loads(tr_path.read_text())
         words_in_seg = _words_in_range(transcript, seg_start, seg_end)
 
-        # Group into 2-word chunks, break on punctuation
+        # Group into N-word chunks, break on punctuation
         chunks: list[list[dict]] = []
         current: list[dict] = []
         for w in words_in_seg:
@@ -648,19 +673,19 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path) -> None:
     # Sort and write as SRT
     entries.sort(key=lambda e: e[0])
 
-    # Sentence case: the ASR capitalizes mid-sentence words lowercase, which is
-    # correct for a continuation line but wrong when a cut makes that word the
-    # start of a sentence. Capitalize a cue that opens the file or follows one
-    # ending in sentence-final punctuation.
+    # In sentence case the ASR's capitalization is right for a continuation
+    # line but wrong when a cut promotes a mid-sentence word to the start of a
+    # sentence. Capitalize a cue that opens the file or follows one ending in
+    # sentence-final punctuation.
     if case_mode == "sentence":
-        fixed: list[tuple[float, float, str]] = []
+        recased: list[tuple[float, float, str]] = []
         prev_text = ""
         for a, b, t in entries:
             if t and (not prev_text or prev_text.rstrip()[-1:] in ".!?"):
                 t = t[0].upper() + t[1:]
-            fixed.append((a, b, t))
+            recased.append((a, b, t))
             prev_text = t
-        entries = fixed
+        entries = recased
 
     lines: list[str] = []
     for i, (a, b, t) in enumerate(entries, start=1):
@@ -898,16 +923,16 @@ def main() -> None:
         default=None,
         help="Output height in pixels (e.g. 2160, 1440, 1080). Default 1080 "
              "(720 with --draft). Width follows the source aspect. Delivering at "
-             "the source height skips the downscale entirely.",
+             "the source height skips the downscale generation entirely.",
     )
     ap.add_argument(
         "--crf",
         type=crf_value,
         default=None,
         help="x264 CRF for the per-segment extract - the FIRST of two video "
-             "encodes, so it is the quality ceiling. Lower is better. Default 16 "
-             "for final, 22 for --preview, 28 for --draft. The composite encode "
-             "is set 2 below this automatically.",
+             "encodes, so it sets the quality ceiling. Lower is better. Default "
+             "16 for final, 22 for --preview, 28 for --draft. The overlay/subtitle "
+             "composite encode is derived as (crf - 2).",
     )
     ap.add_argument(
         "--fps",
@@ -932,8 +957,8 @@ def main() -> None:
         edl, edit_dir, preview=args.preview, draft=args.draft, fps=args.fps,
         height=args.height, crf=args.crf,
     )
-    # The composite is a SECOND generation on top of the extract. Keep its CRF
-    # below the extract's so it adds as little further loss as possible.
+    # The composite is a SECOND video generation on top of the extract. Keep its
+    # CRF below the extract's so it adds as little further loss as possible.
     gen1_crf = float(args.crf) if args.crf is not None else (
         28.0 if args.draft else 22.0 if args.preview else 16.0
     )
@@ -968,12 +993,14 @@ def main() -> None:
     if args.no_loudnorm:
         # Composite directly to final output
         build_final_composite(base_path, overlays, subs_path, out_path, edit_dir,
-                              force_style=sub_force_style, crf=gen2_crf, preset=gen2_preset)
+                              force_style=sub_force_style,
+                              crf=gen2_crf, preset=gen2_preset)
     else:
         # Composite to a temp file, then run loudnorm → final output
         tmp_composite = out_path.with_suffix(".prenorm.mp4")
         build_final_composite(base_path, overlays, subs_path, tmp_composite, edit_dir,
-                              force_style=sub_force_style, crf=gen2_crf, preset=gen2_preset)
+                              force_style=sub_force_style,
+                              crf=gen2_crf, preset=gen2_preset)
         print("loudness normalization → social-ready (-14 LUFS / -1 dBTP / LRA 11)")
         apply_loudnorm_two_pass(tmp_composite, out_path, preview=args.draft)
         tmp_composite.unlink(missing_ok=True)
