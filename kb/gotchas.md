@@ -151,6 +151,37 @@ CRF 16 for masters.
 
 ---
 
+## One head branch cannot serve two PRs once their bases diverge
+
+The three change-sets were raised twice — once against upstream, once against the fork — reusing
+the same head branch for both. That works only while both bases are identical.
+
+When fork PR #1 was merged into the fork's `main`, fork PR #2 conflicted (both touched
+`build_final_composite`'s signature and `main()`). Rebasing that shared branch onto the fork's
+`main` fixed the fork PR and **silently corrupted the upstream one**: upstream #159 grew from
++82/-9 to +295/-21, absorbing #1's commits plus a fork merge commit, because upstream's `main`
+does not contain #1.
+
+Nothing warns you about this. `gh pr view <n> --json mergeable` still said MERGEABLE — the PR was
+mergeable, just no longer the change it claimed to be. **After force-pushing a branch that backs
+more than one PR, check every PR's diff size, not just its mergeability.**
+
+Resolution is one branch per base:
+
+| Branch | Base | Serves |
+|---|---|---|
+| `pr/<topic>` | upstream `main` | the upstream PR |
+| `merge/<topic>` | fork `main` | the fork PR |
+
+The upstream PR keeps the original branch, because review comment threads attach to the PR and
+would be lost by closing it.
+
+**Merge order matters for the rest.** Each fork merge into `main` can conflict the siblings that
+touch the same functions. The conflicts here were all *additive* — each side added parameters and
+neither replaced the other — so the resolution is to keep both, never to pick a side.
+
+---
+
 ## Never predict another tool's rounding — measure it
 
 `probe_scaled_dims()` originally computed ffmpeg's `scale=-2` width in Python as

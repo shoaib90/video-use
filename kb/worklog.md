@@ -5,6 +5,28 @@ re-derive it or mistake a deliberate change for a bug.
 
 ---
 
+## 2026-09-08 (later) — Resolved fork PR #2's conflicts
+
+#1 had been merged into the fork's `main`, which conflicted #2 exactly where predicted: both
+change-sets touch `build_final_composite`'s signature and `main()`. All three conflicts were
+additive, so the resolution kept both sides rather than choosing one.
+
+**The mistake worth remembering:** rebasing the shared head branch fixed the fork PR and quietly
+corrupted upstream #159, which reuses that branch against a base without #1 — it went from
++82/-9 to +295/-21 and absorbed a merge commit. `mergeable` still reported MERGEABLE, so nothing
+flagged it. Fixed by splitting one branch per base (`pr/*` on upstream `main`, `merge/*` on fork
+`main`), keeping the original branch for the upstream PR so its review threads survive; fork #2
+was closed and replaced by #4. Written up in gotchas.md.
+
+**A verification that correctly found nothing.** The combined render put a lowercase caption
+("it is to maintain") at a cut, which looked like the sentence-case fix regressing. It was my
+test EDL: I had cut mid-sentence at an arbitrary 82.0s, so the preceding cue ended without
+punctuation and the following one genuinely reads as a continuation. The real edit capitalizes it
+correctly (previous cue ends "happened.") while keeping "past week" lowercase where the cut is a
+deliberate mid-sentence trim. Left the rule alone — "fixing" it would have broken the second case.
+
+---
+
 ## 2026-09-08 — Addressed review on all three PRs
 
 Automated review raised 7 findings across #158/#159/#160. **All 7 were valid** — none were

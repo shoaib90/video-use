@@ -56,10 +56,16 @@ Branches:
   file can leak. Verified with `git diff --name-only main..<branch> | grep -E '^(kb/|CLAUDE.md|uv.lock)'`.
 
 PRs are raised **twice**: against upstream for contribution, and against the fork so they can be
-reviewed and merged into this copy independently. Fork PRs
-[#1](https://github.com/shoaib90/video-use/pull/1) /
-[#2](https://github.com/shoaib90/video-use/pull/2) /
-[#3](https://github.com/shoaib90/video-use/pull/3) mirror the upstream three.
+merged into this copy independently. That needs **one branch per base** — see gotchas.md; reusing
+a head branch for both corrupts the upstream PR the moment the fork's `main` moves ahead.
+
+| Topic | upstream PR (base: upstream `main`) | fork PR (base: fork `main`) |
+|---|---|---|
+| quality controls | [#158](https://github.com/browser-use/video-use/pull/158) `pr/output-quality` | [#1](https://github.com/shoaib90/video-use/pull/1) **merged** |
+| subtitles | [#159](https://github.com/browser-use/video-use/pull/159) `pr/configurable-subtitles` | [#4](https://github.com/shoaib90/video-use/pull/4) `merge/configurable-subtitles` |
+| Deepgram | [#160](https://github.com/browser-use/video-use/pull/160) `pr/deepgram-transcriber` | [#3](https://github.com/shoaib90/video-use/pull/3) |
+
+(Fork #2 was closed and replaced by #4 for the branch-per-base reason above.)
 
 Open upstream PRs (2026-09-07, review comments addressed):
 
