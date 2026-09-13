@@ -61,7 +61,9 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
 - **Self-eval audio numerically**, not by eye: compare the max sample-to-sample step at each cut
   boundary against a continuous-speech reference. A pop shows as a step well above it.
 - Default shell is zsh — it does **not** word-split unquoted `$var`, and it reads `$var:x`
-  as a history modifier, so brace any variable followed by `:` in an ffmpeg filter string.
+  as a history modifier. Brace **any** variable followed by `:`, not just in ffmpeg filter
+  strings: `git show "${b}:path/file"` silently returns nothing without the braces (zsh applies
+  `:h`/`:helpers…` as a modifier), which reads as "the feature is absent" rather than an error.
 - **Anything positional in the output timeline must be measured from a real render**, never
   summed from EDL floats — extracts are frame-quantised. This bit both caption offsets
   (0.6s drift by the end of a 30-segment cut) and an overlay's `start_in_output`. A cheap
