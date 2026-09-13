@@ -3,11 +3,18 @@
 macOS. Gets a second laptop to the exact state in [environment.md](environment.md).
 
 ```bash
-git clone git@github.com:shoaib90/video-use.git ~/Documents/video-use
-cd ~/Documents/video-use
-git checkout main
+git clone git@github.com:shoaib90/video-use.git ~/Documents/Github/video-use
+cd ~/Documents/Github/video-use
 bash kb/bootstrap.sh
 ```
+
+**Clone it anywhere** — the path is not baked in. `bootstrap.sh` resolves the repo from its own
+location and points the skill symlink at wherever you cloned, so `~/Documents/Github/video-use`,
+`~/Developer/video-use` or anything else works. No branch checkout is needed: `main` is the
+default and carries everything.
+
+If HTTPS is easier than SSH on that machine, swap the URL for
+`https://github.com/shoaib90/video-use.git`.
 
 The script is idempotent, so re-run it any time to repair a machine. It ends by running
 [check-env.sh](check-env.sh), so a green run means the machine really is ready.
@@ -38,8 +45,8 @@ keep the open PRs to browser-use/video-use focused — do not clone those.
 The only genuinely manual step. Copy `.env` from the first machine, or issue a new key:
 
 ```bash
-printf 'DEEPGRAM_API_KEY=%s\n' 'YOUR_KEY' > ~/Documents/video-use/.env
-chmod 600 ~/Documents/video-use/.env
+cd /path/to/your/clone          # e.g. ~/Documents/Github/video-use
+printf 'DEEPGRAM_API_KEY=%s\n' 'YOUR_KEY' > .env && chmod 600 .env
 ```
 
 Never commit it. `.env` is gitignored at line 2 — verify with `git check-ignore -v .env`.
