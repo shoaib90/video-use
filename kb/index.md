@@ -28,6 +28,8 @@ Transcribe ──> Pack ──> reason over text ──> EDL ──> Render ─�
 | [gotchas.md](gotchas.md) | Verified traps that cost real debugging time | Anything fails unexpectedly |
 | [worklog.md](worklog.md) | Dated log of local changes + why | Understanding a local divergence |
 | [check-env.sh](check-env.sh) | Re-verifies everything in environment.md | Cold start, or something broke |
+| [new-machine.md](new-machine.md) | Cloning onto another laptop; what doesn't travel | Setting up a second machine |
+| [bootstrap.sh](bootstrap.sh) | Idempotent installer for a fresh macOS machine | Same |
 
 ## Hard rules (never violate — these cause silent failures)
 

@@ -6,6 +6,36 @@ re-derive it or mistake a deliberate change for a bug.
 
 ---
 
+## 2026-09-13 — Second-machine setup made reproducible
+
+User wants the same state on another laptop, where this session's Claude Code history does not
+exist. Audited what is actually where first: **`local` is byte-identical to `fork/local`**, every
+working branch is pushed, nothing uncommitted, no stashes — so all work is on the fork. The
+fork's `main` is the incomplete one (only the three merged PRs; missing the caption-offset fix,
+the `subtitle_style` balance fix, `transcribe_whisper.py`, the `_language` cache fix and two test
+files), so a clone must check out **`local`**, not `main`.
+
+Added [bootstrap.sh](bootstrap.sh) and [new-machine.md](new-machine.md). The script was **run on
+this machine to prove it is idempotent** — it detected every existing component, changed nothing,
+and finished green through `check-env.sh`.
+
+Worth recording about the `local` vs `main` diff: it looks alarming at +4,747 lines, but 58% is
+`uv.lock` and 29% is `kb/` + `CLAUDE.md`. Only ~600 lines are code and tests. Size of a diff is a
+bad proxy for how much real change it carries.
+
+**What does not travel, verified:** `.env` (gitignored at `.gitignore:2`; confirmed with
+`git log --all -S<key>` that the key has never been committed on any branch), the ~600 MB whisper
+models, ffmpeg-with-libass, the skill symlink, `.venv/`, and `~/.claude` session history. Footage
+and `edit/` dirs live outside the repo — `edit/transcripts/` should be **copied, not
+regenerated**, since transcription is paid per call and those JSONs carry hand corrections.
+
+The session-history point is the one that matters conceptually: it does not need to travel,
+because `kb/` was built so the knowledge lives in files the repo carries and `SKILL.md` points
+at from any directory. The per-project auto-memory is deliberately a thin pointer at `kb/` rather
+than a copy, so losing it loses nothing.
+
+---
+
 ## 2026-09-08 (later) — YT1 Ep1: first scripted talking-head cut, 25 takes → 3:34
 
 Full decision record with the footage at `~/Documents/Ambitious/Editing/YT1/edit/project.md`.
