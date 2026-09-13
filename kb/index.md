@@ -46,7 +46,8 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
 
 - Run helpers as `uv run python helpers/<name>.py` — there are no console scripts.
 - `pytest` is not a declared dep: `uv run --with pytest python -m pytest tests/`.
-- Local changes live on git branch `local`; `main` stays clean for `git pull --ff-only`.
+- **`main` is the working branch** and this fork's copy of the tool (`local` is a synonym at the
+  same commit). `pr/*` branches alone are based on upstream `main`, for the open PRs.
 - Three ASR providers wired up: Deepgram (default, diarizes), whisper.cpp (free, local, no
   diarization), ElevenLabs (unconfigured). Each has a different flaw — see [gotchas.md](gotchas.md).
 - Paid transcription is cached per source. Never re-transcribe unnecessarily; iterate with whisper.

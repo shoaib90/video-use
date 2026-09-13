@@ -5,7 +5,7 @@ macOS. Gets a second laptop to the exact state in [environment.md](environment.m
 ```bash
 git clone git@github.com:shoaib90/video-use.git ~/Documents/video-use
 cd ~/Documents/video-use
-git checkout local          # NOT main — see "which branch" below
+git checkout main
 bash kb/bootstrap.sh
 ```
 
@@ -14,13 +14,12 @@ The script is idempotent, so re-run it any time to repair a machine. It ends by 
 
 ## Which branch
 
-**`local`.** That is the working branch and the one the skill runs from.
+**`main`.** It is this fork's copy of the tool and carries everything — helpers, `kb/`,
+`CLAUDE.md`, tests, `uv.lock`. `local` points at the same commit and is kept only as a synonym.
 
-`main` on the fork has only the first three merged PRs — it is missing the caption-offset fix,
-the `subtitle_style` balance fix, `transcribe_whisper.py`, the `_language` cache fix, and two
-test files. Cloning `main` gets you a materially older tool.
-
-Optionally add upstream for pulls: `git remote add origin https://github.com/browser-use/video-use.git`
+This fork is not an upstream mirror and upstream is not tracked; the fork exists to carry our own
+changes. The `pr/*` branches are the only ones based on upstream `main`, and they exist solely to
+keep the open PRs to browser-use/video-use focused — do not clone those.
 
 ## What does NOT travel with the clone, and why
 

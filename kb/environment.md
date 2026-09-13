@@ -40,50 +40,45 @@ Revert with `brew unlink ffmpeg-full && brew link ffmpeg`. Do not "fix" the unli
 A `brew upgrade` may relink the slim `ffmpeg` and silently break subtitle burn-in. If
 captions start failing, re-check `ffmpeg -filters | grep subtitles` first.
 
-## Git / upstream
+## Git
 
-| Remote | URL |
-|---|---|
-| `origin` | `browser-use/video-use` (upstream, read-only in practice) |
-| `fork` | `git@github.com:shoaib90/video-use.git` |
-
-Branches:
-
-- **`local`** — the working branch. Carries everything, including `kb/` and `CLAUDE.md`.
-  Backed up to `fork/local`. **This is the branch to work on.**
-- **`main`** — tracks upstream, kept clean so `git pull --ff-only` works. Rebase `local` onto it after pulling.
-- **`pr/*`** — one focused branch per upstream PR, each built from clean `main` so no local-only
-  file can leak. Verified with `git diff --name-only main..<branch> | grep -E '^(kb/|CLAUDE.md|uv.lock)'`.
-
-PRs are raised **twice**: against upstream for contribution, and against the fork so they can be
-merged into this copy independently. That needs **one branch per base** — see gotchas.md; reusing
-a head branch for both corrupts the upstream PR the moment the fork's `main` moves ahead.
-
-| Topic | upstream PR (base: upstream `main`) | fork PR (base: fork `main`) |
+| Remote | URL | Role |
 |---|---|---|
-| quality controls | [#158](https://github.com/browser-use/video-use/pull/158) `pr/output-quality` | [#1](https://github.com/shoaib90/video-use/pull/1) **merged** |
-| subtitles | [#159](https://github.com/browser-use/video-use/pull/159) `pr/configurable-subtitles` | [#4](https://github.com/shoaib90/video-use/pull/4) `merge/configurable-subtitles` |
-| Deepgram | [#160](https://github.com/browser-use/video-use/pull/160) `pr/deepgram-transcriber` | [#3](https://github.com/shoaib90/video-use/pull/3) |
+| `fork` | `git@github.com:shoaib90/video-use.git` | **ours — the one that matters** |
+| `origin` | `browser-use/video-use` | upstream. **Not tracked.** Kept only as a base for the open PRs. |
 
-(Fork #2 was closed and replaced by #4 for the branch-per-base reason above.)
+This fork is not a mirror. It exists to carry our own changes, so:
 
-Open upstream PRs (2026-09-07, review comments addressed):
+- **`main`** — the working branch and this fork's copy of the tool. Carries everything: helpers,
+  `kb/`, `CLAUDE.md`, tests, `uv.lock`. **Work here.**
+- **`local`** — a synonym, at the same commit. Retained only so older notes and links still
+  resolve; it can be deleted once nothing refers to it.
+- **`pr/*`** — the exception. Each is built from **upstream** `main` (`origin/main`), not from
+  ours, so the open PRs stay focused and carry no local-only files. Never reuse one of these for
+  a PR against the fork: rebasing a shared head branch onto our `main` silently corrupts the
+  upstream PR (it grew +82→+295 once). One branch per base — see gotchas.md.
+
+Because `main` is now the working branch, **fork PRs are no longer part of the workflow**; commit
+to `main` and push. Fork PRs #1–#4 were how the first three change-sets landed and are history.
+
+Open upstream PRs (all still open as of 2026-09-13):
 
 | PR | Branch | Contents |
 |---|---|---|
 | [#158](https://github.com/browser-use/video-use/pull/158) | `pr/output-quality` | `--height`, `--crf`, derived gen-2 CRF, numeric `zoom`, `audio_filter` |
-| [#159](https://github.com/browser-use/video-use/pull/159) | `pr/configurable-subtitles` | `subtitle_style` (chunking/case/force_style) + sentence-case fix |
-| [#160](https://github.com/browser-use/video-use/pull/160) | `pr/deepgram-transcriber` | `transcribe_deepgram.py` |
+| [#159](https://github.com/browser-use/video-use/pull/159) | `pr/configurable-subtitles` | `subtitle_style` (chunking/case/force_style/balance) + sentence-case fix |
+| [#160](https://github.com/browser-use/video-use/pull/160) | `pr/deepgram-transcriber` | `transcribe_deepgram.py`, provider/model/language-aware cache |
+| [#161](https://github.com/browser-use/video-use/pull/161) | `pr/caption-offset-drift` | caption offsets measured from rendered segments, not summed from the EDL |
 
 **Held back deliberately:** `transcribe_whisper.py`. `SKILL.md`'s anti-patterns list names
 "running Whisper locally" explicitly, so upstream is unlikely to want it. Ours runs on Metal in
-~4s and serves as a free cross-check rather than the primary, which is a different proposition —
-but it stays local unless upstream asks.
+~4s and serves as a free cross-check rather than the primary — a different proposition, but it
+stays ours unless upstream asks.
 
-**Never upstream:** `kb/`, `CLAUDE.md`. Machine-specific.
+**Never upstream:** `kb/`, `CLAUDE.md`, `uv.lock`. Machine- and fork-specific.
 
 #158 and #159 both touch `build_final_composite`'s signature and `main()`, so whichever merges
-second needs a trivial rebase.
+second upstream needs a trivial rebase.
 
 ## Credentials
 

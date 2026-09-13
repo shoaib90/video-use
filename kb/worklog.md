@@ -6,6 +6,29 @@ re-derive it or mistake a deliberate change for a bug.
 
 ---
 
+## 2026-09-13 (later) — `main` is now the fork's copy of the tool
+
+The fork is not tracking upstream — it exists to carry our own changes — so the "main mirrors
+upstream, work on `local`" convention was ceremony with no payoff, and it had already gone wrong:
+fork `main` sat 9 commits ahead of upstream (so `git pull --ff-only` was broken anyway) while
+simultaneously *missing* the caption-offset fix, the `subtitle_style` balance fix,
+`transcribe_whisper.py`, the `_language` cache fix and two test files.
+
+Fast-forwarded `main` to `local` (clean FF, 26 commits, no merge commit — `main` had nothing
+`local` lacked) and pushed. `main` and `local` now point at the same commit; **`main` is the
+working branch**. `local` is retained as a synonym so older notes resolve, and can be deleted.
+
+Updated every place that stated the old convention: `CLAUDE.md`, `kb/index.md`,
+`kb/environment.md` (whose Git section had become self-contradictory, calling both branches "the
+working branch") and `kb/new-machine.md` (which told a fresh clone to check out `local`, the
+opposite of what is now right). The historical worklog entry from 2026-09-07 was **left alone** —
+it was accurate when written, and a dated log should not be rewritten to match the present.
+
+The `pr/*` branches are unaffected and still based on `origin/main`: they are the one place the
+branch-per-base rule still applies, and all four upstream PRs remain open.
+
+---
+
 ## 2026-09-13 — Second-machine setup made reproducible
 
 User wants the same state on another laptop, where this session's Claude Code history does not
