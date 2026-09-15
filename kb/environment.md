@@ -40,6 +40,28 @@ Revert with `brew unlink ffmpeg-full && brew link ffmpeg`. Do not "fix" the unli
 A `brew upgrade` may relink the slim `ffmpeg` and silently break subtitle burn-in. If
 captions start failing, re-check `ffmpeg -filters | grep subtitles` first.
 
+## Machines
+
+There are now **two** checkouts, both on `main`:
+
+| Machine | Path |
+|---|---|
+| primary | `~/Documents/video-use` |
+| second  | `~/Documents/Github/video-use` |
+
+Both were set up with [bootstrap.sh](bootstrap.sh) and report green from
+[check-env.sh](check-env.sh). The path differs deliberately — nothing is hardcoded to either.
+
+**Consequence: `git pull` before starting work.** Commits made on one machine are not on the
+other until pushed and pulled, and there is no longer a single source of truth on disk. Push at
+the end of a session.
+
+**What does not sync at all:** `.env` (each machine holds its own copy), the whisper models,
+`.venv/`, Claude Code session history, and — the expensive one — **footage and `edit/`
+directories**, which live beside the video files rather than in the repo. `edit/transcripts/` in
+particular should be copied between machines rather than regenerated, since transcription is paid
+per call and those files carry hand corrections. See [new-machine.md](new-machine.md).
+
 ## Git
 
 | Remote | URL | Role |
