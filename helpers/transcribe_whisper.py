@@ -137,14 +137,35 @@ def call_whisper(audio_path: Path, model: Path, language: str | None, threads: i
     if threads:
         cmd += ["-t", str(threads)]
 
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    # errors="replace": whisper-cli streams its progress (including recognized
+    # text) to stderr and can split a multi-byte character across buffer
+    # boundaries, which makes strict UTF-8 decoding raise. Nothing downstream
+    # reads this text except the error message below — the transcript itself is
+    # read from the JSON file on disk — so lossy decoding here is harmless, and
+    # without it every non-Latin-script transcription crashes.
+    proc = subprocess.run(cmd, capture_output=True, text=True, errors="replace")
     if proc.returncode != 0:
         raise RuntimeError(f"whisper-cli failed ({proc.returncode}): {proc.stderr[-500:]}")
 
     json_path = Path(f"{out_prefix}.json")
     if not json_path.exists():
         raise RuntimeError(f"whisper-cli wrote no JSON at {json_path}")
-    return json.loads(json_path.read_text())
+    try:
+        return json.loads(json_path.read_text())
+    except UnicodeDecodeError as exc:
+        # `-ml 1` splits output at TOKEN boundaries, and whisper's byte-level BPE
+        # represents one non-Latin character as several tokens — so a Devanagari
+        # (or CJK, Cyrillic, ...) character gets cut in half and whisper-cli
+        # writes invalid UTF-8 into its own JSON. Decoding leniently here would
+        # silently hand back mojibake, which is worse than stopping: the whole
+        # point of this helper is verbatim text. Fail loudly instead.
+        raise RuntimeError(
+            f"whisper-cli wrote invalid UTF-8 at byte {exc.start} of {json_path}.\n"
+            "This is the known -ml 1 / non-Latin-script limitation: word-level "
+            "timings are not available from whisper.cpp for this language.\n"
+            "Use Deepgram for word-level timings, or run whisper-cli without "
+            "-ml for segment-level text (content cross-check only)."
+        ) from exc
 
 
 def to_contract_schema(wj: dict, spacing_threshold: float = 0.05) -> dict:
