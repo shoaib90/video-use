@@ -6,6 +6,32 @@ re-derive it or mistake a deliberate change for a bug.
 
 ---
 
+## 2026-09-18 — Remotion scaffold command was interactive; two gotchas recorded
+
+`npx create-video@latest` was prescribed in four places (`SKILL.md` x2, `install.md`,
+`kb/environment.md`). Per Remotion's CLI reference that form opens an interactive TUI, so an
+agent session would **hang** at the scaffold step rather than fail — and the docs cite scripting
+and AI agents as the reason `--yes` exists. All four now read
+`npx create-video --yes --blank --no-tailwind <dir>`.
+
+The docs also state that non-interactive mode fails inside a git repository. That makes Hard
+Rule 12's slot location (`<edit>/animations/slot_<id>/`, beside the footage) load-bearing for a
+second, previously unrecorded reason: scaffolding at the repo root would hard-fail because
+video-use is itself a git repo.
+
+Two entries added to `gotchas.md`: the create-video behaviour above, and the fact that a
+cloud/web session has no footage, no ffmpeg and no `.env`, so video work there is impossible and
+the session cannot be migrated — start a local one instead.
+
+Source: the CLI reference page, supplied into the session because `remotion.dev` and
+`registry.npmjs.org` are both blocked by the sandbox egress proxy. No command was executed
+against a real Remotion project, so the corrected invocation is **documented but not yet run** —
+the open question is whether `<directory>` accepts `.` for an in-place scaffold.
+
+Not touched: no helper code changed, and Remotion remains unused by any current project.
+
+---
+
 ## 2026-09-13 (later) — `main` is now the fork's copy of the tool
 
 The fork is not tracking upstream — it exists to carry our own changes — so the "main mirrors

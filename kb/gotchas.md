@@ -518,3 +518,61 @@ on phrase boundaries. Fixing a bug and shipping the fix are separate decisions.
 
 Hard Rule 12: all session output goes to `<videos_dir>/edit/`. The scratch/test artifacts from
 setup verification live in the session scratchpad, not here.
+
+---
+
+## `npx create-video@latest` stalls an agent session, and fails inside a git repo
+
+Read from the Remotion CLI reference for `create-video` on 2026-09-18. `remotion.dev` and
+`registry.npmjs.org` are both unreachable from a sandboxed session, so the page was supplied
+into the session rather than fetched — primary source, not recollection.
+
+The bare `npx create-video@latest` form — which this repo prescribed in four places until now —
+is **interactive**: *"If no arguments are passed, an interactive TUI will guide you through the
+setup."* Nobody is there to answer it, so the scaffold step hangs rather than failing, which is
+the worse failure mode. The docs name our exact case as the reason the escape hatch exists:
+*"useful for scripting and AI agents like Claude Code."*
+
+Three things about non-interactive mode:
+
+- `--yes` (alias `-y`) requires **both** a template flag and a directory argument. Minimum
+  working form: `npx create-video --yes --blank <dir>`.
+- **It fails when already inside a git repository.** This is a second, independent reason the
+  slot must live at `<edit>/animations/slot_<id>/` beside the footage: scaffolding at the
+  video-use repo root would hard-fail, because video-use *is* a git repo. Hard Rule 12 was
+  already keeping us out of that hole for an unrelated reason.
+- Tailwind is installed by default wherever the template supports it. Pass `--no-tailwind`; a
+  few-second overlay card has no use for a CSS framework.
+
+Version floor: `--yes` needs ≥ 4.0.439 and `--help` needs ≥ 4.0.488. environment.md records
+4.0.520 and Remotion publishes its packages in lockstep, so both are available here.
+
+**Unverified:** whether `<directory>` accepts `.` for an in-place scaffold the way
+`hyperframes init .` does. The docs show only a named subdirectory. If it does not, the project
+lands one level below the slot and the EDL overlay `file` must point wherever `remotion render`
+actually wrote — confirm with `ffprobe` on first use, as SKILL.md already instructs.
+
+---
+
+## A cloud/web session cannot do video work at all
+
+Verified 2026-09-16 in a Claude Code session running in a remote Linux container — the web/app
+execution environment, not the local CLI.
+
+Nothing the pipeline needs is present:
+
+| Need | State in the container |
+|---|---|
+| the footage | absent — the Mac filesystem is not mounted, `/Users` does not exist |
+| `ffmpeg` / `ffprobe` | not installed |
+| `.env` / `DEEPGRAM_API_KEY` | absent — gitignored, so it never travels with the clone |
+| `whisper-cli` + models | not installed |
+
+Only the repo travels. **A session cannot be moved between environments** — the container is
+fixed when the session is created — so the remedy is to start a fresh session in the local CLI
+and let `kb/` carry the knowledge across. This is precisely the case new-machine.md means by
+"session history does not matter".
+
+Recognise it early: `/Users` missing and `find / -iname '*.mp4'` returning nothing means you are
+in a cloud session, **not** that the user gave you a bad path. Say so instead of hunting for the
+folder.

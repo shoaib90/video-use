@@ -121,7 +121,7 @@ Never echo key values into tool output. Never write a key anywhere but `.env` at
 |---|---|---|
 | Manim | **0.21.0 installed**, render verified | `uv run manim -ql --format=mp4 scene.py Scene` |
 | HyperFrames | **v0.8.27**, npx cache warmed | `npx --yes hyperframes ...` |
-| Remotion | 4.0.520 reachable, scaffolded per-slot | `npx create-video@latest` |
+| Remotion | 4.0.520 reachable, scaffolded per-slot | `npx create-video --yes --blank --no-tailwind <dir>` |
 
 Manim needed system libs that aren't obvious: `brew install pkgconf cairo pango cmake`, and
 `PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig` exported, or `pycairo` fails to build.
