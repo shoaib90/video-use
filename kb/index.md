@@ -120,10 +120,23 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   stream-copied join reports a mid-stream property change and the graph fails to reinitialise.
 - **Check every B-roll cutaway against the line it sits under.** The dashcam OSD speed readout
   makes this free; it killed 2 of 7 planned cutaways on Detour-2.
+- **Place overlays with `-itsoffset`, never `setpts`, and always `repeatlast=0`** — over a long
+  render a `setpts`-placed overlay drains ahead of the timeline, runs out early and then freezes
+  the picture on its last frame. It hit 4 of 5 overlays on Detour-2 and reproduces only against
+  the real base decoded from t=0. Scan every delivery with `freezedetect`. See gotchas.md.
 - **Anything positional in the output timeline must be measured from a real render**, never
   summed from EDL floats — extracts are frame-quantised. This bit both caption offsets
   (0.6s drift by the end of a 30-segment cut) and an overlay's `start_in_output`. A cheap
   `--draft` pass measures boundaries valid at any output resolution.
+
+- **Piping frames through Python? Read and write `yuv420p` and tag the rawvideo
+  INPUT with `-color_range tv -colorspace bt709`.** A bgr24 round trip costs ~20 dB,
+  and an untagged input costs another ~19 dB, both silently. Measure any Python video
+  stage against a plain re-encode of the same file. See gotchas.md.
+- **Set music levels per cue against the programme in THAT window** — on Detour-2 the
+  windows spanned 84 dB, so one global target left two cues inaudible and one clipping.
+  Where a window has no headroom, duck the programme with the ramps outside the cue.
+  Mix before loudnorm, never after. See gotchas.md.
 
 ## Maintaining this KB
 

@@ -1416,3 +1416,113 @@ importantly, keeps the channels bit-identical instead of running a mono model
 twice and getting two slightly different answers.
 
 ---
+
+## Overlays placed with `setpts` drain ahead in a long render, then freeze on their last frame
+
+`[i:v]setpts=PTS-STARTPTS+t/TB` plus `overlay=enable='between(t,start,end)'` is the obvious way
+to place a timed overlay, and it is wrong in a way that only shows up at length.
+
+On a 27-minute cut with five overlays chained, each overlay entered its window **already some
+way into its own footage** — the 4th was 48 frames (1.6 s) in, constant from its very first
+displayed frame. Having started late in its own material it ran out early, and `overlay`'s
+default `eof_action=repeat` then held the last frame for the remainder of the enable window.
+These overlays were full-frame, so the picture froze while the audio carried on.
+
+It hit 4 of 5 overlays and grew with position in the chain: **0.43 s, 0.77 s, 1.67 s, 1.93 s**.
+The first overlay was unaffected.
+
+What makes this expensive to find: it does **not** reproduce
+
+- on a short clip,
+- on a synthetic base (`testsrc2`) of the same length, even with all five overlays chained,
+- on a slice of the real base that has been **re-encoded** (re-encoding regenerates timestamps),
+- when seeking into the real base with `-ss` — the graph has to run from t=0.
+
+The only reproduction is: real `base.mp4`, decoded from the beginning, full overlay chain.
+
+Fix — position at the demuxer and never let an overlay repeat:
+
+```
+-itsoffset <start_in_output> -i overlay.mp4        # per overlay input, BEFORE its -i
+overlay=enable='between(t,s,e)':eof_action=pass:repeatlast=0
+```
+
+Measured after: overlay frame 0 lands at 1037.500 s for a 1037.513 s cue, best frame offset
+−1 (seek granularity) against +48 before, and `freezedetect` finds nothing in the whole film.
+Keep `enable` — an overlay FILE may be longer than the EDL asks for (one was 7.50 s against a
+declared 7.267 s). Pinned by `tests/test_render_overlay_timing.py`.
+
+**Check every delivery with `freezedetect` over the whole file, without seeking:**
+
+```bash
+ffmpeg -i final.mp4 -vf freezedetect=n=-55dB:d=0.4 -map 0:v -f null - 2>&1 | grep freeze_
+```
+
+A frozen full-frame overlay is invisible to every other check: duration, frame count, segment
+dimensions and A/V sync are all still exactly right.
+
+---
+
+## Piping frames through Python: two colour traps that cost ~20 dB each
+
+Per-frame work that ffmpeg cannot express (a neural mask, a landmark detector)
+means piping rawvideo out and back. Both of the obvious ways to do it wreck the
+picture while producing a file that plays perfectly and passes every structural
+check — duration, frame count and dimensions are all still exactly right.
+
+**1. Do not round-trip through bgr24.** `yuv420p -> bgr24 -> yuv420p` is not
+idempotent. Measured on a rendered segment: **34 dB** PSNR against its own
+source, where a plain `ffmpeg -i seg -c:v libx264` re-encode of the same file
+scores **55 dB**. Every pixel in the frame was being altered in order to
+retouch a few hundred of them. Read and write `yuv420p`, do the work on the
+planes, and convert a throwaway BGR copy only if a detector needs one.
+
+**2. Tag the rawvideo INPUT, not just the output.** Raw frames carry no colour
+metadata, so ffmpeg assumes full range and silently inserts a full->limited
+conversion on the way to the encoder:
+
+```
+-f rawvideo -pix_fmt yuv420p -color_range tv -colorspace bt709 -s WxH -r FPS -i -
+```
+
+Isolated measurement of the same round trip, no processing at all:
+
+| | PSNR |
+|---|---|
+| output tagged only | **33.8 dB** |
+| input tagged too | **52.4 dB** |
+
+The symptom is a subtly washed-out picture and `color_range=unknown` on the
+result. Check with `ffprobe -show_entries stream=pix_fmt,color_range,color_space`.
+
+**Always measure a Python video stage against a plain re-encode of the same
+file**, not against nothing. "It looks fine" and "the duration matches" both
+pass while 20 dB quietly disappears. Pinned by `tests/test_retouch_teeth.py`.
+
+---
+
+## Music levels are per-window, not per-film
+
+Setting all cues to one target relative to the programme's integrated loudness
+produced two inaudible cues and one that clipped. The programme level in each
+cue's own window is what matters, and on Detour-2 it spanned **84 dB**:
+
+| cue | programme in that window | peak headroom |
+|---|---|---|
+| title reveal | −32.4 dBFS | 1.7 dB |
+| traffic jam | −23.5 dBFS (road noise) | 3.6 dB |
+| restaurant | −15.7 dBFS (shop ambience) | **−0.5 dB** |
+| dam gate | −99.6 dBFS (muted dashcam) | 57.8 dB |
+| dusk timelapse | −59.3 dBFS | 19.8 dB |
+
+Measure the window, then set the cue against it. Where the window has **no
+headroom** no music level works — duck the programme instead, and put the duck's
+ramps OUTSIDE the music window so full depth is reached before the cue enters.
+Ramping from the cue's own start leaves the first half-second unducked, which is
+exactly where the sum clipped.
+
+Mix music **before** the loudnorm pass, never after: the normaliser has to see
+the finished mix or the music rides on top of an already-normalised programme
+and pushes it past −1 dBTP with nothing to catch it.
+
+---

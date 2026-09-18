@@ -735,3 +735,66 @@ not by any error. Now parsed by key with a plausibility check.
 15 new tests (`tests/test_denoise.py`), suite at **56 passing**.
 
 **Not yet applied to the cut** — waiting on the user to pick an ambience level from the A/B.
+
+## 2026-09-18 (later) — overlay freezes, music, teeth
+
+**Overlay freezes.** User reported the picture stopping at 17:28 and 24:19. A
+full-file `freezedetect` found **four**, not two, each ending exactly where an
+overlay ends (0.43 s, 0.77 s, 1.67 s, 1.93 s — growing with position in the
+chain). Root cause: `setpts`-placed overlays drain ahead of the main timeline
+over a long render, so each entered its window already some way into its own
+footage, ran out early, and `eof_action=repeat` held the last frame. Proved by
+matching delivered frames to the overlay source pixel-for-pixel: constant +48
+frame offset from the first displayed frame. Only reproduces against the real
+`base.mp4` decoded from t=0 — not on a short clip, not on a synthetic base, not
+on a re-encoded slice, which cost time. Fixed with `-itsoffset` per input plus
+`eof_action=pass:repeatlast=0`; offset now −1 frame and zero freezes film-wide.
+10 tests in `tests/test_render_overlay_timing.py`.
+
+**Music.** Five Epidemic Sound tracks supplied; mapped to the five cues by
+measured tempo, percussive share, brightness and dynamic range rather than by
+title. Levels set per cue against the programme in that window — a single global
+target left two cues inaudible, and the restaurant window has **negative**
+headroom (programme peaks at −0.5 dBFS) so that cue ducks the programme 4 dB
+with the ramps outside the music. Mixed before loudnorm. The mix then pushed
+true peak to +0.8 dBTP, fixed with an audio-only limiter pass (video
+stream-copied): delivered at −14.5 LUFS, −0.4 dBTP.
+
+**Teeth.** My first assessment — "not worth it, 0.013% of frame" — was wrong
+because I sampled the dam monologue, where he talks rather than smiles. At the
+three windows the user named he is smiling wide and the yellow is obvious.
+Built `helpers/retouch_teeth.py`: explicit window and explicit face, mediapipe
+inner-lip mask, enamel selected by brightness and low saturation, applied in YUV.
+
+The interesting part was quality. Piping frames through Python cost ~20 dB
+twice: a `bgr24` round trip (34 dB vs 55 dB for a plain re-encode) and an
+untagged rawvideo input making ffmpeg insert a full→limited conversion (33.8 vs
+52.4 dB). Both produce a file that plays correctly and passes every structural
+check. After fixing, the three segments measure 50–56 dB against their
+originals. Frame counts unchanged, flicker 1–6% of effect size.
+
+**Delivered:** `detour2_final5.mp4`. Suite at 81 passing.
+
+### Same day — teeth pushed harder, after a mask bug
+
+User: "didn't had that much difference honestly in terms of teeth color but you
+can push it." They were right, and the cause was not timidity in the settings.
+
+The enamel mask selected "bright AND low saturation" (`S < 90`). On a real smile
+that dropped **656 bright pixels averaging saturation 99 at hue 23** — the yellow
+enamel itself. The rule was whitening the teeth that were already white and
+skipping the discoloured ones, so the effect was real but landing in the wrong
+places. Mask now keeps bright pixels that are near-neutral OR yellow at moderate
+saturation (`(S<115 & 8<=Hue<=45) | S<70`); coverage 2682 -> 3211 px on the test
+frame.
+
+Strength raised from desat 0.55 / lift 10 to **0.90 / 18**, chosen from a ladder
+rendered on a still: 1.0 / 22 flattens the teeth to uniform white and reads as
+fake, 0.90 / 18 keeps tooth-to-tooth shading.
+
+Also renamed `H` to `Hue` in the worker — `H` is the frame height everywhere else
+in the same file. It worked by Python scoping and was a trap for the next edit.
+
+**Delivered `detour2_final6.mp4`:** 0 freezes, −14.5 LUFS / −0.4 dBTP, duration
+unchanged, music unchanged, speech within 0.04 dB, untouched picture regions
+50–56 dB. Suite at 82.
