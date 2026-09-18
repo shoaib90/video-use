@@ -983,18 +983,35 @@ def build_final_composite(
         run(["ffmpeg", "-y", "-i", str(base_path), "-c", "copy", str(out_path)], quiet=True)
         return
 
+    # Position each overlay with `-itsoffset` on its INPUT, not with `setpts`
+    # inside the graph.
+    #
+    # `[i:v]setpts=PTS-STARTPTS+t/TB` looks equivalent and is not. In a long
+    # render with several overlays chained, the overlay inputs get drained ahead
+    # of the main timeline: measured on a 27-minute cut, the 4th overlay in the
+    # chain entered its window already 48 frames (1.6 s) into its own footage,
+    # played to its end, and then — because `overlay`'s default `eof_action` is
+    # `repeat` — held its LAST frame for the remaining 1.6 s. Since these
+    # overlays are full-frame, that reads as the picture freezing while the
+    # audio continues. It hit 4 of 5 overlays, and the amount grew with position
+    # in the chain (0.43 s, 0.77 s, 1.67 s, 1.93 s).
+    #
+    # Shifting at the demuxer instead lands frame 0 within a frame of its mark
+    # (measured: 1037.500 s for a 1037.513 s cue) and the drift does not occur.
     inputs: list[str] = ["-i", str(base_path)]
     for ov in overlays:
         ov_path = resolve_path(ov["file"], edit_dir)
-        inputs += ["-i", str(ov_path)]
+        inputs += ["-itsoffset", f"{float(ov['start_in_output']):.3f}",
+                   "-i", str(ov_path)]
 
+    # Chain overlays on top of base.
+    #
+    # `enable` still bounds the window, because an overlay file may be longer
+    # than the EDL asks for. `repeatlast=0` stops the last frame being held once
+    # the overlay ends, and `eof_action=pass` lets the main through untouched
+    # rather than ending the output with the shortest input. Both are needed:
+    # the freeze above was `repeat` doing exactly what it is documented to do.
     filter_parts: list[str] = []
-    # PTS-shift every overlay so its frame 0 lands at start_in_output
-    for idx, ov in enumerate(overlays, start=1):
-        t = float(ov["start_in_output"])
-        filter_parts.append(f"[{idx}:v]setpts=PTS-STARTPTS+{t}/TB[a{idx}]")
-
-    # Chain overlays on top of base
     current = "[0:v]"
     for idx, ov in enumerate(overlays, start=1):
         t = float(ov["start_in_output"])
@@ -1002,7 +1019,8 @@ def build_final_composite(
         end = t + dur
         next_label = f"[v{idx}]"
         filter_parts.append(
-            f"{current}[a{idx}]overlay=enable='between(t,{t:.3f},{end:.3f})'{next_label}"
+            f"{current}[{idx}:v]overlay=enable='between(t,{t:.3f},{end:.3f})'"
+            f":eof_action=pass:repeatlast=0{next_label}"
         )
         current = next_label
 
