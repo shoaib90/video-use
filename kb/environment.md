@@ -64,17 +64,26 @@ per call and those files carry hand corrections. See [new-machine.md](new-machin
 
 ## Git
 
-| Remote | URL | Role |
+**The remote names differ between the two checkouts. Run `git remote -v` before pushing.**
+
+| Checkout | `origin` | `fork` |
 |---|---|---|
-| `fork` | `git@github.com:shoaib90/video-use.git` | **ours — the one that matters** |
-| `origin` | `browser-use/video-use` | upstream. **Not tracked.** Kept only as a base for the open PRs. |
+| primary, `~/Documents/video-use` | `browser-use/video-use` (upstream) | `shoaib90/video-use` (**ours**) |
+| second, `~/Documents/Github/video-use` | `shoaib90/video-use` (**ours**) | not configured |
+
+So `git push origin main` means **opposite things** on the two machines: ours on the second
+checkout, upstream on the primary. Upstream is not configured at all on the second checkout,
+which is the safer arrangement — there is nothing to push to by accident.
+
+The `pr/*` branches live on **our** fork in both cases (a PR from a fork keeps its head branch
+there); what comes from upstream is the commit they are *based* on, not where they are hosted.
 
 This fork is not a mirror. It exists to carry our own changes, so:
 
 - **`main`** — the working branch and this fork's copy of the tool. Carries everything: helpers,
   `kb/`, `CLAUDE.md`, tests, `uv.lock`. **Work here.**
-- **`local`** — a synonym, at the same commit. Retained only so older notes and links still
-  resolve; it can be deleted once nothing refers to it.
+- **`local`** — was a synonym of `main`; the two have since DIVERGED (`local` was left behind
+  at the two-machines commit). Nothing works from it. Delete it rather than resyncing it.
 - **`pr/*`** — the exception. Each is built from **upstream** `main` (`origin/main`), not from
   ours, so the open PRs stay focused and carry no local-only files. Never reuse one of these for
   a PR against the fork: rebasing a shared head branch onto our `main` silently corrupts the
