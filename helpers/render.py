@@ -120,6 +120,20 @@ def resolve_path(maybe_path: str, base: Path) -> Path:
 
 HDR_TRANSFERS = {"smpte2084", "arib-std-b67"}  # PQ (HDR10) and HLG
 
+# Audio encode settings, shared by the per-segment extract and by the concat's
+# single continuous re-encode. They must agree: the concat re-encodes what the
+# extract produced, so a bitrate or rate that drifts between the two would
+# silently change the finished audio.
+#
+# `-ac 2` is load-bearing, not cosmetic. Without it every segment inherits its
+# source's channel count, so a single mono source in an otherwise stereo EDL
+# gives one segment a different channel layout from its neighbours. The concat
+# demuxer cannot carry a layout change through a re-encode, and every segment
+# after the odd one out is decoded wrong — silently, and with the file still
+# reporting the correct total duration.
+AAC_ARGS = ["-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2"]
+
+
 TONEMAP_CHAIN = (
     "zscale=t=linear:npl=100,"
     "format=gbrpf32le,"
@@ -322,6 +336,18 @@ def parse_fps(value: str) -> str:
     return f"{rate.numerator}/{rate.denominator}"
 
 
+def _rate_to_float(rate: str) -> float:
+    """Frame rate string ("30", "30000/1001") as a float. 0.0 if unparseable."""
+    try:
+        if "/" in rate:
+            num, den = rate.split("/", 1)
+            d = float(den)
+            return float(num) / d if d else 0.0
+        return float(rate)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return 0.0
+
+
 def probe_source_fps(video: Path) -> str | None:
     """Return an ffmpeg-ready source rate, preferring the average frame rate.
 
@@ -416,14 +442,6 @@ def extract_segment(
         vf_parts.append(extra_vf)
     vf = ",".join(vf_parts)
 
-    # 30ms audio fades at both edges (Rule 3) — prevent pops
-    fade_out_start = max(0.0, duration - 0.03)
-    af = f"afade=t=in:st=0:d=0.03,afade=t=out:st={fade_out_start:.3f}:d=0.03"
-    # Denoise/EQ runs BEFORE the fades so the 30ms fades stay on the true
-    # segment edges (Rule 3).
-    if audio_prefilter:
-        af = f"{audio_prefilter},{af}"
-
     if draft:
         preset, default_crf = "ultrafast", "28"
     elif preview:
@@ -438,16 +456,50 @@ def extract_segment(
     # own rate; fall back to 24 only if it can't be probed.
     out_rate = rate if rate is not None else (probe_source_fps(source) or "24")
 
+    # Snap the segment to a whole number of output frames.
+    #
+    # Video can only end on a frame boundary, so an arbitrary float duration
+    # gives a video stream quantised to the frame grid and an audio stream of
+    # the exact requested length. The two then differ by up to one frame period
+    # per segment, and because the concat butt-joins both streams the error
+    # ACCUMULATES: measured at 13 ms per segment, reaching 0.6 s of audio-ahead-
+    # of-picture over a 46-segment cut. Quantising here makes the two agree by
+    # construction, for every segment, so there is nothing to accumulate.
+    fps_value = _rate_to_float(out_rate)
+    t_epsilon = 0.0
+    if fps_value > 0:
+        n_frames = max(1, round(duration * fps_value))
+        duration = n_frames / fps_value
+        # `-t` is passed as a decimal string, and n/fps is usually not exactly
+        # representable (1358/30 -> "45.266667"), which rounds UP past the frame
+        # boundary and makes ffmpeg emit one extra frame. Bias the string a hair
+        # low. 1e-5 s is under one sample at 48 kHz, so the audio is unaffected.
+        t_epsilon = 1e-5
+
+    # 30ms audio fades at both edges (Rule 3) — prevent pops. Computed AFTER the
+    # frame snap above so the fade-out sits on the segment's real end.
+    fade_out_start = max(0.0, duration - 0.03)
+    af = (f"afade=t=in:st=0:d=0.03,"
+          f"afade=t=out:st={fade_out_start:.6f}:d=0.03,"
+          # apad guarantees the audio is never SHORTER than the video; the
+          # output `-t` below trims both streams to the same frame-aligned
+          # length, so they end together to within a sample.
+          "apad")
+    # Denoise/EQ runs BEFORE the fades so the 30ms fades stay on the true
+    # segment edges (Rule 3).
+    if audio_prefilter:
+        af = f"{audio_prefilter},{af}"
+
     cmd = [
         "ffmpeg", "-y",
         "-ss", f"{seg_start:.3f}",
         "-i", str(source),
-        "-t", f"{duration:.3f}",
+        "-t", f"{max(0.0, duration - t_epsilon):.6f}",
         "-vf", vf,
         "-af", af,
         "-c:v", "libx264", "-preset", preset, "-crf", crf,
         "-pix_fmt", "yuv420p", "-r", out_rate,
-        "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
+        *AAC_ARGS,
         "-movflags", "+faststart",
         str(out_path),
     ]
@@ -525,9 +577,17 @@ def extract_all_segments(
             print(f"        zoom:  {seg_zoom:.3f}x  (x-bias {seg_zoom_x})")
         if seg_vf:
             print(f"        vf:    {seg_vf}")
+        # Per-range `audio_filter` overrides the EDL-level one. Noise is a
+        # property of where a clip was shot, not of the edit: a windy outdoor
+        # take and a take inside a moving car want different denoise strengths,
+        # and one global setting has to compromise between them.
+        seg_audio = r.get("audio_filter")
+        seg_audio = audio_prefilter if seg_audio is None else seg_audio
+        if seg_audio != audio_prefilter:
+            print(f"        audio: {seg_audio or '(none)'}")
         extract_segment(src_path, start, duration, seg_filter, out_path,
                         preview=preview, draft=draft, rate=out_rate,
-                        extra_vf=seg_vf, audio_prefilter=audio_prefilter,
+                        extra_vf=seg_vf, audio_prefilter=seg_audio,
                         height=height, crf=crf, zoom=seg_zoom, zoom_x=seg_zoom_x)
         seg_paths.append(out_path)
 
@@ -538,7 +598,22 @@ def extract_all_segments(
 
 
 def concat_segments(segment_paths: list[Path], out_path: Path, edit_dir: Path) -> None:
-    """Lossless concat via the concat demuxer. No re-encode."""
+    """Concat via the concat demuxer: video stream-copied, audio re-encoded once.
+
+    Video is `-c:v copy` — Hard Rule 2's whole point is that the concat adds no
+    second video generation, and that is preserved exactly.
+
+    Audio is deliberately NOT stream-copied. Every segment was encoded as its own
+    AAC stream, and AAC carries encoder delay: ~1024 priming samples at the head
+    and padding at the tail of each stream. Stream-copying concatenates those
+    artefacts *into the timeline*, so each cut boundary gets a few ms of silence
+    and a discontinuity — an audible click, and one that the 30ms fades of Rule 3
+    cannot help with because it is created after the fades, by the container.
+
+    Re-encoding the decoded audio once across the whole concat produces a single
+    continuous stream with exactly one priming sequence, at the very start, where
+    it is inaudible.
+    """
     out_path.parent.mkdir(parents=True, exist_ok=True)
     concat_list = edit_dir / "_concat.txt"
     concat_list.write_text("".join(f"file '{p.resolve()}'\n" for p in segment_paths))
@@ -547,7 +622,8 @@ def concat_segments(segment_paths: list[Path], out_path: Path, edit_dir: Path) -
         "ffmpeg", "-y",
         "-f", "concat", "-safe", "0",
         "-i", str(concat_list),
-        "-c", "copy",
+        "-c:v", "copy",
+        *AAC_ARGS,
         "-movflags", "+faststart",
         str(out_path),
     ]
