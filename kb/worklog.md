@@ -352,3 +352,386 @@ against upstream keeps working. Rebase `local` onto `main` after pulling.
 **Still open:** no real footage edited yet. `ELEVENLABS_API_KEY` is unset (only Deepgram is
 configured), so audio-event tagging is unavailable. The dropped-leading-filler behaviour needs
 re-checking against real human speech.
+
+---
+
+## 2026-09-16 — Detour-2 inventory + transcription (a-roll only)
+
+Source: `~/Documents/Ambitious/Editing/Detour-2`. Scope was deliberately inventory +
+transcription only; no strategy, no EDL. Output in `<src>/edit/`.
+
+**Shape of the shoot.** 54 a-roll clips / 54.5 min (iPhone HEVC, HLG 10-bit); `b-roll/phone`
+2 clips / 50s; `b-roll/dashcam` **405 clips / 6.70 h / 77 GB**, uniformly 2592x1944 (4:3),
+30fps, aac mono — a different aspect from everything else, which any future timeline has to
+reconcile. Full per-clip ffprobe tables written to `<src>/edit/inventory/{aroll,phone,dashcam}.tsv`.
+
+**A-roll is heterogeneous in every axis that matters**: display orientation 45 landscape /
+9 portrait; frame rates 29.97 (4), 30 (46), 24 (3), 15 (1); rotation metadata spanning
+0 / ±90 / ±180; HLG on 51 clips but bt709 on the two Live Photo `.MP4`s. Per `kb/gotchas.md`
+that means the concat needs an explicit `--fps`, and the portrait clips need prepping to the
+majority geometry.
+
+**Transcribed** all 54 a-roll files with `transcribe_deepgram.py --language multi` (Hinglish,
+per the user and confirmed on a single-clip check before the batch — first clip returned
+Devanagari + Latin mixed). 4689 words, 369 phrases, `takes_packed.md` 44.8 KB.
+
+**Verified** (how): orientation by extracting one frame from all 54 clips into a contact sheet;
+empty transcripts by `volumedetect` then a local-whisper presence test; durations/codecs by
+`ffprobe`. Two new traps found — see [gotchas.md](gotchas.md).
+
+**Open / not done:** diarization is poor on this footage (308 phrases S0 vs 61 S1 despite two
+speakers conversing throughout — two voices are being merged into S0). `murgan-idli-3.mp4`
+needs a `transpose` before use. No multilingual whisper model is installed, so the KB's
+recommended free cross-check on *content* could not be run — only a presence test.
+
+## 2026-09-16 (later) — whisper cross-check on Detour-2
+
+Fetched multilingual `ggml-small.bin` (465 MB, HF `ggerganov/whisper.cpp`) to close the gap
+noted in the previous entry, and ran the cross-check. Four new entries in
+[gotchas.md](gotchas.md); `ggml-small.bin` recorded in [environment.md](environment.md).
+
+**The footage moved mid-task.** Between the inventory and the cross-check, the 16 no-dialogue
+a-roll clips were relocated to `b-roll/phone/` — exactly the 16 this session had flagged as
+music/ambient. Verified as a clean move: all 16 present at byte-identical sizes, nothing lost.
+Cross-check scope therefore became the **38** clips remaining in `a-roll/`. (Worth knowing that
+a source tree can change under a long task; the `MISSING:` list looked alarming for a minute.)
+
+**Two fixes to `helpers/transcribe_whisper.py`** (first local change to that file since it was
+written):
+1. `subprocess.run(..., errors="replace")` — whisper-cli streams recognized text to stderr and
+   splits multi-byte characters, so strict decoding crashed on *any* non-Latin transcription
+   before whisper even finished.
+2. The JSON read now raises a RuntimeError naming the `-ml 1` byte-level-BPE cause instead of a
+   bare `UnicodeDecodeError`. Deliberately **not** decoded leniently — that would return
+   mojibake as the transcript.
+Verified: Devanagari path fails with the explanatory message, English path still produces a
+transcript, `uv run --with pytest python -m pytest tests/` 25 passed / 15 subtests.
+
+**Cross-check result: Deepgram holds up.** 38 clips, whisper-en at 0.85–0.95× the Deepgram word
+count. 7 ratio outliers inspected; 3 real findings, all recorded in gotchas.md:
+- Deepgram `multi` emits **Spanish** on 3 clips (IMG_3200 47% of its words, timestamped
+  17.3–22.6s — would burn into a caption).
+- IMG_3196 `कपिल`(Kapil) vs whisper "couple/step three" — unresolved name, needs the speaker.
+- Sub-second clips hallucinate in both engines.
+
+The scariest-looking hit was a **false alarm**: whisper reported 4 sentences after Deepgram's
+last word on IMG_3187, which looked like 32s of dropped dialogue. Speech-band level (−39 vs
+−26 dB) and frames at 55/65/75s (two people sitting quietly in a car) showed it was whisper
+hallucinating on ambience. Recorded as its own gotcha — the verification pattern generalises.
+
+**Artifacts:** `<src>/edit/crosscheck-whisper.md` (side-by-side, all 38) and
+`<src>/edit/crosscheck-whisper-json/` (raw whisper segment JSON).
+
+**Still open:** diarization remains unreliable on this footage (unchanged). Whisper gives no
+independent check on *timings* for Devanagari, so Deepgram's word timings are unverified.
+IMG_3196's name needs human confirmation before it goes in a caption.
+
+## 2026-09-16 (later still) — Detour-2: first real cut
+
+The user added `notes.md` (episode) and `project.md` (standing format brief) to the footage
+folder and said to start editing. Confirmed strategy first per Hard Rule 11 / `project.md`.
+
+**Screened every clip before cutting**, as `notes.md` demands — 6-frame filmstrips for all 38
+a-roll and 18 b-roll/phone clips, dashcam sampled at the anchors. This overturned four things in
+`notes.md`; findings written to `<src>/edit/review-findings.md`:
+
+1. `murgan-idli-3.mp4` is a **landscape clip stored sideways**, not portrait. `transpose=2`
+   dissolved the "Unresolved — blocks the render" section entirely; the 4K target stands and
+   none of its three fallbacks were needed.
+2. The "unidentified silent 4K" block (3223/3224/3225 + 3182/3185/3202) is **the two of them
+   singing along to in-car music** — best-looking interior footage of the day, not scenic b-roll.
+3. Four return-leg clip times were ~1 h late and the closer was placed at the wrong dashcam
+   block, because the timeline had been built on `creation_time`. See gotchas.md.
+4. The traffic-jam speed-ramp needed a different dashcam window — found via the dashcam's
+   burned-in **speed readout**, which also exposed a GPS privacy issue.
+
+**User decisions:** two-hander (guest gets real space); both off-spec branded lines used as shot;
+title asset deferred, 4 s bed left in the cut for it.
+
+**Built:** `edit/edl.json` — 46 ranges, 16:05. Turn cut 5m54s -> 4m25s by removing only the
+duplicated brain passage, keeping each half continuous so the take's pauses and restarts survive
+(`project.md` says protect them). One subtle `zoom: 1.06` on the second half to disguise the
+single internal jump cut, since the turn takes no cutaways. Preps in `edit/prepped/`:
+transposed murgan-idli-3, pillarboxed 3214/3215, a 10s return-drive timelapse (3h29m -> 10s,
+300 sampled frames, runs into dusk), and a 7.5s jam speed-ramp overlay (18.8 min of crawl).
+
+**Verified:** 0/46 cuts inside a word (after fixing three real snapper bugs — see gotchas.md);
+**0/45 boundaries showed an audio pop** (worst 1.16x vs a continuous-speech reference, threshold
+1.5x), so Rule 3's fades hold; caption offsets measured from rendered segments showed
+**1.082 s** of frame-quantisation drift versus the EDL float sum — the largest instance of that
+trap yet recorded here, on a 46-segment cut.
+
+**Still open:** b-roll overlay pass (L-cut on the rain exchange, J-cut into the dam, dashcam
+cutaways) is deliberately a second pass — it needs the cut reviewed first, and overlays are
+resolution-specific so they get rebuilt for the 4K final. Title asset not built. Guest consent
+screening not done. Music cues not laid (no EDL field; custom `amix` pass).
+
+## 2026-09-16 (cont.) — concat audio fix on `main`
+
+User asked for: video stream-copy preserved through the concat, audio re-encoded once into a
+continuous 48 kHz / 192 kbps stream to avoid per-segment AAC priming clicks, and a regression
+test on the generated command. Done, plus one thing the investigation turned up.
+
+**`helpers/render.py`**
+- New module constant `AAC_ARGS`, shared by `extract_segment` and `concat_segments` so the two
+  cannot drift (the concat re-encodes what the extract produced).
+- `concat_segments`: `-c copy` → `-c:v copy` + `AAC_ARGS`. Rule 2 is untouched — video is still
+  stream-copied and there is still no second video generation.
+- `AAC_ARGS` includes **`-ac 2`**, which was not in the original ask but turned out to be
+  required: one mono source among 44 stereo ones was silently corrupting everything after it.
+
+**`tests/test_render_concat_audio.py`** (new, 7 tests): video stream-copied, audio re-encoded at
+192k/48k, stereo forced, no blanket `-c copy`, audio not stream-copied, concat demuxer still
+used, and extract/concat audio settings agree. Verified the tests actually catch the regression
+by temporarily reverting — 4 of 6 failed on the old code, all pass on the new. Suite 25 → 32.
+
+**Measured, not assumed.** The premise checked out and was worse than a click: the old
+`-c copy` concat added **+1.396 s of audio across 46 segments (30.4 ms per boundary)**, so audio
+drifted progressively *late* against picture, ~1.4 s by the end. Envelope cross-correlation
+against the corrected build matched the predicted drift at four points (corr up to 1.000).
+`loudnorm`'s measured LRA fell 23.8 → 18.6 once the phantom silence was gone.
+
+**The mono trap.** Right after the fix, the last segments could not be located in the
+concatenated audio at all. A control search for segment 00 (found at 0.020 s, corr 0.986)
+established the method was sound, so the result was real: `murgan-idli-3.mp4` is mono, its two
+segments sat at the break, and the concat demuxer cannot carry a channel-layout change through a
+re-encode. Everything after decoded wrong while the file kept the correct duration and played
+fine. `-ac 2` fixes it.
+
+**Also learned:** the KB's boundary-pop self-eval is blind to this class of bug — inserted
+silence is a gap, not a step discontinuity, so it reported 0/45 clean while 30 ms was being
+inserted at all 45 boundaries. Pair it with a duration check. All three lessons are in
+gotchas.md, along with a confirmation that draft and preview segment durations are bit-identical
+(max diff 0.0 ms over 46 segments).
+
+**Consequence for the episode:** the delivered preview had the drift, so the cut was re-rendered.
+
+## 2026-09-16 (cont.) — Detour-2: noise, title, dual-capture B-roll; second A/V drift fixed
+
+User asked for dashcam B-roll on the "let me show you outside" lines (full-frame or iPhone-style
+dual capture), the "Detour" title over the departure, and noise suppression.
+
+**`helpers/render.py` — second drift bug**, found while verifying the concat fix. `extract_segment`
+passed a float `-t`, so video was frame-quantised and audio was not; the error accumulated to
+0.6 s of audio-ahead-of-picture over 46 segments. Now snapped to whole frames before the fades
+are computed, with `apad`. Verified: max per-segment |audio − video| **33 ms → 0.00 ms**, total
+**−0.631 s → +0.000 s**. Tests 32 → 37 (`SegmentDurationTests`). Two sub-traps in gotchas.md.
+
+**Noise suppression.** Measured four chains on three acoustic settings rather than inheriting the
+KB's. Chose `highpass=f=100,afftdn=nr=20:nf=-28` as the EDL `audio_filter`; the previously
+recorded aggressive chain is **3 dB worse on the dam monologue**, which is the spine. Programme
+LRA fell 23.8 → 11.1 across the session's fixes.
+
+**Title.** Built as a reusable series asset in `~/Documents/Ambitious/Editing/_assets/the-detour-title/`
+(ProRes 4444 with real alpha at 3840x2160, plus the PNG sequence and the generator). Screen-space
+3D: Y-axis rotation easing to camera, ease_out_cubic, drift matching the car's direction. Not a
+tracked solve — the shot pans and this pipeline has no tracker, per notes.md — and deliberately
+flat white condensed type, no bevel/chrome/shadow. Also moved the title bed from IMG_3167 [2-6]
+(reversing in the garage) to **[41-47]**, where the car actually drives out and clears frame.
+
+**Dual-capture B-roll.** 5 PiP overlays: dashcam full-frame with a rounded, bordered inset of the
+A-roll top-left. The portrait clip (IMG_3214) uses a phone-shaped inset, which is what the look
+is imitating anyway. Each was checked against the line it sits under — **2 of 7 candidates were
+dropped** because the dashcam OSD showed 0-8 km/h while the speaker says "clear road". See
+gotchas.md.
+
+**Also fixed:** an EDL range overran its source because Deepgram timed a word at 8.96 s on a
+7.37 s clip; render.py truncated the hook silently. The EDL builder now clamps and reports.
+
+**Still open:** 4K final; music cues; guest consent screening; the two dropped cutaways pending
+a call on whether those lines are sarcastic.
+
+## 2026-09-16 (later) — Detour-2 rebuilt to the revised brief
+
+User replaced `project.md` and `notes.md` and asked for a rebuild from those alone. The new
+brief changes the shape substantially: a 0:00–0:40 cold-open montage, **dual-capture as the
+default** for driving A-roll (not an occasional effect), a standing rule that any mention of the
+road/traffic/rain cuts to dashcam, text cards, and the turn cut to 3:00–3:30.
+
+**The noise complaint was correct and my earlier reporting was wrong.** I had reported "+2.4 dB
+separation"; the user heard more noise, not less. Separation is a ratio — the absolute floor of
+the *delivered* file was 3.2 dB **louder** than the source, because `loudnorm` re-applied ~4 dB.
+Switched to `arnndn` (models fetched to `~/.cache/rnnoise-models/`), which is 12–24 dB better
+than `afftdn` on this material. User chose per scene by ear: **lq at the dam, cb in car/night**.
+That needed `ranges[].audio_filter` (new, 4 tests, suite 37 → 41). All in gotchas.md.
+
+**`murgan-idli-3` resolved** — it is a landscape clip stored sideways, not portrait. `transpose=2`
+gives native 1920×1080. notes.md Unresolved #1 (pillarbox / cut to 45s / re-record as VO / drop
+to 1080p) needs none of its options. The user suggested rotating; that was right.
+
+**ETA.** notes.md says not to doctor map footage from another vlog; the user asked to see a
+repaint first and approved it. Built tracked repaints of the CarPlay strip: scene 9 shows this
+trip's real `1:00 ETA · 26 min · 32 km`, scene 20 shows `6:46 ETA · 2:20 hrs` — **two fields, not
+three, because the distance is not known from the footage** and inventing one is the exact thing
+the brief warns against. Shown as a corner inset per the user's steer. Method and the two failed
+tracking approaches are in gotchas.md.
+
+**Built:** 72 ranges, 17m17s. 9 dual-capture prepped sources (dashcam full-frame + 24% interior
+inset, bottom-left, consistent), 4 full-frame dashcam beats, pillarboxed portrait inserts, the
+rotated shop clip, 4 overlays (title, speed-ramp, 2 ETA insets). Turn at 3:06 with all five
+spine lines the brief names. Verified 0 cuts inside a word, per-segment A/V delta 0.00 ms,
+uniform stereo.
+
+**Still open:** music (5 cues, custom `amix` pass — needs the user's tracks), the 4K final,
+guest consent screening. Dual-capture sources are built at 1080p and would need rebuilding at
+2160p for the final.
+
+**Turn in-point caught late.** The first turn range started at 58.41 s, which the snapper resolved
+to 58.66 — *inside* the preceding phrase, so the most important section of the episode opened on
+the fragment "these kind of videos." Moved to 55.85 (the phrase start, "uh, मतलब coming to
+recording these kind of videos"), which leads straight into "मैं पहले अकेला...". Fixed with a
+targeted re-extract of that one segment plus re-concat / re-SRT / re-place overlays rather than a
+72-segment re-render.
+
+Two things worth keeping from that: **a range start chosen for "2 s of lead-in" can land inside
+the previous sentence** — check the words at the in-point, not just that the snapper produced a
+legal boundary. And notes.md's "at least 2 s of clean ambience before the first word" was **not
+achievable**: the largest gap anywhere near the turn-in is 0.71 s because the take is continuous
+speech. Reported rather than manufactured.
+
+Caption drift on this render was **+0.033 s** (vs 1.082 s on the pre-fix cut) — the frame-snap
+fix means measured and EDL durations now agree almost exactly.
+
+## 2026-09-17 — Detour-2 v3: the user's line-by-line notes on the first cut
+
+User reviewed v2 and gave ~24 numbered points. Nearly all were "you trimmed content I wanted",
+so the through-line of this pass is **keep the take, cut less**.
+
+**Real defect they caught:** `murgan-idli-1.mp4` was never pillarboxed, so one segment was
+1080x1920 among 71 landscape ones. The `-c:v copy` concat accepted it silently and the player
+stretched it. A segment-dimension check now belongs in pre-render validation — see gotchas.md.
+
+**Content restored:** 3171 from its real opening ("So, what's up guys?") and full; 3173, 3174,
+3175, 3176 from their true starts; `murgan-idli-3` full 2m55s; 3206 essentially whole.
+
+**3206 — why the old cut read as broken.** The notes said the two-parts-of-the-brain point is
+made twice, keep the second. Taken literally that removed the *setup* (which is in the first
+instance) and kept only the payoff. Correct cut keeps the setup and drops just the abandoned
+first attempt (217.19-228.38). Also measured: **3206 has no pause longer than 1.5 s**, so
+"cut only long pauses" removes nothing there.
+
+**New assets:** dual-capture for 3173/3187/3214 (+ 3171/3172/3183 rebuilt longer); full-frame
+dashcam for the hill-and-arrival (`132141`) and the dam gate (`153549`-`153649`, with a "reached
+dam entry" card); `pb_murgan-idli-1`; `murgan-idli-3` re-prepped with **BMI inserts** baked in at
+the lines that name the numbers (14.0% body fat, 33.6 kg muscle mass, current InBody) — the
+InBody photos were cropped to exclude a partially visible mobile number; two timelapses
+(4 s evening bridge, 10 s dusk-into-night moved before the closer); title regenerated with a
+4.6 s hold so the word is standing as the car clears frame.
+
+**Caption fixes** in the transcripts, originals kept as `.orig`: "those who know who know",
+"smooth ride", "long ride".
+
+**Three engineering traps hit and recorded:** odd PiP dimensions vs `force_original_aspect_ratio`
+rounding; a range flush with its source overrunning after the frame-snap (this aborted a
+50-segment render at seg 43 with an intermittent AAC encoder error); and `-c copy` joins breaking
+downstream filtergraphs. EDL clamp headroom is now 0.05 s.
+
+**Result:** 50 ranges, **27m14s** (was 17m20s) — the direct cost of keeping the content. All
+segments 1920x1080, max |audio-video| 0.00 ms, 0 cuts inside a word, 5 overlays.
+
+**Open:** music (5 cues, needs the user's tracks), 4K final (dual-capture sources are 1080p and
+would need rebuilding at 2160p), guest consent screening.
+
+## 2026-09-17 — Detour-2 v4: the shop walk-in was still sideways
+
+The user replaced `b-roll/phone/murgan-idli-1.mp4` with `murgan-idli-1-new.mov` for the
+11:13-11:19 walk-in. Checking why showed the swap was fixing a **real defect, not a preference**:
+the original is 1080x1920 with *landscape content lying on its side* — the same trap as
+`murgan-idli-3`, which was caught. `-1` was not; it was read from its dimensions alone and
+"fixed" with a pillarbox, which kept the picture sideways and merely framed it in black bars. It
+then passed the uniform-dimension check (the pillarbox output is a legitimate 1920x1080) and a
+second review that only asked whether every segment was 1920x1080.
+
+Verified by extracting one frame from the raw file, the prepped `pb_` file and the new file.
+Also re-checked `murgan-idli-2.mp4` (538x954): genuinely upright portrait. So within one
+three-clip batch, sharing a session and a filename stem, two are sideways and one is not — an
+earlier gotcha entry claiming the siblings were upright has been corrected rather than caveated.
+
+**Change:** EDL source `murgan-idli-1` now points at `../b-roll/phone/murgan-idli-1-new.mov`
+directly. It is already 1920x1080 hevc/bt709, so it needs no prep; `prepped/pb_murgan-idli-1.mp4`
+is now unused. `edl.json.v3.bak` keeps the previous state.
+
+**Rebuild was surgical.** The new segment is frame-identical to the one it replaces — 240 frames,
+8.000 s video *and* audio, 1920x1080, stereo 48 kHz — so every downstream offset (overlay
+`start_in_output`, caption timings) is unchanged. Only `seg_25` was re-extracted; the other 49
+came from `clips_preview/` and `master.srt` was reused rather than rebuilt, which also protects
+the hand-made caption corrections. Driver in the scratchpad calls `render.py`'s own
+`concat_segments` / `build_final_composite` / `apply_loudnorm_two_pass` so the settings cannot
+drift from a normal render.
+
+**New gotcha:** pillarbox and transpose fix *opposite* problems that `ffprobe` reports
+identically, and the dimension check cannot tell them apart. Recorded with the rule that follows
+from it — look at one frame from every clip you *prepped*, after prepping it.
+
+### Same day — 1080p final master, and a stale-cache bug it exposed
+
+User chose a **1080p final** over 4K after seeing the numbers. Measured against what the
+originals actually hold, a 2160p master would have been true 4K for 46.5% of the runtime, a
+1.12x upscale for 37.6% (the 1080x1920 phone clips, pillarboxed), a 2x upscale for 13.0%
+(`murgan-idli-3`, `IMG_3189`, `IMG_3207` — including the longest single block in the film) and
+1.48x for the 2.9% of dashcam. It would also have meant rebuilding every `prepped/` asset at
+2160p, since those are all 1080p intermediates — 57.5% of the runtime.
+
+Final render: CRF 16 / preset `slow` segments, CRF 14 / `slow` composite, two-pass loudnorm.
+27.0 Mbps video, up from 13.6. 5.3 GB.
+
+**The clean re-extract came out 0.304 s shorter than v4, which exposed a real bug.** Six ranges
+— the ones clamped to `source_duration - 0.05` after the seg-43 abort — had been clamped *after*
+`clips_preview/` was extracted, and nothing re-extracted them. So v3 and v4 were built from
+segments 1-2 frames longer than their own EDL asks for, and `master.srt` plus all five overlay
+positions were measured against that longer timeline. Self-consistent, silent, and wrong: reusing
+those positions in the final would have put every caption after 0:24 up to 0.333 s late.
+
+Fix: rebuilt `master.srt` from `clips_graded/` (914 of 917 cues moved) and remapped the overlay
+starts onto the measured boundaries, then re-composited from the existing `base.mp4` — no
+re-extract needed. Recorded in gotchas.md with the frame-count assertion that catches it, and
+note that `round()` is banker's rounding, so the check must use the same call `extract_segment`
+does.
+
+**Verified on the delivered file:** container 1634.262667 s, video 1634.200000 s = the exact sum
+of the 50 graded segments; all 50 segments 1920x1080 and **0 disagreeing with the EDL** on frame
+count; 49 cut boundaries all clean (max step within 5 ms of a join: 213, against 5685 for
+continuous speech — the two boundaries that first looked hot were loud *content* either side, not
+seams); all 5 overlays spot-checked in place against their cued lines.
+
+## 2026-09-18 — `helpers/denoise.py`: neural denoising in the pipeline
+
+User heard wind on the dam monologue (IMG_3206) from 17:00 in the final, supplied an Adobe
+Enhance Speech v2 render as a target, then asked for the capability to be built into the repo
+rather than importing Adobe's file — naming DeepFilterNet and SpeechBrain.
+
+**Measurement first.** The complaint was correct and the gap was large: voice-normalised noise
+floor of 3206 was −42.4 dB raw, −50.1 dB as shipped, −75.9 dB from Adobe. Our `arnndn` chain had
+removed 8 dB where Adobe removed 34. Diagnosed why: wind is 72% below 300 Hz and **gusts through
+27 dB**, which is `arnndn`'s weak case — it barely touched the gusting (27.6 dB swing after, vs
+30.4 before). A scan of all 25 sources found 3206 is the **only** gusty clip (everything else
+3.4–17 dB swing), and — counter-intuitively — it has one of the *best* raw SNRs in the film
+(31.6 dB; the in-car takes are 6–11 dB). Steady drone is tolerable, gusting is not.
+
+**Engines benchmarked** on the same 25 s excerpt, band-limited to 0–8 kHz so the 16 kHz models
+are not flattered. DeepFilterNet3 + `--pf`: **−70.8 dB, 1 dB better than Adobe**, 23.2 dB better
+than shipped, 2.6 dB more 4–10 kHz presence than Adobe, at 24x realtime locally. DeepFilterNet2:
+−66.2. Both SpeechBrain models were **worse than the existing `arnndn`** (+3.4 and +1.9 dB) —
+VoiceBank-DEMAND training, 16 kHz, wrong tool. Not installed.
+
+**Built `helpers/denoise.py`.** Produces a prepped source (video stream-copied, cleaned audio),
+which is how the repo already handles anything ffmpeg cannot express — captions and offsets then
+resolve for free. Shells out to a pinned python 3.11 env it bootstraps itself, because
+DeepFilterLib has no arm64 wheel above cp311 *and* DeepFilterNet needs `torchaudio<2.2`.
+Detects dual-mono phone audio and denoises once. Asserts the sample count is unchanged and
+refuses to write if not — SpeechBrain's mtl-mimic came back 8 ms short, which would have shifted
+every cut after it.
+
+**`--ambience` restores "outdoors" the only way that works.** The obvious approach — mix the
+original back at 10% — measured −51.5 dB, i.e. exactly the old `arnndn` floor, because 84% of
+what the model strips is wind below 300 Hz. Blending the **high-passed residual** instead gives
+−59.4 dB at 10% and −54.9 dB at 20%, both still well ahead of what shipped.
+
+**Bug hit and pinned:** `probe()` read ffprobe output positionally, and ffprobe prints
+`sample_rate` before `channels` regardless of the requested order — so a stereo clip reported
+48000 channels and the helper began denoising "channel 44". Caught by watching the process list,
+not by any error. Now parsed by key with a plausibility check.
+
+15 new tests (`tests/test_denoise.py`), suite at **56 passing**.
+
+**Not yet applied to the cut** — waiting on the user to pick an ambience level from the A/B.

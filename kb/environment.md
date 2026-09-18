@@ -137,6 +137,12 @@ Scaffold Remotion/HyperFrames **inside `<edit>/animations/slot_<id>/`**, never a
 |---|---|---|
 | `ggml-small.en.bin` | 465 MB | **default** for `transcribe_whisper.py` |
 | `ggml-base.en.bin` | 141 MB | faster, but makes word errors — see gotchas.md |
+| `ggml-small.bin` | 465 MB | **multilingual**; added 2026-09-16 for the Hinglish cross-check |
+
+`ggml-small.bin` (sha256 `1be3a9b2…fea987b`) came from
+`https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin`.
+Use it with **`-l en`** on Hinglish — not `-l hi`/`-l auto`, and note that word-level
+(`-ml 1`) output is unusable for Devanagari. Both reasons are in gotchas.md.
 
 ffmpeg 9 also has a built-in `whisper` filter (`-h filter=whisper`), unused so far — the
 `whisper-cli` path gives cleaner word-level JSON.
@@ -148,3 +154,24 @@ inline file delivery to the user, publishable HTML Artifacts (cut plans, before/
 breakdowns), a separate Remotion skill, Figma/Canva connectors for branded overlay assets,
 and scheduled tasks. Parallel animation sub-agents (Hard Rule 10) work via the `Agent` tool —
 but **the user asked that it not be used unless they request it**, so confirm before fanning out.
+
+## Neural denoising — `helpers/denoise.py`
+
+DeepFilterNet3 runs locally for wind/broadband speech denoising. It cannot live in the repo's
+own environment, for two independent reasons (both in [gotchas.md](gotchas.md)): `DeepFilterLib`
+0.5.6 has no macOS arm64 wheel above cp311, and DeepFilterNet 0.5.6 needs `torchaudio<2.2`.
+
+| | |
+|---|---|
+| Env | `~/.cache/video-use/denoise-env` — python **3.11**, ~2 GB |
+| Pins | `deepfilternet==0.5.6`, `torch==2.1.2`, `torchaudio==2.1.2`, `numpy<2` |
+| Created by | `helpers/denoise.py` on first use, via `uv venv` + `uv pip install` |
+| Speed | ~24x realtime on this machine (354 s of audio in 14.6 s, CPU) |
+| Models | `DeepFilterNet3` (default) and `DeepFilterNet2`, auto-downloaded on first run |
+
+The helper shells out to that interpreter the same way it shells out to ffmpeg, so nothing in
+the repo's 3.12 env ever imports torch.
+
+**SpeechBrain was evaluated and rejected** for this job — `metricgan-plus-voicebank` and
+`mtl-mimic-voicebank` both scored *worse than the existing `arnndn` chain* on real footage, and
+both are 16 kHz models. Numbers in gotchas.md. Not installed.
