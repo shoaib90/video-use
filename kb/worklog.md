@@ -6,6 +6,95 @@ re-derive it or mistake a deliberate change for a bug.
 
 ---
 
+## 2026-09-20 — a motion graphics system, built from two reference videos
+
+User called the first graphics attempt "very basic" and pointed at two YouTube videos, then
+downloaded them locally. Both were analysed properly: the 35 s showreel sampled at 1.4 fps for
+vocabulary, the 11:44 tutorial transcribed AND read frame-by-frame *against its own script* to
+recover the mapping from spoken line to graphic.
+
+That mapping is the valuable artefact and is now in `SKILL.md`. The tutorial's framework —
+design first, then timing / weight / rhythm / intention — named exactly what was wrong with the
+first attempt: one curve, one duration, one colour, everywhere.
+
+**Built, in dependency order:**
+
+- `helpers/script_scan.py` — the decision layer. Reads transcripts, reports where a graphic
+  earns its place with confidence and evidence. Validated against the reference, where the
+  ground truth is known: it independently rediscovered essentially every graphic decision that
+  edit made. On the user's own scripts it found `"Thirteen years"` (the YT1 hook, and its
+  thumbnail) and Detour-1's `"two parts of your brain"` / `"three parts"`, with no noise.
+- `helpers/motion.py` — curves (spring, back_out, anticipate), per-role `WEIGHTS`, stagger with
+  acceleration bias, sub-frame motion blur, ProRes 4444 sequence rendering + alpha verifier.
+- `helpers/brand.py` — `derive()` measures a palette off delivered work. YT1: `#0A0A0A` /
+  `#DED3BD` / accent `#F25435` / cool `#3554F2`, which matches the thumbnail's own device.
+- `helpers/components.py` — `big_number`, `opposing_chips`, `staggered_items`, `kinetic_type`,
+  `sliding_carousel`.
+- `demotions` in the EDL + `build_demotion_filter` in render.py — speaker demotion.
+
+**Findings worth the KB** (all in gotchas.md): grouping a script on silence fails on already-
+edited footage (11 groups for 2267 words); a figure detector without a salience model buries the
+real hits 5:1; `pad` evaluates x/y once so it cannot place a shrinking picture; PIL's ImageDraw
+replaces rather than blends, which made a correct component look broken in preview; component
+timing must be absolute or a late component silently draws nothing; unfitted type is clipped by
+the canvas pad without any error.
+
+Suite 82 -> 144 tests. Demonstrated on the IMG_3052 beat, rebuilt three times.
+
+**Not built:** subject masking (type passing behind the speaker) needs a person matte.
+
+---
+
+## 2026-09-19 — Detour-1 session 2: 4:26 drive vlog -> 15:14 three-act film
+
+The user added everything the first cut never had: 207 dashcam clips covering the whole day,
+b-roll, the cafe monologue, and a studio re-record. Nothing about the tool changed; this entry
+is about what the material and the checks taught.
+
+**The footage's own problem.** The cafe monologue — the point of the trip — was lost off the
+phone. `main-clip.mov` is its surviving tail; `IMG_3629/3630` are a re-record made a month
+later. So the same argument exists twice from two locations, and the edit's real decision was
+which instance holds what. Resolution: the studio carries the argument, `IMG_3630`'s own wrap-up
+is cut, and `main-clip` delivers the conclusion from the real cafe table. The lost footage gets
+the last word.
+
+**Dual-capture as a prepped source worked exactly as the KB says it would.** 10 driving takes
+rebuilt as dashcam-full-frame + phone-interior inset, under the **original source key**, so
+caption lookup and word timings resolved with no overlay bookkeeping. Prep must not retime:
+verified every output against its source duration (all within 30 ms).
+
+**Wall-clock alignment is free and worth doing.** `com.apple.quicktime.creationdate` per take vs
+the dashcam filename timestamp agreed to the minute, and the dashcam independently corroborated
+the whole day — including a **57-minute gap 19:35->20:32 that is exactly the cafe stop**. No
+guessing which dashcam file covers a moment.
+
+**Four classes of defect caught, all now written up in gotchas.md:**
+
+1. **Ghost captions** — a range end rounded to 3 decimals landing microseconds past the next
+   word's start, so the word was captioned but never heard. The user heard this before any
+   check did. Fixed by flooring ends / ceiling starts to the millisecond.
+2. **Nine Act-1 edges cutting inside a word**, inherited from session 1's *delivered* cut.
+3. **Five mid-sentence joins that skipped the words carrying the meaning** — found only by
+   reading the assembled cut back as prose, plus a scan for same-source joins with no sentence
+   boundary either side.
+4. **A "closing shot" that was a parked car** — `freezedetect` caught 2.7 s of frozen picture;
+   a frame-difference scan (validated against a known-moving control first) found the real
+   arrival 8 minutes earlier.
+
+**Also measured:** `arnndn` lq is worth **+18 dB** of separation on in-car speech whose raw
+separation is under 2 dB, while the treated studio room is the case where *every* chain measures
+identical and the right answer is no filter at all. Caption chunking for long-form: `break_on
+".!?"` + 7-word cap + `min_words 3` took 493 cues / 86 one-word orphans down to 331 / 4.
+
+**Process note worth keeping:** reusing an interrupted run's segments is safe *only* with the
+per-segment frame-count assertion the KB already prescribes — it let a killed 4K run resume at
+the concat instead of re-extracting 109 segments. And cues anchored to a source's first output
+occurrence, rather than to hardcoded times, survived a re-cut that moved every boundary by ~9 s.
+
+**Delivered:** `final_s2_4k.mp4`, 3840x2160 @30, 15:14.
+
+---
+
 ## 2026-09-13 (later) — `main` is now the fork's copy of the tool
 
 The fork is not tracking upstream — it exists to carry our own changes — so the "main mirrors

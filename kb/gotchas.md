@@ -1526,3 +1526,367 @@ the finished mix or the music rides on top of an already-normalised programme
 and pushes it past −1 dBTP with nothing to catch it.
 
 ---
+
+## A range end rounded to 3 decimals captions a word that is never heard
+
+The nastiest bug of the Detour-1 session 2 cut, and the user heard it before any check did:
+*"full words are coming in captions, but in speech missing one word before it and jumping to
+next."*
+
+`_words_in_range` selects caption words by **overlap**. Deepgram spans are ~87% contiguous, so a
+kept word's end IS the next word's start — and rounding that edge to 3 decimals can land a few
+**microseconds** past it:
+
+| segment | range end | next word | overlap |
+|---|---|---|---|
+| IMG_3154 | 17.745 | `और` starts 17.744999 | **1 µs** |
+| IMG_3630 | 576.59 | `So` starts 576.58997 | **30 µs** |
+
+Both words were burned into the caption while none of their audio played. Nothing else catches
+this: the cut is frame-correct, the SRT is well-formed, Hard Rule 6 is satisfied (the edge is on
+a word boundary, just the wrong side of it), and the duration is right.
+
+**Round range ENDS down and STARTS up to the millisecond**, never half-even:
+
+```python
+def ms_floor(t): return math.floor(t * 1000) / 1000   # range end
+def ms_ceil(t):  return math.ceil(t * 1000) / 1000    # range start
+```
+
+That costs under 1 ms of the word being kept — inaudible, and far under one frame — and it can
+never cross into a neighbour. Flooring both edges would produce the identical bug at the IN edge,
+where it captions the *previous* word instead.
+
+**Standing check before any render:**
+
+```python
+ov = min(w["end"], r["end"]) - max(w["start"], r["start"])
+if ov > 0 and ov / (w["end"] - w["start"]) < 0.9:   # captioned but not heard
+```
+
+Related: a *hint* value fed into a re-snap must sit **inside** the target word, not on its
+leading edge. A hint at `मतलब`'s nominal start pulled in the preceding `to`, because `to` ended
+3 ms *after* `मतलब` nominally began. Aim hints at the middle of the word you want.
+
+---
+
+## Read the finished cut back as continuous prose — no structural check replaces it
+
+Three real defects in one session were invisible to every automated check and obvious in one
+read-through of the assembled text:
+
+- **Five OUT points were taken from a word's START instead of its end**, silently dropping
+  `week.` `again.` `special.` `future.` `sort.` — so sentences lost their last word. The EDL was
+  internally consistent and every boundary was on a word edge.
+- `only.` was dropped from *"today I am going to Rasta Cafe **only.**"* — the speaker's own
+  idiom, and the line reads wrong without it.
+- A section opened on *"**so that** I can continue my rigid routine…"*, a non-sequitur after the
+  preceding cut.
+
+Reconstruct the text from the EDL, not from the SRT — the SRT is chunked for display and hides
+sentence structure:
+
+```python
+" ".join(w["text"] for w in words(r["source"])
+         if w["end"] > r["start"] + EPS and w["start"] < r["end"] - EPS)
+```
+
+**And scan every same-source join that skips words without a sentence boundary on either side.**
+On this cut that found 10, of which 5 were genuinely broken — all inherited from the *delivered*
+session-1 edit:
+
+| was heard as | the words that were missing |
+|---|---|
+| "most of the places" → *jump* | "are thirty, minimum thirty kilometers from बैंगलोर" |
+| "we'll connect to this" → *jump* | "national highway which will take you to मैसूर…" |
+| "…like to do that" → "relief" | "और I don't know. It just gives me a" |
+| "series is all about" → "it is to maintain" | "whatever I am thinking … what has happened" |
+
+The "relief" one is the clearest illustration: the sentence is *"it just gives me a relief"* and
+only the word "relief" survived the cut.
+
+---
+
+## `freezedetect d=0.4` false-positives on a locked-off talking head
+
+`freezedetect=n=-55dB:d=0.4` is the right instrument for a frozen overlay, but on a static-camera
+studio shot it also flags a person simply holding still. Measured on a 15-minute cut:
+
+| flag | duration | frame-difference around it | verdict |
+|---|---|---|---|
+| parked dashcam shot | **2.7 s** | 0.20 (vs 13–25 for moving footage) | **real** |
+| studio, 8:49 | 0.40 s | 0.72 mean, peaks >20 | false positive |
+| studio, 12:12 | 0.43 s | 0.88 mean, peaks >20 | false positive |
+
+Both false positives sat *exactly* at the threshold. **Use `d=1.0` to discriminate**; it kept the
+real one and dropped both false ones. Keep `d=0.4` only where the whole frame should be moving.
+
+**And a dashcam clip near the end of a drive is probably a PARKED car.** `NO20260821-221031`
+looked like "pulling into the garage" from a single frame and is 100% static — the dashcam keeps
+recording after the engine stops. A per-clip frame-difference scan located the real arrival ~8
+minutes earlier. Two things made that scan trustworthy:
+
+- **Validate the metric on a known-moving control first.** Highway footage read 13.6 and city
+  footage 25.1 against 0.21 for the parked clips. Without that control, "everything reads 0.2"
+  looks like a broken measurement.
+- **Scan *within* the chosen clip too.** The first replacement was still wrong — the car was
+  stopped at a gate waiting for it to open for the entire window. Per-2s differences inside the
+  clip found the moving stretch (47–60 s).
+
+---
+
+## Speech buried under road noise: measure before inheriting a chain
+
+Re-measured on Detour-1, with the noise floor taken in real speech gaps located from the
+transcript:
+
+| setting | raw separation | `highpass=100,afftdn=nr=22` | **`arnndn` lq** |
+|---|---|---|---|
+| car, day (IMG_3152) | **0.9 dB** | 2.6 dB | **19.3 dB** |
+| car, day (IMG_3156) | 1.7 dB | 4.0 dB | **17.7 dB** |
+| car, night | 12.7 dB | 15.6 dB | 17.4 dB |
+| cafe (fans running) | 9.2 dB | 9.9 dB | 11.8 dB |
+| **studio (treated room)** | 7.1 dB | 7.0 dB | **7.1 dB — nothing helps** |
+
+Two things worth carrying forward. At **under 2 dB** of raw separation the speech is genuinely
+buried, not merely noisy, and the `afftdn` chain this KB recorded from an earlier shoot bought
+almost nothing — consistent with the existing note that spectral denoise barely touches broadband
+noise overlapping speech. And a **quiet room is the case where every chain measures identical**:
+there is no broadband noise to remove, so the correct setting is `audio_filter: ""`. Applying a
+chain there only attenuates the voice.
+
+---
+
+## Caption chunking for long-form: measure each option on its own
+
+The shipped default breaks on `.,!?;:`, which on a 15-minute cut with a 9-minute monologue
+produced **493 cues, 86 of them a single word** ("uh", "calling them", "the brain."). Each option
+measured in its own run:
+
+| style | cues | mean words | 1-word | 2-word |
+|---|---|---|---|---|
+| default (6 words, break on `,` too) | 493 | 4.3 | 86 | 49 |
+| `break_on ".!?"` | 435 | 4.9 | 43 | 33 |
+| + `words_per_chunk 7` | 377 | 5.6 | 36 | 17 |
+| + `min_words 3` | **331** | **6.4** | **4** | **3** |
+
+`break_on ".!?"` is the big win and costs nothing; commas in speech are breath marks, not clause
+boundaries. Mixed Devanagari/Latin cues read correctly at 7 words.
+
+---
+
+## `drawtext` does no font fallback — a missing glyph ships as a blank box
+
+Subtitles and on-screen text behave differently here, which is exactly why this is easy to miss.
+libass (the `subtitles` filter) substitutes another face for a glyph the style's font lacks, so
+mixed Devanagari/Latin captions render correctly. `drawtext` does not fall back at all: whatever
+the chosen font is missing is drawn as tofu, silently, in a file that is otherwise perfect.
+
+Measured on macOS with `HSR -> बढ़िया 5:30`:
+
+| font | Latin | Devanagari |
+|---|---|---|
+| `Helvetica.ttc` | correct | **tofu** |
+| `Kohinoor.ttc` | correct | correct |
+| `DevanagariMT.ttc` | **tofu** | correct |
+
+So a Devanagari-only face is not the safe choice either — it breaks the Latin half of a Hinglish
+line. `Kohinoor.ttc` covers both and is the one to use for this footage. Note it still lacks
+common symbols: `→` (U+2192) is **not** in it, at any of its five faces.
+
+`helpers/graphics.py` checks coverage with fontTools before building the filter and refuses,
+naming the characters. Two details that matter in that check:
+
+- A `.ttc` must be inspected at **face 0**, because that is the face `fontfile=` selects —
+  `drawtext` exposes no face index.
+- "Could not inspect the font" must not return the same value as "checked, nothing missing".
+  An earlier version returned an empty set for both, so in an environment without fontTools the
+  guard silently became a no-op while still reading as a clean result. It now returns `None` for
+  uncheckable and warns once.
+
+---
+
+## zsh: a loop variable named `path` destroys your PATH
+
+Third zsh trap in this KB. `$path` is zsh's array form of `$PATH` — they are tied together — so
+this wipes out the shell's command lookup mid-script:
+
+```zsh
+for path in /a/font.ttc /b/font.ttc; do
+  ffmpeg ... "$path"        # "command not found: ffmpeg" from the FIRST iteration
+done
+```
+
+The failure looks like a broken environment rather than a naming collision, and `export PATH=...`
+at the top of the same command does **not** save you — the loop clobbers it again immediately.
+Other tied pairs to avoid as variable names: `cdpath`, `fpath`, `manpath`.
+
+Use any other name (`fp`, `font_path`). Bit me while comparing three font files.
+
+---
+
+## Grouping a script on silence fails on footage that is already edited
+
+`script_scan.py` and anything else that reasons per phrase must split on **sentence-final
+punctuation**, not only on silence gaps. An unedited rush has pauses to split on; a finished
+video has had every one of them removed.
+
+Measured on a delivered 11-minute reference edit: grouping 2267 words on gaps >= 0.55 s produced
+**11 groups for the whole film** — paragraphs of ~200 words. Every detector then fired on the
+same paragraph, several times over, and the reported quotes were unusable. Splitting on `.?!`
+first gave proper sentences and the detections became one-to-one with what was actually on
+screen.
+
+The same applies to reading a cut back as prose, or to anything that reports "the line where X
+happens": on edited material the sentence is the unit, and the silence is gone.
+
+---
+
+## A figure detector must model salience, or it buries the real hits
+
+First pass over an 11-minute reference found **20 opportunities, 15 of them figures**. The
+reference edit put a graphic on **three**. Everything else — "give me the next ten minutes",
+"it took me four weeks" — was conversational quantity, and a detector that reports them all is
+worse than no detector, because the three that matter are now in a list of twenty.
+
+What separates them, derived by checking each against what he actually drew:
+
+| signal | effect |
+|---|---|
+| not round for its magnitude (12,917) | **+0.45** — an odd number is evidence, not an aside |
+| a range ("15k to 40k") | +0.30 — a range is always a claim being made |
+| money/audience unit, or a money verb nearby | +0.35 / +0.25 — the unit may be "a month" while the subject is money |
+| narrative anchor ("thirteen years **ago**") | +0.45 — the strongest cue in a personal essay |
+| conversational framing ("give me the next…") | **−0.45** |
+
+Three parsing traps found on real transcripts, each of which produced a confident wrong number:
+
+- **`10**(len(str(v))-2)` as the roundness divisor makes every two-digit number round**, which
+  scored "thirteen years ago" — the spine of an entire episode, and its thumbnail — at zero.
+- **A comma ends a number.** "hundred, hundred and fifty kilometers" is two alternatives; without
+  a comma boundary it parses as **10,050**.
+- **Indian spoken idiom**: "two fifty rupees" is 250, not 2 + 50. "one twenty" is 120.
+
+And one precision trick worth reusing: **"not X but Y" is only a real contrast when both X and Y
+recur in the script.** "Motion design is not difficult, but people…" is rhetorical negation;
+"difficult" occurs once. "Video editing and motion design" occur throughout. Requiring both
+sides to appear at least twice removed the false positive without losing the true one.
+
+---
+
+## Component timing must be absolute, and type must be fitted
+
+Two bugs from building the motion graphics layer, each of which cost a full render and each of
+which produced a *valid* file with something silently missing.
+
+**1. A relative duration compared against an absolute clock draws nothing.** Components took a
+`duration` and computed their exit fade as `t - (duration - fade)`, while `draw(img, t)` receives
+the ABSOLUTE output time. A component placed 11 s into the timeline therefore decided its fade
+had finished nine seconds ago and painted nothing — no error, no warning, just an overlay with a
+hole in it. Components now take absolute `start` and `end`, and every weight is anchored to
+`self.start`. There is then no offset left to get wrong.
+
+**2. Type with no fit is clipped by the canvas pad, silently.** "CONSTANTLY AFRAID OF FAILING"
+and "FOR MY MOMENT" both ran past the edge of the overlay canvas and were cut mid-word; the
+encode succeeded and the alpha check passed, because the pixels that existed were fine. Fit every
+string to the available width before drawing, and leave room for the drop shadow — fitting to
+exactly the canvas width still clips the shadow, which is what makes it read as an accident
+rather than a tight layout.
+
+A related one: **PIL does not fall back to another font either.** Same rule as `drawtext` —
+select an international face explicitly when the string contains anything above U+024F.
+
+---
+
+## PIL's ImageDraw replaces the pixel, it does not blend
+
+`ImageDraw.text`/`rectangle` with an RGBA fill writes that RGBA value straight into an RGBA
+image. It does **not** alpha-composite, and `ImageDraw.Draw(img, "RGBA")` does not change this:
+
+```python
+img = Image.new("RGBA", (8, 8), (0, 0, 0, 255))
+ImageDraw.Draw(img).rectangle([0, 0, 7, 7], fill=(255, 255, 255, 25))
+img.getpixel((4, 4))      # (255, 255, 255, 25) - NOT (25, 25, 25, 255)
+```
+
+In the real overlay pipeline this is harmless and in fact what you want: the canvas is
+transparent, each element is drawn once, the alpha lands in the PNG and **ffmpeg** composites it.
+
+It is a trap when **previewing**. Drawing a 9%-alpha element onto an opaque background and then
+`convert("RGB")` shows it at *full* brightness, because the alpha was written rather than
+applied and then discarded. A correctly-ghosted background numeral previewed as a solid slab,
+and chasing that cost a rebuild of a component that was already right.
+
+Preview the way ffmpeg composites:
+
+```python
+layer = Image.new("RGBA", size, (0, 0, 0, 0))
+component.draw(layer, t)
+Image.alpha_composite(background, layer)
+```
+
+Corollary for authoring: where two elements overlap on one canvas, the later draw **replaces**
+the earlier rather than blending over it. That happens to give the right z-order for text over a
+ghosted numeral, but it is not blending, and anything that depends on real translucency between
+two drawn elements has to go through its own layer and `alpha_composite`.
+
+---
+
+## `pad` evaluates x/y once; `overlay` can evaluate per frame
+
+To animate a picture shrinking inside a constant-size frame — speaker demotion — the obvious
+chain is `scale` with `eval=frame` into a `pad`. It does not work: **`pad` evaluates its x/y
+expressions once at configuration time**, when the input is still full size, so x resolves to 0
+and the picture collapses towards the top-left corner instead of staying centred.
+
+`overlay` onto a `color` source does evaluate per frame:
+
+```
+color=c=#0A0A0A:s=1x1:r=FPS[bg_src];
+[0:v]split[ref][src];
+[bg_src][ref]scale2ref[bg][r];[r]nullsink;
+[src]scale=w='2*floor(iw*S(t)/2)':h='2*floor(ih*S(t)/2)':eval=frame[sc];
+[bg][sc]overlay=x='W*X(t)-w/2':y='H*Y(t)-h/2':eval=frame:shortest=1
+```
+
+Both `eval=frame` are required — dropping the one on `scale` freezes the size, dropping the one
+on `overlay` freezes the position. Keep the scaled dimensions even (`2*floor(.../2)`) or the
+encode fails in yuv420p. Verified: constant 3840x2160 output, picture easing smoothly from full
+frame to a 40% card and back.
+
+---
+
+## A matte is a new signal, so it escapes the colour round-trip tax
+
+The KB records that piping frames through Python costs ~20 dB for a bgr24 round trip and another
+~19 for an untagged rawvideo input. That rule is about **modifying and writing back the
+picture**. Generating a *matte* does not: frames go in, an 8-bit mask comes out, and every
+composite stays in ffmpeg. The 4K master is never decoded into numpy at all.
+
+So the shape that avoids the whole class of problem is:
+
+```
+frames --(downscaled)--> python --> matte.mp4       # only the mask leaves Python
+[base] + behind-overlays                            # picture stays in ffmpeg
+[base] + [matte] -> alphamerge -> [subject]
+[with_overlays][subject] overlay -> out
+```
+
+Three details that each cost a debugging round:
+
+- **`scale2ref` takes TWO inputs and returns two.** `[matte][ref]scale2ref[scaled][ref_out]`.
+  Calling it with one input is a filtergraph error, and `alphamerge` needs the matte at exactly
+  the base's size or it fails naming the filter rather than the cause.
+- **Dilate the matte and smooth it over time.** A slightly generous matte hides the seam; a
+  tight one eats into a shoulder. Per-frame segmentation flicker is far more visible than a
+  matte that is a few pixels wrong.
+- **Refine against the frame's own luma.** MediaPipe's selfie segmenter is 256x256 natively, so
+  its edges are soft and do not follow the subject; a guided filter against the luma snaps them
+  back. 2 ms/frame for the model, ~24 s for a 13 s 4K clip end to end.
+
+**And the test that looks like a failure but is not:** a graphic centred behind a centred
+speaker disappears completely. That is the feature working. Place the graphic so it extends
+past the silhouette — the reference's own example spans the full frame width and lets the
+speaker occlude the middle.
+
+---

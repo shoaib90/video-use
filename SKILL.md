@@ -105,6 +105,23 @@ Helpers (`helpers/transcribe.py`, `helpers/render.py`, etc.) live alongside this
 - **`timeline_view.py <video> <start> <end>`** — filmstrip + waveform PNG. On-demand visual drill-down. **Not a scan tool** — use it at decision points, not constantly.
 - **`render.py <edl.json> -o <out>`** — per-segment extract → concat → overlays (PTS-shifted) → subtitles LAST. `--preview` for 720p fast. `--build-subtitles` to generate master.srt inline. `--height` sets the output height (default 1080) and `--crf` the extract quality (default 16 final / 22 preview) — see *Output quality* below.
 - **`grade.py <in> -o <out>`** — ffmpeg filter chain grade. Presets + `--filter '<raw>'` for custom.
+- **`script_scan.py <edit_dir>`** — reads the transcripts and reports **where a motion graphic
+  earns its place**: enumerations, figures worth showing, contrasts, attribute lists, named
+  concepts. Each hit carries a confidence, the evidence that produced it, and the component it
+  suggests. It proposes; the editor disposes. See *Finding graphic opportunities*.
+- **`motion.py`** — the motion engine: curve library (spring, overshoot, anticipation), per-role
+  **weight** presets, stagger/rhythm, real sub-frame motion blur, and ProRes 4444 sequence
+  rendering with an alpha verifier.
+- **`brand.py`** — per-channel palette, type scale and shape language, sized as fractions of the
+  output height. `derive()` measures a palette off already-delivered work rather than asserting one.
+- **`components.py`** — the archetypes: `big_number`, `opposing_chips`, `staggered_items`,
+  `kinetic_type`. Built on weights, not raw durations.
+- **`matte.py <video> -o <matte.mp4>`** — a person matte so a graphic can pass BEHIND the
+  speaker. Bootstraps its own interpreter (mediapipe needs one, like DeepFilterNet). The picture
+  never round-trips through Python — only the matte is computed.
+- **`graphics.py`** — declarative on-screen text (titles, lower thirds, chapter cards) from a
+  `graphics` block on the EDL. Anchored to sources/segments/spoken phrases, sized as fractions
+  of the output height, drawn in the composite pass *before* subtitles. See *Text graphics*.
 
 For animations, create `<edit>/animations/slot_<id>/` with `Bash` and spawn a sub-agent via the `Agent` tool.
 
@@ -240,6 +257,168 @@ Two things worth knowing when you deviate:
 
 - `"case": "sentence"` keeps the ASR's own capitalization, but a cut can promote a mid-sentence word to the start of a sentence. The builder capitalizes any cue that opens the file or follows sentence-final punctuation, so that case is handled.
 - `force_style`'s `MarginV` is relative to `PlayResY=288`. The default of 90 is tuned for **vertical** video; for 16:9 landscape a value around 28 sits the caption roughly 10% up from the bottom.
+
+## Finding graphic opportunities in a script
+
+Before building any graphic, run `script_scan.py` over the edit's transcripts. The hard part of
+motion design on a talking-head script is not drawing a chip — it is noticing that *this* line
+enumerates five things and *that* one states a figure, and leaving the rest alone.
+
+The taxonomy below came from reading a reference edit frame by frame against its own script
+(Somrat Dutta, *"If You ONLY Watch One Motion Design Video"*), matching what was on screen at
+each spoken line:
+
+| The line… | He put on screen |
+|---|---|
+| enumerates ("five pillars") | card carousel, sub-items staggering, sliding between items |
+| marks a step ("First, … Second, …") | numbered badges, or giant ghosted numerals in a carousel |
+| states a figure ("15,000 to 40,000 a month") | big numeral + unit, **attached to the entity it describes** |
+| states an oddly specific one ("12,917 dirhams") | huge number passing **behind** the speaker |
+| contrasts two topics ("X and Y are not the same") | two opposing chips, left and right |
+| lists attributes ("contrast, hierarchy and balance") | staggered sub-items under a heading |
+| names a concept ("I call it the post-mortem method") | term card |
+| is emphatic ("the single reason some reels…") | words scattered at mixed scale, speaker composited in front |
+| **is none of these** | **plain shot** |
+
+That last row is the important one. About a third of the reference carries no graphic at all,
+and the restraint is what makes the rest land. Run on a personal-narrative episode, the scanner
+should return *almost nothing* — on one it returned exactly one hit, `"Thirteen years"`, which
+is the line that episode's thumbnail is built on.
+
+Two structural devices are worth copying and are not components:
+
+- **Speaker demotion** — when the graphic carries the content, shrink the talking head to a
+  corner card and let the graphic own the frame.
+- **Attachment** — a figure means more drawn *on* the thing it describes than floating alone.
+
+Detection is deliberately conservative, and the salience model is the part to tune: a figure
+earns the screen when it is oddly specific, large, a range (which is always a claim), a money
+claim, or a narrative anchor ("thirteen years **ago**"). It loses the screen when it is round,
+small and conversational ("give me the next ten minutes").
+
+## Motion graphics
+
+Three layers, and the order matters — components built without the two beneath them produce
+exactly the flat, uniform motion that reads as amateur.
+
+**1. Weight, not duration.** Author a ROLE, never a time. `motion.WEIGHTS` maps
+`hero / primary / secondary / aside / draw / exit` to its own curve, travel, timing and whether
+it earns motion blur. The reference's test is the right one: *"a logo landing and a subtitle
+fading in should not feel the same."* Never `linear` — everything lands rather than stops.
+
+**2. A brand per channel** (`brand.json` beside the footage), all sizes as fractions of the
+output height so one definition is correct at 720p and 2160p. Derive it:
+
+```bash
+uv run python helpers/brand.py <edit>/final.mp4 <thumbnail>.png -o <edit>/brand.json
+```
+
+A palette measured off the delivered grade cannot clash with the footage it has to sit on; one
+invented in the abstract usually does.
+
+**3. Components**, each corresponding to a row of the taxonomy in *Finding graphic
+opportunities*. Times are **absolute output times**, never relative — a component that took a
+relative duration and compared it against an absolute clock silently drew nothing at all.
+
+**Speaker demotion** is an EDL block, because it transforms the base picture rather than
+drawing on top of it:
+
+```json
+"demotions": [
+  {"start": 5.67, "end": 10.53, "scale": 0.40, "anchor": "right", "transition": 0.55}
+]
+```
+
+The talking head eases down into a card and the graphic takes the frame it leaves. Two things
+this will get wrong if you are not careful:
+
+- **It is a pairing, not an effect.** A graphic that stays where the head used to be ends up
+  drawn on top of the card. Give the demoted beats their own canvas in the vacated area and
+  leave the non-demoted beats on a side strip — that usually means two overlay files.
+- `pad` cannot place the shrinking picture: its x/y are evaluated **once**, so the frame
+  collapses towards the top-left and never re-centres. `overlay` with `eval=frame` is the one
+  that works, and the scale needs `eval=frame` too.
+
+**Subject masking** lets a graphic run behind the speaker — the reference's device for its
+biggest figure. Build the matte once per base, then mark the overlay:
+
+```bash
+uv run python helpers/matte.py <edit>/base.mp4 -o <edit>/mattes/base.mp4
+```
+```json
+"matte": "mattes/base.mp4",
+"overlays": [{"file": "big.mov", "start_in_output": 0, "duration": 13.4,
+              "behind_subject": true}]
+```
+
+The composite draws the behind-overlays on the base, then cuts the subject back out over them
+with `alphamerge`. **The picture is never decoded into Python** — only the matte is, which is
+why none of the colour round-trip loss in gotchas.md applies here.
+
+Two things to expect: the matte is deliberately dilated and temporally smoothed, because a
+slightly generous matte hides a seam where a tight one eats into a shoulder, and per-frame
+flicker is far more noticeable than being slightly wrong. And **place the graphic so it extends
+past the subject** — a centred graphic behind a centred speaker simply disappears, which looks
+exactly like a broken render.
+
+Masking and demotion do not combine: the matte describes the full-frame subject, so it will not
+line up with a shrunken card. render.py warns rather than producing a silent misalignment.
+
+**`list_carousel`** is the sliding treatment: columns narrow enough that neighbours stay in
+frame (that is what makes it read as a list being traversed), a giant ghosted numeral per
+column, dashed dividers, and `ease_in_out` for the slide — a carousel that overshoots reads as
+a glitch, where a single element landing wants exactly that overshoot.
+
+Three things worth copying from the reference beyond the components themselves:
+
+- **Hierarchy over symmetry.** In a list, everything that is not the newest item drops to the
+  muted colour, so there is always exactly one focus. This does more for the look than any curve.
+- **Speaker demotion.** When the graphic carries the content, shrink the talking head to a corner
+  card and let the graphic own the frame.
+- **Restraint.** About a third of the reference has no graphic at all.
+
+Everything renders to ProRes 4444 with alpha and composites as an `overlays` entry, drawn before
+subtitles. Always check alpha on the ENCODED file (`motion.verify_alpha`) — VP9 in this build
+returns a valid, fully opaque file.
+
+## Text graphics (titles, lower thirds, chapter cards)
+
+For on-screen *text*, use the EDL's `graphics` block rather than hand-writing `drawtext`. It
+costs no extra generation — the filters ride along in the composite encode that has to happen
+anyway for subtitles.
+
+```json
+"graphics": [
+  {"type": "title", "text": "Quick fit check",
+   "anchor": {"source": "b-roll1"}, "offset": 0.35, "duration": 2.8,
+   "position": "top-right"},
+
+  {"type": "lower_third", "text": "Shoaib", "subtitle": "HSR to Filter Coffee",
+   "anchor": {"word": "my name is"}, "duration": 4.0,
+   "font": "/System/Library/Fonts/Kohinoor.ttc"},
+
+  {"type": "chapter", "text": "The drive back",
+   "anchor": {"source": "IMG_3632"}, "offset": -0.5}
+]
+```
+
+**Anchor to content, never to a timestamp.** `{"source": X, "nth": n}`, `{"segment": i}`,
+`{"word": "some phrase"}` or `{"time": t}` as an escape hatch. The first three resolve against
+the *measured* segment durations, so they stay correct when the cut changes — on a real edit a
+late round of repairs moved every boundary by ~9 s and the anchored entries needed no rework,
+while any hardcoded time would have been wrong. A `word` anchor only matches words the cut
+actually keeps, so it can never land on a line you removed.
+
+**Sizes are fractions of the output height** (`font_frac`, `margin_frac`, `y_frac`), so one entry
+is right in a 720p draft and a 2160p final.
+
+**Fonts do not fall back.** libass (subtitles) substitutes a face for a missing glyph; `drawtext`
+does not — it draws a blank box, silently, in an otherwise perfect file. Measured on macOS:
+Helvetica renders Latin but not Devanagari, `DevanagariMT` the reverse, `Kohinoor.ttc` both.
+`graphics.py` checks coverage and refuses the render with the offending characters named, so this
+fails loudly rather than shipping. Set `font` per entry for anything beyond ASCII.
+
+Anything **animated** is still an `overlays` entry — see below.
 
 ## Animations (when requested)
 

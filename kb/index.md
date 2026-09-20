@@ -124,6 +124,37 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   render a `setpts`-placed overlay drains ahead of the timeline, runs out early and then freezes
   the picture on its last frame. It hit 4 of 5 overlays on Detour-2 and reproduces only against
   the real base decoded from t=0. Scan every delivery with `freezedetect`. See gotchas.md.
+- **Round range ENDS down and STARTS up to the millisecond.** Deepgram spans are contiguous, so
+  a normally-rounded end can land microseconds past the next word's start — and captions are
+  selected by *overlap*, so that word is burned in while none of it is spoken. The user hears a
+  skip. See gotchas.md.
+- **Read the assembled cut back as continuous prose before rendering.** It is the only thing that
+  catches an OUT point taken from a word's *start* (drops the sentence's last word) or a join
+  that skips the words carrying the meaning. Found 5 broken joins in a *delivered* cut.
+- **`freezedetect d=0.4` false-positives on a locked-off talking head** — use `d=1.0`. And a
+  dashcam clip at the end of a drive is probably a *parked* car; validate any motion metric on a
+  known-moving control first.
+- **Motion graphics are three layers**: `motion.py` (curves + per-role WEIGHTS + stagger),
+  `brand.py` (a palette derived from delivered work), `components.py` (the archetypes).
+  Author a **role**, never a duration — a hero landing and an aside fading must not match.
+- **Speaker demotion** (`demotions` in the EDL) shrinks the talking head so a graphic owns the
+  frame. `pad` cannot place it — its x/y evaluate once and the picture collapses to the
+  top-left; use `overlay` with `eval=frame` on both the scale and the overlay. It is a
+  *pairing*: the graphic must move into the vacated area or it lands on the card.
+- **Subject masking** (`helpers/matte.py` + `behind_subject` on an overlay) lets a graphic pass
+  behind the speaker. Only the MATTE is computed in Python — the picture stays in ffmpeg, so the
+  colour round-trip tax does not apply. A centred graphic behind a centred subject vanishes
+  entirely; that is the feature working, not a bug.
+- **PIL's ImageDraw replaces, it does not blend.** A 9%-alpha element previewed on an opaque
+  background looks 100% opaque. Preview via `Image.alpha_composite`, as ffmpeg does.
+- **On-screen text goes in the EDL's `graphics` block** (`helpers/graphics.py`), anchored to a
+  source, segment or spoken phrase rather than a timestamp, and sized as a fraction of the output
+  height. Anchored entries survive a re-cut; hardcoded times do not.
+- **`drawtext` does NOT fall back to another font** the way libass does for subtitles — a missing
+  glyph is drawn as a blank box, silently. `Kohinoor.ttc` covers Latin + Devanagari (but not `→`).
+  See gotchas.md.
+- **Never name a zsh variable `path`** — it is tied to `$PATH` and a loop over it wipes out
+  command lookup, which reads as a broken environment. See gotchas.md.
 - **Anything positional in the output timeline must be measured from a real render**, never
   summed from EDL floats — extracts are frame-quantised. This bit both caption offsets
   (0.6s drift by the end of a 30-segment cut) and an overlay's `start_in_output`. A cheap
