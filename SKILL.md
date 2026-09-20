@@ -105,6 +105,9 @@ Helpers (`helpers/transcribe.py`, `helpers/render.py`, etc.) live alongside this
 - **`timeline_view.py <video> <start> <end>`** — filmstrip + waveform PNG. On-demand visual drill-down. **Not a scan tool** — use it at decision points, not constantly.
 - **`render.py <edl.json> -o <out>`** — per-segment extract → concat → overlays (PTS-shifted) → subtitles LAST. `--preview` for 720p fast. `--build-subtitles` to generate master.srt inline. `--height` sets the output height (default 1080) and `--crf` the extract quality (default 16 final / 22 preview) — see *Output quality* below.
 - **`grade.py <in> -o <out>`** — ffmpeg filter chain grade. Presets + `--filter '<raw>'` for custom.
+- **`coverage.py <cut.mp4> --edl … --srt … [--retention …]`** — where the timeline goes quiet:
+  visual events per minute, median hold, and every stretch over `--min-gap` with nothing
+  changing, alongside what is said there, unused b-roll, and candidate insertion points.
 - **`script_scan.py <edit_dir>`** — reads the transcripts and reports **where a motion graphic
   earns its place**: enumerations, figures worth showing, contrasts, attribute lists, named
   concepts. Each hit carries a confidence, the evidence that produced it, and the component it
@@ -257,6 +260,53 @@ Two things worth knowing when you deviate:
 
 - `"case": "sentence"` keeps the ASR's own capitalization, but a cut can promote a mid-sentence word to the start of a sentence. The builder capitalizes any cue that opens the file or follows sentence-final punctuation, so that case is handled.
 - `force_style`'s `MarginV` is relative to `PlayResY=288`. The default of 90 is tuned for **vertical** video; for 16:9 landscape a value around 28 sits the caption roughly 10% up from the bottom.
+
+## Deciding the treatment for a beat
+
+Which treatment a beat gets, not just which graphic. Run `coverage.py` on any finished cut to
+find where the timeline goes quiet, and use this table to decide what belongs there.
+
+| What the beat is doing | Treatment | Why |
+|---|---|---|
+| states a figure, enumerates, contrasts, names a concept | **graphic** (`script_scan` finds these) | read frame-by-frame off a professional reference edit |
+| references something you can actually show — a place, an object, a document, a person | **cutaway** | but it must AGREE with the line; two of seven planned cutaways were dropped on one edit because the dashcam speed readout contradicted "clear road" |
+| a jump cut between consecutive takes of one source | **push-in** (`ranges[].zoom`) | makes the splice read as intent rather than a glitch |
+| the graphic, not the speaker, carries the content | **demote** the speaker | the graphic owns the frame; see *Motion graphics* |
+| an emotional peak — a confession, a punchline, a landing | **hold.** No treatment | Tversky 2002: animation does not aid comprehension; do not animate to fill silence |
+| none of the above | **plain shot** | about a third of the reference carries nothing |
+
+Three anti-rules, each learned the expensive way:
+
+- **A graphic that repeats the caption adds nothing.** If both occupy a beat, one must say
+  something different — abstract the graphic to chapter markers, or suppress the caption.
+- **A cutaway that contradicts the line is worse than no cutaway.** It reads as an editing
+  mistake. Check the picture against the words every time.
+- **Do not treat a beat to fill silence.** Restraint is what makes the rest land.
+
+### Pacing: measure it, do not inherit it
+
+`coverage.py` reports visual events per minute, the median hold, and every stretch over
+`--min-gap` with nothing changing — cross-referenced with what is being said there, the unused
+b-roll you already own, and candidate insertion points on sentence boundaries.
+
+Measured on a delivered 3m34s personal-essay episode against an 11m44s professional explainer:
+
+| | the essay | the explainer |
+|---|---|---|
+| visual events | 2.8/min | 8.6/min |
+| median hold | 4.3 s | 3.6 s |
+| longest static stretch | **124.9 s** | 58.9 s |
+
+**Do not copy the explainer's rate.** Format decides pace, and a reflective essay earns holds a
+tutorial does not. The number that mattered was not the average but the single 125-second
+stretch — 58% of that film — where nothing changed at all, while nine b-roll assets sat unused.
+A working rule is a *ceiling*, not a target: no stretch beyond ~25-30 s without something
+changing, unless the hold is deliberate.
+
+And the honest limit of all of the above: this measures **change**, not **interest**. Pass
+`--retention` with a YouTube Studio audience-retention export and the report shows what each
+gap actually cost in viewers — which replaces every rule here with evidence from the channel's
+own audience.
 
 ## Finding graphic opportunities in a script
 

@@ -1929,3 +1929,47 @@ an oversight.
   seen before".
 
 ---
+
+## An EDL in a subdirectory loses its transcripts, and an empty SRT hard-fails
+
+`render.py` takes `edit_dir` from the EDL's own parent, and `build_master_srt` reads
+`<edit_dir>/transcripts/<source_key>.json`. So a scratch EDL placed in `edit/gfx_demo/`
+looks for `edit/gfx_demo/transcripts/` and finds nothing.
+
+The failure is two-stage and the first stage is quiet: a missing transcript is a soft skip
+(`no transcript for X, skipping captions`), so the SRT is written with **0 cues**, and only
+then does the subtitle filter fail — `ffmpeg` exits 183 on an empty subtitle file, with an
+error that says nothing about transcripts.
+
+Symlink the real directory next to the scratch EDL:
+
+```bash
+ln -sfn ../transcripts <edit>/gfx_demo/transcripts
+```
+
+Worth checking the cue count in the render log (`master SRT → master.srt (N cues)`) whenever a
+demo EDL lives anywhere other than the main edit directory. `0 cues` is the tell.
+
+---
+
+## A graphic that repeats the caption adds nothing
+
+The scanner reported **no opportunity** on a roadmap line — *"I'm going to show you exactly
+what changed my answer and the philosophy that I use now"*. Overriding it and setting the two
+promised items as `WHAT CHANGED MY ANSWER` / `THE PHILOSOPHY I USE NOW` produced a graphic
+that said, word for word, what the burned caption underneath already said. Two renders of the
+same sentence, one above the other.
+
+The fix is not to drop the graphic but to **abstract it**: `① THE TURN`, `② THE PHILOSOPHY`.
+Chapter markers do something the caption cannot — they announce structure and persist past the
+words — and they are short enough to leave a real margin, which fixed a composition problem in
+the same move.
+
+Two rules from this:
+
+- When a graphic and a caption occupy the same beat, one of them must be **saying something
+  different**. Either abstract the graphic, or suppress the caption for that span.
+- **A shorter label is usually the fix for a crowding problem too.** The verbatim version ran
+  to 88 px from the frame edge and read as clipped even though it was not.
+
+---

@@ -141,6 +141,14 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   frame. `pad` cannot place it — its x/y evaluate once and the picture collapses to the
   top-left; use `overlay` with `eval=frame` on both the scale and the overlay. It is a
   *pairing*: the graphic must move into the vacated area or it lands on the card.
+- **Run `helpers/coverage.py` on any finished cut.** It reports visual events/min, median hold,
+  and every stretch with nothing changing — with what is said there, the unused b-roll you own,
+  and insertion points on sentence boundaries. A delivered 3m34s episode had **124.9s (58%)**
+  with no visual change while 9 b-roll assets sat unused.
+- **Pacing is a ceiling, not a target.** Format decides pace — do not copy an explainer's
+  8.6 events/min onto a personal essay. The rule is: no stretch beyond ~25-30s without
+  something changing, unless the hold is deliberate. And this measures CHANGE, not INTEREST;
+  a retention export replaces the whole guess.
 - **UI motion numbers are wrong for video.** Web guidance (150 ms default, <500 ms) exists
   because the user is *waiting*; a video viewer is not. `motion.WEIGHTS` is deliberately 2-4x
   slower. What does transfer: curve for opacity, spring for transforms — a spring on alpha
