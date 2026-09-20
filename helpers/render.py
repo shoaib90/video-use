@@ -134,6 +134,26 @@ HDR_TRANSFERS = {"smpte2084", "arib-std-b67"}  # PQ (HDR10) and HLG
 AAC_ARGS = ["-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2"]
 
 
+try:                                    # normal package import
+    from . import graphics as graphics_mod
+except ImportError:                      # run directly as a script
+    import importlib.util as _ilu
+    _spec = _ilu.spec_from_file_location(
+        "video_use_graphics", Path(__file__).with_name("graphics.py"))
+    graphics_mod = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(graphics_mod)
+
+
+def probe_video_height(video: Path) -> int:
+    """Actual output height, for sizing graphics that are declared as fractions."""
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=height",
+         "-of", "default=noprint_wrappers=1:nokey=1", str(video)],
+        capture_output=True, text=True, check=True)
+    return int(out.stdout.strip().splitlines()[0])
+
+
 TONEMAP_CHAIN = (
     "zscale=t=linear:npl=100,"
     "format=gbrpf32le,"
@@ -958,6 +978,69 @@ def apply_loudnorm_two_pass(
     return True
 
 
+# -------- Speaker demotion ---------------------------------------------------
+
+
+ANCHORS = {"right": 0.72, "left": 0.28, "center": 0.5,
+           "top-right": 0.72, "bottom-right": 0.72}
+
+
+def _smoothstep(u: str) -> str:
+    """Cubic ease as an ffmpeg expression. `linear` reads as mechanical here
+    just as it does everywhere else."""
+    return f"(({u})*({u})*(3-2*({u})))"
+
+
+def build_demotion_filter(demotions: list[dict], bg: str, fps: str,
+                          in_label: str = "[0:v]",
+                          out_label: str = "[dem]") -> tuple[str, str]:
+    """Shrink the talking head into a card so a graphic can own the frame.
+
+    The reference does this whenever the graphic carries the content, and it is
+    the difference between a caption sitting on a shot and a designed frame.
+
+    Implemented as an animated `scale` (eval=frame) composited onto a brand
+    backdrop with `overlay` (also eval=frame). `pad` cannot be used for the
+    placement: its x/y are evaluated ONCE at configuration time, so the picture
+    shrinks towards the top-left corner and never re-centres.
+
+    Output dimensions stay constant, which is what the encoder requires.
+    """
+    if not demotions:
+        return "", in_label
+
+    # f(t) is 0 outside every window and 1 inside, easing across the transition
+    terms = []
+    for d in demotions:
+        a, b = float(d["start"]), float(d["end"])
+        tau = max(0.05, float(d.get("transition", 0.55)))
+        u_in = f"clip((t-{a:.4f})/{tau:.4f},0,1)"
+        u_out = f"clip((t-{max(a, b - tau):.4f})/{tau:.4f},0,1)"
+        terms.append(f"({_smoothstep(u_in)}-{_smoothstep(u_out)})")
+    f = "+".join(terms)
+
+    # one scale and one anchor for the whole set; per-window values would need
+    # a weighted sum, and no real cut has wanted that yet
+    k = float(demotions[0].get("scale", 0.36))
+    ax = ANCHORS.get(str(demotions[0].get("anchor", "right")), 0.72)
+    ay = float(demotions[0].get("anchor_y", 0.5))
+
+    sc = f"(1+({k:.4f}-1)*({f}))"
+    xf = f"(0.5+({ax:.4f}-0.5)*({f}))"
+    yf = f"(0.5+({ay:.4f}-0.5)*({f}))"
+
+    chain = (
+        f"color=c={bg}:s=1x1:r={fps}[dbg_src];"
+        f"{in_label}split[dbg_ref][dsrc];"
+        f"[dbg_src][dbg_ref]scale2ref[dbg][dref];"
+        f"[dref]nullsink;"
+        f"[dsrc]scale=w='2*floor(iw*{sc}/2)':h='2*floor(ih*{sc}/2)':eval=frame[dsc];"
+        f"[dbg][dsc]overlay=x='W*{xf}-w/2':y='H*{yf}-h/2':eval=frame:shortest=1"
+        f"{out_label}"
+    )
+    return chain, out_label
+
+
 # -------- Final compositing (Rule 1 + Rule 4) -------------------------------
 
 
@@ -970,15 +1053,28 @@ def build_final_composite(
     force_style: str = SUB_FORCE_STYLE,
     crf: str = "18",
     preset: str = "fast",
+    graphics: list[dict] | None = None,
+    demotions: list[dict] | None = None,
+    brand_bg: str = "#0B0B0C",
+    fps: str = "30",
+    matte: Path | None = None,
 ) -> None:
-    """Final pass: base → overlays (PTS-shifted) → subtitles LAST → out.
+    """Final pass: base → overlays → text graphics → subtitles LAST → out.
 
-    If there are no overlays and no subtitles, just copy base to out.
+    `graphics` are resolved entries from `graphics.py`. They are drawn after the
+    overlays and before the subtitle burn, so a caption is never hidden behind a
+    title (Rule 1), and they cost no extra generation — they ride along in the
+    composite encode that has to happen anyway.
+
+    If there is nothing to draw at all, just copy base to out.
     """
+    graphics = graphics or []
+    demotions = demotions or []
     has_overlays = bool(overlays)
     has_subs = subtitles_path is not None and subtitles_path.exists()
+    has_graphics = bool(graphics)
 
-    if not has_overlays and not has_subs:
+    if not has_overlays and not has_subs and not has_graphics and not demotions:
         # Nothing to do — just rename/copy base to final name
         run(["ffmpeg", "-y", "-i", str(base_path), "-c", "copy", str(out_path)], quiet=True)
         return
@@ -998,11 +1094,28 @@ def build_final_composite(
     #
     # Shifting at the demuxer instead lands frame 0 within a frame of its mark
     # (measured: 1037.500 s for a 1037.513 s cue) and the drift does not occur.
+    # An overlay marked `behind_subject` is drawn on the base and then the
+    # subject is cut back out over it, so the graphic passes BEHIND the speaker.
+    behind = [o for o in overlays if o.get("behind_subject")]
+    front = [o for o in overlays if not o.get("behind_subject")]
+    if behind and not matte:
+        raise ValueError("an overlay is marked behind_subject but no matte was "
+                         "supplied; build one with helpers/matte.py")
+    if behind and demotions:
+        # the matte is of the undemoted frame, so it would not line up
+        print("  warning: behind_subject overlays and demotions do not combine; "
+              "the matte describes the full-frame subject")
+    overlays = behind + front          # chain order: behind first
+
     inputs: list[str] = ["-i", str(base_path)]
     for ov in overlays:
         ov_path = resolve_path(ov["file"], edit_dir)
         inputs += ["-itsoffset", f"{float(ov['start_in_output']):.3f}",
                    "-i", str(ov_path)]
+    matte_idx = None
+    if matte:
+        matte_idx = len(overlays) + 1
+        inputs += ["-i", str(matte)]
 
     # Chain overlays on top of base.
     #
@@ -1013,6 +1126,16 @@ def build_final_composite(
     # the freeze above was `repeat` doing exactly what it is documented to do.
     filter_parts: list[str] = []
     current = "[0:v]"
+    if matte_idx is not None:
+        # keep a clean copy of the base to cut the subject from later
+        filter_parts.append("[0:v]split[b_main][b_subj]")
+        current = "[b_main]"
+    # Demotion transforms the BASE, so it happens before anything is drawn on
+    # top of it.
+    if demotions:
+        dem, current = build_demotion_filter(demotions, brand_bg, fps)
+        filter_parts.append(dem)
+        print(f"  demotions: {len(demotions)}")
     for idx, ov in enumerate(overlays, start=1):
         t = float(ov["start_in_output"])
         dur = float(ov["duration"])
@@ -1023,6 +1146,28 @@ def build_final_composite(
             f":eof_action=pass:repeatlast=0{next_label}"
         )
         current = next_label
+        # once the last BEHIND overlay is drawn, put the subject back on top
+        if matte_idx is not None and idx == len(behind) and behind:
+            # alphamerge needs the matte at EXACTLY the base's size, or it
+            # fails with a frame-size mismatch that names the filter and not
+            # the cause
+            # scale2ref scales its FIRST input to match its SECOND, and
+            # returns both - so the base copy comes back out as [bsj]
+            filter_parts.append(
+                f"[{matte_idx}:v][b_subj]scale2ref=flags=bicubic[mk][bsj];"
+                f"[mk]format=gray[mkg];"
+                f"[bsj][mkg]alphamerge[subj];"
+                f"{current}[subj]overlay=eof_action=pass:repeatlast=0[vsubj]")
+            current = "[vsubj]"
+
+    # Text graphics: after the overlays, before the subtitles. Sized against the
+    # real output height so one EDL entry is correct at every resolution.
+    if has_graphics:
+        out_h = probe_video_height(base_path)
+        chain = ",".join(graphics_mod.build_filters(graphics, out_h,
+                                                    edit_dir / "graphics"))
+        filter_parts.append(f"{current}{chain}[g]")
+        current = "[g]"
 
     # Subtitles LAST — Rule 1
     if has_subs:
@@ -1032,8 +1177,8 @@ def build_final_composite(
         )
         out_label = "[outv]"
     else:
-        # Rename the last overlay output to [outv] for consistency
-        if has_overlays:
+        # Rename the last stage's output to [outv] for consistency
+        if has_overlays or has_graphics:
             filter_parts.append(f"{current}null[outv]")
             out_label = "[outv]"
         else:
@@ -1163,17 +1308,50 @@ def main() -> None:
     # 4. Composite (overlays + subtitles LAST) → intermediate (pre-loudnorm) path
     overlays = edl.get("overlays") or []
     sub_force_style = (edl.get("subtitle_style") or {}).get("force_style") or SUB_FORCE_STYLE
+
+    # Graphics anchor to sources, segments or spoken phrases; resolve them
+    # against the MEASURED segment durations, never a sum of EDL floats.
+    demotions = edl.get("demotions") or []
+    brand_bg = "#0B0B0C"
+    bpath = edit_dir / "brand.json"
+    if not bpath.exists():
+        bpath = edit_dir.parent / "brand.json"
+    if bpath.exists():
+        try:
+            brand_bg = json.loads(bpath.read_text()).get("bg", brand_bg)
+        except Exception:
+            pass
+
+    matte_path = None
+    if edl.get("matte"):
+        matte_path = resolve_path(edl["matte"], edit_dir)
+        if not matte_path.exists():
+            print(f"warning: matte not found: {matte_path}")
+            matte_path = None
+
+    graphics = edl.get("graphics") or []
+    if graphics:
+        durations = [probe_duration(p) for p in segment_paths]
+        graphics = graphics_mod.resolve_anchors(graphics, edl, edit_dir, durations)
+        print(f"graphics: {len(graphics)} resolved")
+        for g in graphics:
+            print(f"  {g['type']:<12} {g['start']:8.3f}s +{g['duration']:.2f}s  "
+                  f"{str(g.get('text', ''))[:40]}")
     if args.no_loudnorm:
         # Composite directly to final output
         build_final_composite(base_path, overlays, subs_path, out_path, edit_dir,
                               force_style=sub_force_style,
-                              crf=gen2_crf, preset=gen2_preset)
+                              crf=gen2_crf, preset=gen2_preset, graphics=graphics,
+                              demotions=demotions, brand_bg=brand_bg,
+                              fps=str(args.fps or 30), matte=matte_path)
     else:
         # Composite to a temp file, then run loudnorm → final output
         tmp_composite = out_path.with_suffix(".prenorm.mp4")
         build_final_composite(base_path, overlays, subs_path, tmp_composite, edit_dir,
                               force_style=sub_force_style,
-                              crf=gen2_crf, preset=gen2_preset)
+                              crf=gen2_crf, preset=gen2_preset, graphics=graphics,
+                              demotions=demotions, brand_bg=brand_bg,
+                              fps=str(args.fps or 30), matte=matte_path)
         print("loudness normalization → social-ready (-14 LUFS / -1 dBTP / LRA 11)")
         apply_loudnorm_two_pass(tmp_composite, out_path, preview=args.draft)
         tmp_composite.unlink(missing_ok=True)
