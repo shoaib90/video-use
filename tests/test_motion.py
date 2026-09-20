@@ -339,3 +339,117 @@ class SubjectMaskingTests(unittest.TestCase):
         sig = inspect.signature(self.matte.build_matte)
         self.assertGreater(sig.parameters["dilate"].default, 0)
         self.assertGreater(sig.parameters["smooth"].default, 0)
+
+
+class NodeDiagramTests(unittest.TestCase):
+    """Nodes appearing in sequence with connections drawing themselves."""
+
+    def setUp(self):
+        self.b = Brand()
+        self.nodes = [{"title": "Basic", "subtitle": "After Effects"},
+                      {"title": "Intermediate", "subtitle": "Illustrator"},
+                      {"title": "Advanced", "subtitle": "Figma"}]
+
+    def _c(self, **kw):
+        data = {"nodes": self.nodes, "times": [0.0, 2.0, 4.0], **kw}
+        return comp.build("node_diagram", self.b, 2160, data, start=0.0, end=8.0)
+
+    def test_registered(self):
+        self.assertIn("node_diagram", comp.REGISTRY)
+
+    def test_edges_default_to_a_chain(self):
+        from PIL import Image
+        c = self._c()
+        img = Image.new("RGBA", (2400, 1400), (0, 0, 0, 0))
+        c.draw(img, 5.0)
+        self.assertGreater(img.getchannel("A").getextrema()[1], 200)
+
+    def test_an_edge_waits_for_BOTH_its_endpoints(self):
+        """A line arriving at a node that does not exist yet reads as a glitch.
+
+        Between node 0 appearing and node 1 appearing, only node 0's card may
+        be painted - nothing in the region the edge would travel through.
+        """
+        from PIL import Image
+        c = self._c()
+        early = Image.new("RGBA", (2400, 1400), (0, 0, 0, 0))
+        c.draw(early, 1.2)                      # node 0 up, node 1 not yet
+        late = Image.new("RGBA", (2400, 1400), (0, 0, 0, 0))
+        c.draw(late, 3.4)                       # both up, edge drawn
+        # clear of node 0's own card (which ends at x=713, y=476) so the band
+        # only ever contains the edge or node 1
+        band = lambda im: im.crop((760, 500, 1500, 900)).getchannel("A").getextrema()[1]
+        self.assertEqual(band(early), 0, "an edge was drawn before its target existed")
+        self.assertGreater(band(late), 0, "the edge never drew once both nodes existed")
+
+    def test_cards_stay_inside_the_canvas(self):
+        from PIL import Image
+        c = self._c(nodes=[{"title": "A very long node label indeed"},
+                           {"title": "Another rather long one"}],
+                    times=[0.0, 1.0])
+        img = Image.new("RGBA", (1600, 900), (0, 0, 0, 0))
+        c.draw(img, 3.0)
+        a = img.getchannel("A")
+        for box in ((0, 0, 2, 900), (1598, 0, 1600, 900),
+                    (0, 0, 1600, 2), (0, 898, 1600, 900)):
+            self.assertEqual(a.crop(box).getextrema()[1], 0,
+                             "a card touched the canvas edge and was clipped")
+
+    def test_explicit_positions_are_honoured(self):
+        from PIL import Image
+        c = self._c(nodes=[{"title": "L", "x": 0.15, "y": 0.5},
+                           {"title": "R", "x": 0.85, "y": 0.5}],
+                    times=[0.0, 0.0])
+        img = Image.new("RGBA", (2000, 800), (0, 0, 0, 0))
+        c.draw(img, 2.0)
+        a = img.getchannel("A")
+        self.assertGreater(a.crop((100, 0, 500, 800)).getextrema()[1], 0)
+        self.assertGreater(a.crop((1500, 0, 1900, 800)).getextrema()[1], 0)
+
+
+class CurveVsSpringTests(unittest.TestCase):
+    """Transforms and opacity take different curves.
+
+    A spring on alpha overshoots past fully opaque and then dips back: `hero`
+    peaks at 1.205, clamps to 255, and falls to 96% before settling, so the
+    element visibly pulses as it arrives.
+    """
+
+    def test_transform_may_overshoot_but_alpha_never_does(self):
+        for name, w in mo.WEIGHTS.items():
+            alphas = [w.alpha_at(i / 60 * w.duration) for i in range(61)]
+            self.assertLessEqual(max(alphas), 1.0, f"{name} alpha exceeds 1")
+            self.assertGreaterEqual(min(alphas), 0.0, f"{name} alpha below 0")
+
+    def test_alpha_is_monotonic(self):
+        for name, w in mo.WEIGHTS.items():
+            a = [w.alpha_at(i / 80 * w.duration) for i in range(81)]
+            self.assertTrue(all(y >= x - 1e-9 for x, y in zip(a, a[1:])),
+                            f"{name} alpha dips during its reveal")
+
+    def test_hero_transform_still_overshoots(self):
+        # the fix must not flatten the thing that gives weight its mass
+        w = mo.WEIGHTS["hero"]
+        self.assertGreater(max(w.at(i / 60 * w.duration) for i in range(61)), 1.05)
+
+
+class AccentBudgetTests(unittest.TestCase):
+    def test_a_list_with_a_heading_and_an_accent_last_uses_accent_once(self):
+        """Accent is capped at ~2 visible uses per frame; a heading plus an
+        accented final item is already two from a single component."""
+        from PIL import Image
+        b = Brand()
+        c = comp.build("staggered_items", b, 2160,
+                       {"items": ["ONE", "TWO"], "times": [0.0, 0.5],
+                        "heading": "a heading", "accent_last": True},
+                       start=0.0, end=5.0)
+        img = Image.new("RGBA", (1600, 900), (0, 0, 0, 0))
+        c.draw(img, 2.0)
+        accent = comp.rgba(b.accent)[:3]
+        px = list(img.convert("RGBA").getdata())
+        rows = sum(1 for r, g, bl, al in px if al > 60 and (r, g, bl) == accent)
+        self.assertGreater(rows, 0, "the accented item lost its accent")
+        # the heading yields to muted, so accent is not used twice
+        muted = comp.rgba(b.muted)[:3]
+        self.assertGreater(sum(1 for r, g, bl, al in px
+                               if al > 60 and (r, g, bl) == muted), 0)

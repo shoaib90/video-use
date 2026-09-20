@@ -80,23 +80,44 @@ CURVES = {
 }
 
 
+def clamp01(x: float) -> float:
+    return 0.0 if x < 0 else 1.0 if x > 1 else x
+
+
 # -------- weight --------------------------------------------------------------
 
 
 @dataclass(frozen=True)
 class Weight:
     """How a role moves. `travel` is a fraction of the type size, so weight is
-    resolution-independent like everything else."""
+    resolution-independent like everything else.
+
+    Transforms and opacity take DIFFERENT curves. A spring or `back_out` is
+    what gives position and scale their sense of mass, but the same curve on
+    alpha overshoots past fully-opaque and then dips back: `hero` peaks at
+    1.205, which clamps to 255 and then falls to 96% before settling, so the
+    element visibly pulses as it arrives. Opacity has no mass and wants a
+    monotonic curve. (The rule is from OpenDesign's craft/animation-discipline,
+    Apache-2.0: curve for opacity and colour, spring for transforms.)
+    """
     duration: float
     curve: str
     travel: float = 0.0
     scale_from: float = 1.0
     blur: bool = False
+    alpha_curve: str = "ease_out_expo"
 
     def at(self, t: float, start: float = 0.0) -> float:
+        """Transform progress. May overshoot 1 - that is the point."""
         p = (t - start) / self.duration if self.duration > 0 else 1.0
         p = 0.0 if p < 0 else 1.0 if p > 1 else p
         return CURVES[self.curve](p)
+
+    def alpha_at(self, t: float, start: float = 0.0) -> float:
+        """Opacity progress. Never leaves [0, 1]."""
+        p = (t - start) / self.duration if self.duration > 0 else 1.0
+        p = 0.0 if p < 0 else 1.0 if p > 1 else p
+        return clamp01(CURVES[self.alpha_curve](p))
 
 
 WEIGHTS = {
@@ -124,10 +145,6 @@ def stagger(index: int, per: float = 0.085, curve_bias: float = 1.0) -> float:
     gesture rather than a queue.
     """
     return per * (index ** curve_bias if curve_bias != 1.0 else index)
-
-
-def clamp01(x: float) -> float:
-    return 0.0 if x < 0 else 1.0 if x > 1 else x
 
 
 # -------- rendering -----------------------------------------------------------

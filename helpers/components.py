@@ -150,8 +150,9 @@ class BigNumber(Component):
     def draw(self, img, t):
         b, H = self.b, self.height
         w = mo.WEIGHTS["hero"]
-        p = w.at(t, start=self.start)
-        if p <= 0.001:
+        p = w.at(t, start=self.start)          # transform: may overshoot
+        a = w.alpha_at(t, start=self.start)    # opacity: never does
+        if a <= 0.001:
             return
         out = self._out(t)
         if out <= 0:
@@ -182,8 +183,8 @@ class BigNumber(Component):
         y = img.height * 0.30 + dy
 
         def paint(d, shadow):
-            fill = (0, 0, 0, int(b.shadow_alpha * p * out)) if shadow \
-                else rgba(b.fg, p * out)
+            fill = (0, 0, 0, int(b.shadow_alpha * a * out)) if shadow \
+                else rgba(b.fg, a * out)
             off = self.pad if shadow else 0
             draw_tracked(d, (x + off, y + off), display, font, fill, tr)
         self._shadowed(img, paint)
@@ -193,11 +194,12 @@ class BigNumber(Component):
             lfont = load_font(b, "light", lsize)
             ltr = lsize * b.tracking
             lp = mo.WEIGHTS["secondary"].at(t, start=self.start + 0.18)
+            la = mo.WEIGHTS["secondary"].alpha_at(t, start=self.start + 0.18)
             ld = ImageDraw.Draw(img)
             lw = text_width(ld, lfont, label.upper(), ltr)
             draw_tracked(ld, ((img.width - lw) / 2,
                               y + size * 1.16 + mo.WEIGHTS["secondary"].travel * lsize * (1 - lp)),
-                         label.upper(), lfont, rgba(b.accent, lp * out), ltr)
+                         label.upper(), lfont, rgba(b.muted, la * out), ltr)
 
 
 # -------- chips -----------------------------------------------------------------
@@ -253,10 +255,11 @@ class OpposingChips(Component):
             if not txt:
                 continue
             p = w.at(t, start=self.start + mo.stagger(i, per=0.16))
-            if p <= 0.001:
+            a = w.alpha_at(t, start=self.start + mo.stagger(i, per=0.16))
+            if a <= 0.001:
                 continue
             cx = img.width * (0.26 if sign < 0 else 0.74) + sign * travel * (1 - p)
-            _chip(img, d, b, H, txt, cx, cy, p, out, filled)
+            _chip(img, d, b, H, txt, cx, cy, a, out, filled)
 
 
 # -------- staggered list ---------------------------------------------------------
@@ -298,8 +301,12 @@ class StaggeredList(Component):
             hs = b.px(b.size_caption, H)
             hf = load_font(b, "bold", hs)
             hp = mo.WEIGHTS["secondary"].at(t, start=self.start)
+            # Accent is capped at ~2 visible uses per frame (OpenDesign
+            # craft/anti-ai-slop, Apache-2.0). A heading plus an accented last
+            # item is already two from one component, so the heading yields.
+            head_col = b.muted if accent_last else b.accent
             draw_tracked(d0, (0, y0 - hs * 2.6), str(heading).upper(), hf,
-                         rgba(b.accent, hp * out), hs * b.tracking * 2)
+                         rgba(head_col, hp * out), hs * b.tracking * 2)
 
         # which item is newest at time t — everything older dims
         starts = [(times[i] if times and i < len(times)
@@ -309,7 +316,8 @@ class StaggeredList(Component):
 
         for i, item in enumerate(items):
             p = w.at(t, start=starts[i])
-            if p <= 0.001:
+            a = w.alpha_at(t, start=starts[i])
+            if a <= 0.001:
                 continue
             text = str(item).upper()
             font = load_font(b, "intl" if needs_intl(text) else "light", size)
@@ -329,13 +337,13 @@ class StaggeredList(Component):
                 badge = b.px(b.size_body, H)
                 d0.rounded_rectangle(
                     [x, y + size * 0.06, x + badge * 1.5, y + size * 0.06 + badge * 1.5],
-                    radius=b.px(b.radius, H), fill=rgba(b.accent, p * out * dim))
+                    radius=b.px(b.radius, H), fill=rgba(b.accent, a * out * dim))
                 nw = d0.textlength(str(i + 1), font=nf)
                 d0.text((x + badge * 0.75 - nw / 2, y + size * 0.06 + badge * 0.28),
-                        str(i + 1), font=nf, fill=rgba("#FFFFFF", p * out))
+                        str(i + 1), font=nf, fill=rgba("#FFFFFF", a * out))
                 x += badge * 2.1
 
-            def paint(d, shadow, _x=x, _y=y, _t=text, _f=font, _tr=tr, _p=p, _c=col, _dim=dim):
+            def paint(d, shadow, _x=x, _y=y, _t=text, _f=font, _tr=tr, _p=a, _c=col, _dim=dim):
                 fill = (0, 0, 0, int(b.shadow_alpha * _p * out)) if shadow \
                     else rgba(_c, _p * out * _dim)
                 off = self.pad if shadow else 0
@@ -373,8 +381,9 @@ class KineticType(Component):
             w = mo.WEIGHTS[role]
             start = (times[i] if times and i < len(times)
                      else self.start + mo.stagger(i, b.stagger_per, 1.2))
-            p = w.at(t, start=start)
-            if p <= 0.001:
+            p = w.at(t, start=start)             # transform
+            a = w.alpha_at(t, start=start)       # opacity
+            if a <= 0.001:
                 continue
             face = ("intl" if needs_intl(text)
                     else "bold" if spec.get("scale", 1) >= 1.3 else "light")
@@ -390,7 +399,7 @@ class KineticType(Component):
             y = img.height * float(spec.get("y", 0.5)) + w.travel * size * (1 - p)
             col = b.accent if spec.get("accent") else b.fg
 
-            def paint(d, shadow, _x=x, _y=y, _t=text, _f=font, _tr=tr, _p=p, _c=col):
+            def paint(d, shadow, _x=x, _y=y, _t=text, _f=font, _tr=tr, _p=a, _c=col):
                 fill = (0, 0, 0, int(b.shadow_alpha * _p * out)) if shadow \
                     else rgba(_c, _p * out)
                 off = self.pad if shadow else 0
@@ -523,3 +532,126 @@ class SlidingCarousel(Component):
 
 REGISTRY["sliding_carousel"] = SlidingCarousel
 REGISTRY["list_carousel"] = SlidingCarousel      # the reference's own treatment
+
+
+# -------- node diagram -----------------------------------------------------------
+
+
+@dataclass
+class NodeDiagram(Component):
+    """Nodes appearing in sequence with the connections drawing themselves.
+
+    The archetype for a script that describes a progression or a structure —
+    "basic, then intermediate, then advanced", "there are two parts of your
+    brain". Both reference sources landed on it independently, which is a
+    reasonable signal that it is the shape such a line wants.
+
+    An edge only starts drawing once BOTH of its endpoints exist, because a
+    line arriving at nothing reads as a glitch rather than a connection. Edges
+    take the `draw` weight and nodes take `primary`, so the connection feels
+    like a consequence of the nodes rather than a sibling of them.
+
+    `nodes` may carry explicit `x`/`y` (fractions of the canvas); anything
+    without them is laid out as a descending cascade, which is what a
+    progression looks like on a page.
+    """
+
+    def _layout(self, nodes, W, H):
+        n = max(1, len(nodes))
+        out = []
+        for i, nd in enumerate(nodes):
+            if "x" in nd and "y" in nd:
+                out.append((W * float(nd["x"]), H * float(nd["y"])))
+            else:
+                # cascade: step right and down so the eye travels the sequence
+                fx = 0.22 + (0.56 * i / max(1, n - 1)) if n > 1 else 0.5
+                fy = 0.26 + (0.48 * i / max(1, n - 1)) if n > 1 else 0.5
+                out.append((W * fx, H * fy))
+        return out
+
+    def draw(self, img, t):
+        b, H = self.b, self.height
+        out = self._out(t)
+        if out <= 0:
+            return
+        nodes = self.data.get("nodes") or []
+        if not nodes:
+            return
+        edges = self.data.get("edges")
+        if edges is None:                       # default: a simple chain
+            edges = [[i, i + 1] for i in range(len(nodes) - 1)]
+        times = self.data.get("times") or [
+            self.start + mo.stagger(i, b.stagger_per * 5, 1.0) for i in range(len(nodes))]
+
+        pos = self._layout(nodes, img.width, img.height)
+        title_size = self.fit_size([n.get("title", "") for n in nodes],
+                                   b.px(b.size_body, H), int(img.width * 0.30),
+                                   weight="bold")
+        sub_size = int(title_size * 0.62)
+        padx, pady = title_size * 0.85, title_size * 0.70
+        radius = b.px(b.radius, H)
+        wn, we = mo.WEIGHTS["primary"], mo.WEIGHTS["draw"]
+        d0 = ImageDraw.Draw(img)
+
+        # rect for each node, needed by the edges before anything is painted
+        boxes = []
+        for i, nd in enumerate(nodes):
+            title = str(nd.get("title", "")).upper()
+            tf = load_font(b, "intl" if needs_intl(title) else "bold", title_size)
+            tw = text_width(d0, tf, title, title_size * b.tracking)
+            sub = str(nd.get("subtitle", ""))
+            sw = 0.0
+            if sub:
+                sf = load_font(b, "intl" if needs_intl(sub) else "light", sub_size)
+                sw = text_width(d0, sf, sub, sub_size * b.tracking * 0.5)
+            bw = max(tw, sw) + padx * 2
+            bh = title_size * 1.35 + (sub_size * 1.7 if sub else 0) + pady
+            cx, cy = pos[i]
+            # Clamp into the canvas. A card centred near the edge runs off it
+            # and is clipped by the pad silently - the same failure as unfitted
+            # type, and just as invisible to every structural check.
+            m = self.pad * 2
+            bx = min(max(cx - bw / 2, m), max(m, img.width - bw - m))
+            by = min(max(cy - bh / 2, m), max(m, img.height - bh - m))
+            boxes.append((bx, by, bw, bh, tf, title, sub))
+
+        # --- edges first, so they sit behind the cards
+        for a_i, b_i in edges:
+            if a_i >= len(boxes) or b_i >= len(boxes):
+                continue
+            born = max(times[a_i], times[b_i])   # both endpoints must exist
+            q = we.at(t, start=born)
+            al = we.alpha_at(t, start=born)
+            if al <= 0.01:
+                continue
+            ax, ay, aw, ah, *_ = boxes[a_i]
+            bx, by, bw2, bh2, *_ = boxes[b_i]
+            p0 = (ax + aw / 2, ay + ah)          # bottom of the earlier node
+            p1 = (bx + bw2 / 2, by)              # top of the later one
+            d0.line([p0, (p0[0] + (p1[0] - p0[0]) * q, p0[1] + (p1[1] - p0[1]) * q)],
+                    fill=rgba(b.muted, al * out * 0.75),
+                    width=max(2, b.px(b.stroke, H) * 2))
+
+        # --- nodes
+        for i, (x0, y0, bw, bh, tf, title, sub) in enumerate(boxes):
+            p = wn.at(t, start=times[i])
+            a = wn.alpha_at(t, start=times[i])
+            if a <= 0.01:
+                continue
+            dy = wn.travel * title_size * (1 - p)
+            active = t < (times[i + 1] if i + 1 < len(times) else 1e9)
+            d0.rounded_rectangle([x0, y0 + dy, x0 + bw, y0 + bh + dy], radius=radius,
+                                 fill=rgba(b.chip_bg, a * out * 0.92),
+                                 outline=rgba(b.accent if active else b.muted,
+                                              a * out * (0.9 if active else 0.45)),
+                                 width=max(1, b.px(b.stroke, H)))
+            draw_tracked(d0, (x0 + padx, y0 + dy + pady * 0.42), title, tf,
+                         rgba(b.fg, a * out), title_size * b.tracking)
+            if sub:
+                sf = load_font(b, "intl" if needs_intl(sub) else "light", sub_size)
+                sa = mo.WEIGHTS["aside"].alpha_at(t, start=times[i] + 0.12)
+                draw_tracked(d0, (x0 + padx, y0 + dy + pady * 0.42 + title_size * 1.45),
+                             sub, sf, rgba(b.muted, sa * out), sub_size * b.tracking * 0.5)
+
+
+REGISTRY["node_diagram"] = NodeDiagram

@@ -141,6 +141,10 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   frame. `pad` cannot place it — its x/y evaluate once and the picture collapses to the
   top-left; use `overlay` with `eval=frame` on both the scale and the overlay. It is a
   *pairing*: the graphic must move into the vacated area or it lands on the card.
+- **UI motion numbers are wrong for video.** Web guidance (150 ms default, <500 ms) exists
+  because the user is *waiting*; a video viewer is not. `motion.WEIGHTS` is deliberately 2-4x
+  slower. What does transfer: curve for opacity, spring for transforms — a spring on alpha
+  overshoots past opaque and dips back, which pulses. See gotchas.md.
 - **Subject masking** (`helpers/matte.py` + `behind_subject` on an overlay) lets a graphic pass
   behind the speaker. Only the MATTE is computed in Python — the picture stays in ffmpeg, so the
   colour round-trip tax does not apply. A centred graphic behind a centred subject vanishes

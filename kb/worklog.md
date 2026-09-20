@@ -6,6 +6,49 @@ re-derive it or mistake a deliberate change for a bug.
 
 ---
 
+## 2026-09-20 (later) — evaluated two reference repos, took three things
+
+User supplied two repos and asked how much was usable.
+
+**balarabetahir/-Build-AI-Motion-Graphics-with-Claude-and-Remotion** — a README and its PDF
+export, no source. A tutorial describing lower-thirds, title cards and animated diagrams in
+Remotion. Nothing to take as code, and in two places its approach is the weaker one: a
+hand-written theme file where ours is derived from the delivered grade, and `<Sequence
+from={90}>` frame offsets where ours anchor to spoken words. Hardcoded offsets are exactly what
+rotted when the Detour-1 repairs moved every boundary ~9 s. Remotion itself was NOT adopted: it
+needs Node plus a headless Chrome render per frame, where the PIL -> ProRes path does 322 4K
+frames in seconds and is already wired into anchoring, brand, matte and demotion. SKILL.md
+already lists it for bespoke one-off slots, which is the right place for it.
+
+**nexu-io/open-design** (Apache-2.0, 443 MB Electron app) — `apps/`, `packages/`, `shells/`
+are the product and irrelevant. Useful: `craft/` (13 well-sourced design docs), 165 skills
+(mostly web/deck), 154 `DESIGN.md` brand systems.
+
+The important caveat, now in gotchas.md: **`craft/` is about UI motion, where the user is
+waiting.** Its 150 ms default and sub-500 ms ceiling are wrong for graphics synced to speech,
+and `motion.WEIGHTS` is deliberately 2-4x slower.
+
+**Taken:**
+
+- **Curve for opacity, spring for transforms.** This found a real defect: `hero` used a spring
+  for alpha too, peaking at 1.205 — clamped to 255, then dipping to 96% before settling, so
+  every hero element pulsed as it arrived. `Weight` now carries `alpha_curve`; transform
+  overshoot is the point, alpha overshoot is a bug.
+- **Accent capped** at ~2 visible uses per frame; a list with a heading and an accented last
+  item yields the heading to muted.
+- **Tversky 2002** as the citation behind the restraint rule we had already derived empirically
+  from the reference edit.
+
+**Built:** `node_diagram` — nodes appearing in sequence with connections drawing themselves,
+the one genuine gap both repos pointed at (the tutorial builds one; the reference video uses
+one for basic -> intermediate -> advanced). An edge waits for BOTH endpoints, because a line
+arriving at nothing reads as a glitch; cards are clamped inside the canvas, the same failure
+class as unfitted type.
+
+Suite 150 -> 159.
+
+---
+
 ## 2026-09-20 — a motion graphics system, built from two reference videos
 
 User called the first graphics attempt "very basic" and pointed at two YouTube videos, then

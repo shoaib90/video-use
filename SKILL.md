@@ -115,7 +115,7 @@ Helpers (`helpers/transcribe.py`, `helpers/render.py`, etc.) live alongside this
 - **`brand.py`** — per-channel palette, type scale and shape language, sized as fractions of the
   output height. `derive()` measures a palette off already-delivered work rather than asserting one.
 - **`components.py`** — the archetypes: `big_number`, `opposing_chips`, `staggered_items`,
-  `kinetic_type`. Built on weights, not raw durations.
+  `kinetic_type`, `sliding_carousel`, `node_diagram`. Built on weights, not raw durations.
 - **`matte.py <video> -o <matte.mp4>`** — a person matte so a graphic can pass BEHIND the
   speaker. Bootstraps its own interpreter (mediapipe needs one, like DeepFilterNet). The picture
   never round-trips through Python — only the matte is computed.
@@ -305,6 +305,14 @@ exactly the flat, uniform motion that reads as amateur.
 `hero / primary / secondary / aside / draw / exit` to its own curve, travel, timing and whether
 it earns motion blur. The reference's test is the right one: *"a logo landing and a subtitle
 fading in should not feel the same."* Never `linear` — everything lands rather than stops.
+
+Author a role, and note that **transforms and opacity take different curves** — a spring is
+what gives position and scale their mass, but on alpha it overshoots past opaque and dips back,
+which reads as a pulse. `Weight.at()` for transforms, `Weight.alpha_at()` for opacity.
+
+Do **not** import UI motion numbers here. Web guidance converges on ~150 ms because the user is
+waiting on the interface; a video viewer is not, and these weights are deliberately 2-4x slower.
+See `kb/gotchas.md`.
 
 **2. A brand per channel** (`brand.json` beside the footage), all sizes as fractions of the
 output height so one definition is correct at 720p and 2160p. Derive it:

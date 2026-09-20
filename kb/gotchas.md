@@ -1890,3 +1890,42 @@ past the silhouette — the reference's own example spans the full frame width a
 speaker occlude the middle.
 
 ---
+
+## UI motion numbers are wrong for video, and the two get confused constantly
+
+Motion-design guidance on the web is almost all about **interfaces**, where the
+user is *waiting on the machine*. Video graphics are the opposite case: the viewer is
+watching at the speaker's pace and the motion is synced to speech. Importing one set of
+numbers into the other makes the result feel wrong in a way that is hard to name.
+
+Reference guidance (OpenDesign `craft/animation-discipline.md`, Apache-2.0; Emil Kowalski's
+motion skill) converges on:
+
+| UI rule | Why it exists | Video equivalent |
+|---|---|---|
+| 150 ms default, <500 ms for microinteractions | past that the user notices motion *as motion* and waits | **0.30–0.72 s.** Nobody is waiting; a 150 ms reveal on a 4K title reads as a flicker |
+| "frequent animations ≤200 ms" | a hover seen 50x per session | irrelevant — a graphic plays once |
+| "stagger only small groups; long staggers feel slow" | the user is blocked | staggers are *paced to speech*; a 4-item list over 4 s is correct if he takes 4 s to say it |
+| `prefers-reduced-motion` | accessibility, per-user | not expressible — video is baked. Hold the frame longer instead |
+
+`motion.WEIGHTS` is therefore deliberately 2–4x slower than any UI token set, and that is not
+an oversight.
+
+**What does transfer, and is worth taking:**
+
+- **Curve for opacity, spring for transforms.** This one is universal and we had it wrong: a
+  spring on alpha overshoots past fully-opaque and dips back — `hero` peaked at 1.205, clamped
+  to 255, then fell to 96% before settling, so every hero element pulsed as it arrived. `Weight`
+  now carries a separate `alpha_curve`. Transform overshoot is the point; alpha overshoot is a
+  bug.
+- **Animation does not aid comprehension.** Tversky/Morrison/Bétrancourt 2002 (IJHCS 57,
+  247-262) found every study claiming otherwise had a broken control. The endorsed use is
+  spatial/temporal reorientation. This is the citation behind the restraint rule we had already
+  arrived at empirically from the reference edit — roughly a third of it carries no graphic.
+- **Cap the accent.** ~2 visible uses per frame. A list with both a heading and an accented
+  final item is already at the cap from one component, so the heading yields to muted.
+- **~80% proven patterns + ~20% distinctive**, with the distinctive part concentrated in one
+  moment rather than spread thin — the same idea as the reference's "one thing nobody has
+  seen before".
+
+---
