@@ -82,8 +82,11 @@ This fork is not a mirror. It exists to carry our own changes, so:
 
 - **`main`** — the working branch and this fork's copy of the tool. Carries everything: helpers,
   `kb/`, `CLAUDE.md`, tests, `uv.lock`. **Work here.**
-- **`local`** — was a synonym of `main`; the two have since DIVERGED (`local` was left behind
-  at the two-machines commit). Nothing works from it. Delete it rather than resyncing it.
+- **`local`** — **deleted 2026-09-20.** It was meant to be a synonym of `main` but nothing kept
+  it in step, so it silently fell 16 commits behind while the KB still described the two as
+  identical. Verified empty before deleting: `git log main..origin/local` was clean, so every
+  commit on it was already in `main`. Do not recreate it; an unmaintained alias is worse than
+  no alias.
 - **`pr/*`** — the exception. Each is built from **upstream** `main` (`origin/main`), not from
   ours, so the open PRs stay focused and carry no local-only files. Never reuse one of these for
   a PR against the fork: rebasing a shared head branch onto our `main` silently corrupts the

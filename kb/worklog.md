@@ -930,3 +930,15 @@ in the same file. It worked by Python scoping and was a trap for the next edit.
 **Delivered `detour2_final6.mp4`:** 0 freezes, −14.5 LUFS / −0.4 dBTP, duration
 unchanged, music unchanged, speech within 0.04 dB, untouched picture regions
 50–56 dB. Suite at 82.
+
+## 2026-09-20 — retention grounding; `local` branch deleted
+
+- `coverage.py` reads the benchmark column of a YouTube retention export and warns when the
+  curve is built from too few viewers. Episode 1's export is **21 people** — every value a
+  multiple of 4.76 — and the raw and benchmark columns disagree about the opening: raw reads
+  95%→52% in ten seconds (a failed hook), benchmark reads **+17.9 over typical** (normal).
+  Only 2:32–2:47 is genuinely below par (−35.9), and it is 15 s of hedging. See gotchas.md.
+- Deleted the `local` branch. It was documented in four places as a synonym of `main` at the
+  same commit; it was in fact 16 commits behind. Confirmed `git log main..origin/local` empty
+  before deleting, so nothing was lost. CLAUDE.md, kb/index.md, environment.md and
+  new-machine.md all corrected — the claim was in every one of them.

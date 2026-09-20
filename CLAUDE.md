@@ -41,7 +41,8 @@ durable, reusable lesson into the topic file where it belongs — a new trap int
 **`main` is the working branch and this fork's copy of the tool.** It is not an upstream
 mirror — this fork exists to carry our own changes, and upstream is not being tracked.
 
-`local` is kept as a synonym of `main` for now; they point at the same commit. Work on `main`.
+There is no `local` branch — it drifted 16 commits behind `main` while pretending to be a
+synonym, and was deleted on 2026-09-20. `main` is the only branch to work on.
 
 The `pr/*` branches are the exception: each is built from **upstream** `main`
 (`origin/main`) so the open PRs to browser-use/video-use stay focused and free of local-only

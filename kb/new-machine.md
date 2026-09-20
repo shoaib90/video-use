@@ -22,7 +22,7 @@ The script is idempotent, so re-run it any time to repair a machine. It ends by 
 ## Which branch
 
 **`main`.** It is this fork's copy of the tool and carries everything — helpers, `kb/`,
-`CLAUDE.md`, tests, `uv.lock`. `local` points at the same commit and is kept only as a synonym.
+`CLAUDE.md`, tests, `uv.lock`. It is the only branch to clone; the old `local` alias is gone.
 
 This fork is not an upstream mirror and upstream is not tracked; the fork exists to carry our own
 changes. The `pr/*` branches are the only ones based on upstream `main`, and they exist solely to
