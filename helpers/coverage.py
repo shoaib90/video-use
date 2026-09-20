@@ -87,15 +87,45 @@ def said_between(cues, a: float, b: float) -> str:
     return " ".join(t for s, e, t in cues if e > a and s < b)
 
 
+# Which column load_retention() actually used, so the report can label its
+# numbers honestly: "retention %" and "vs benchmark" are not the same units and
+# printing a percentile as a percentage is how a -33 gets read as "33% stayed".
+LAST_METRIC = "retention"
+
+
+def viewer_count(values: list[float]) -> int | None:
+    """Infer how many people the curve is built from.
+
+    Retention is k/N, so the smallest non-zero step between samples is 100/N.
+    This matters more than anything else the report prints: a curve built from
+    21 viewers moves 4.76 points every time ONE person leaves, and reading
+    structure into that is reading noise. Measured on a real export: every
+    value was a multiple of 4.76.
+    """
+    steps = sorted({round(abs(a - b), 2) for a, b in zip(values, values[1:])
+                    if abs(a - b) > 0.01})
+    if not steps:
+        return None
+    n = round(100 / steps[0])
+    return n if 1 <= n <= 100_000 else None
+
+
 def load_retention(path: Path, total: float) -> list[tuple[float, float]]:
-    """YouTube Studio 'Audience retention' export -> [(seconds, pct_remaining)].
+    """YouTube Studio 'Audience retention' export -> [(seconds, value)].
 
     Column names vary by locale and export version, so this matches loosely
     rather than assuming a schema: the first numeric column is position (a
-    fraction, a percentage, or seconds) and the next is retention.
+    fraction, a percentage, or seconds) and the next is the value.
+
+    If a THIRD column is present it is "Compared to other videos" — YouTube's
+    benchmark-relative percentile — and that is used instead, because it is
+    normalised and therefore far more robust at small sample sizes. It can go
+    negative; negative means below the typical video at that point.
     """
+    global LAST_METRIC
     rows = list(csv.reader(path.read_text().splitlines()))
-    out = []
+    out, raw = [], []
+    LAST_METRIC = "retention"
     for r in rows:
         nums = []
         for cell in r:
@@ -104,9 +134,16 @@ def load_retention(path: Path, total: float) -> list[tuple[float, float]]:
             except ValueError:
                 pass
         if len(nums) >= 2:
-            out.append((nums[0], nums[1]))
+            raw.append(nums[1])
+            if len(nums) >= 3:
+                LAST_METRIC = "benchmark"
+            out.append((nums[0], nums[2] if len(nums) >= 3 else nums[1]))
     if not out:
         return []
+    n = viewer_count(raw)
+    if n is not None and n < 200:
+        print(f"  ⚠ retention curve is built from ~{n} viewers — one person is "
+              f"{100 / n:.1f} points. Treat the shape as a hypothesis, not a finding.")
     xmax = max(x for x, _ in out)
     if xmax <= 1.01:                       # fraction of the video
         out = [(x * total, y) for x, y in out]
@@ -176,6 +213,8 @@ def suggest(assets: list[Path], text: str, limit: int = 3) -> list[str]:
 def report(cut: Path, edl_path: Path | None, videos_dir: Path | None,
            srt: Path | None, retention: Path | None, min_gap: float) -> dict:
     total = duration(cut)
+    if total <= 0:
+        raise SystemExit(f"{cut} has no duration — wrong path, or not a video")
     edl = json.loads(edl_path.read_text()) if edl_path and edl_path.exists() else {}
     events = sorted(set([0.0] + scene_changes(cut) + treatment_times(edl) + [total]))
     cues = srt_cues(srt) if srt else []
@@ -192,8 +231,9 @@ def report(cut: Path, edl_path: Path | None, videos_dir: Path | None,
         holds.sort()
         print(f"  median hold {holds[len(holds) // 2]:.1f}s   longest {max(holds):.1f}s")
     if curve:
+        unit = "%ile vs benchmark" if LAST_METRIC == "benchmark" else "% remaining"
         print(f"  retention curve loaded: {len(curve)} points, "
-              f"{curve[0][1]:.0f}% → {curve[-1][1]:.0f}%")
+              f"{curve[0][1]:+.0f} → {curve[-1][1]:+.0f} {unit}")
     if assets:
         print(f"  {len(assets)} unused b-roll asset(s)")
 
@@ -205,7 +245,8 @@ def report(cut: Path, edl_path: Path | None, videos_dir: Path | None,
         if curve:
             r0, r1 = retention_at(curve, a), retention_at(curve, b)
             if r0 is not None and r1 is not None:
-                head += f"   retention {r0:.0f}% → {r1:.0f}%  ({r1 - r0:+.0f})"
+                lbl = "vs bench" if LAST_METRIC == "benchmark" else "retention"
+                head += f"   {lbl} {r0:+.0f} → {r1:+.0f}  ({r1 - r0:+.0f})"
         print(head)
         text = said_between(cues, a, b)
         if text:

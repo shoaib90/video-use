@@ -129,3 +129,60 @@ class TreatmentTimeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ViewerCountTests(unittest.TestCase):
+    """A retention curve from a handful of viewers is mostly quantisation.
+
+    Measured on a real export: every value was a multiple of 4.76 = 1/21, so
+    each visible 'drop' was one person leaving. The report says so rather than
+    letting the shape be over-read.
+    """
+
+    def test_infers_n_from_the_quantisation_step(self):
+        vals = [round(k / 21 * 100, 2) for k in (21, 20, 17, 15, 11, 11, 12)]
+        self.assertEqual(cov.viewer_count(vals), 21)
+
+    def test_a_smooth_curve_implies_many_viewers(self):
+        vals = [100 - i * 0.37 for i in range(50)]
+        n = cov.viewer_count(vals)
+        self.assertTrue(n is None or n > 200, f"got {n}")
+
+    def test_flat_curve_is_not_a_crash(self):
+        self.assertIsNone(cov.viewer_count([50.0, 50.0, 50.0]))
+
+
+class BenchmarkColumnTests(unittest.TestCase):
+    def test_third_column_is_preferred_over_raw_retention(self):
+        """'Compared to other videos' is normalised, so it survives small n
+        where the raw curve does not."""
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "organic.csv"
+            p.write_text("Video position (%),Absolute retention (%),Compared (%)\n"
+                         "0,95.24,32.23\n50,30.00,-25.40\n100,33.33,60.80\n")
+            c = cov.load_retention(p, 200.0)
+            self.assertEqual([v for _, v in c], [32.23, -25.40, 60.80])
+
+    def test_two_column_export_still_uses_retention(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "all.csv"
+            p.write_text("pos,ret\n0,95.24\n100,33.33\n")
+            self.assertEqual([v for _, v in cov.load_retention(p, 200.0)],
+                             [95.24, 33.33])
+
+
+class MetricLabelTests(unittest.TestCase):
+    """A percentile printed with a % sign reads as 'a third of people stayed'
+    when it actually means 'a third worse than a typical video'."""
+
+    def test_metric_is_reported_per_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            three = Path(td) / "organic.csv"
+            three.write_text("pos,ret,cmp\n0,95.2,32.2\n100,33.3,60.8\n")
+            cov.load_retention(three, 200.0)
+            self.assertEqual(cov.LAST_METRIC, "benchmark")
+
+            two = Path(td) / "all.csv"
+            two.write_text("pos,ret\n0,95.2\n100,33.3\n")
+            cov.load_retention(two, 200.0)
+            self.assertEqual(cov.LAST_METRIC, "retention")

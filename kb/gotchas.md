@@ -1973,3 +1973,32 @@ Two rules from this:
   to 88 px from the frame edge and read as clipped even though it was not.
 
 ---
+
+## A retention curve from a small channel is mostly quantisation
+
+Verified on the Episode 1 export (`Audience retention 2026-08-16_2026-09-20`):
+**every value is a multiple of 4.76 = 1/21.** The curve is 21 viewers. Each
+visible "cliff" is one to four people, and the shape carries far less
+information than it appears to.
+
+`coverage.py` now infers N from the smallest non-zero step between samples and
+prints a warning below 200. Do not plan an edit around a feature of a curve
+smaller than 100/N points.
+
+**Prefer `Organic.csv` over `All.csv`.** The export's third column,
+"Compared to other videos (%)", is benchmark-normalised, so it survives small N
+where the raw curve does not — and on this video the two columns tell opposite
+stories. Raw: 95% → 52% in the first 10 s, which reads as a failed hook.
+Benchmark: **+17.9 over typical across the same 10 s.** Most of that drop is
+what every video experiences; only the departure from the benchmark is a
+signal about *this* cut. `load_retention()` uses the third column when present
+and `LAST_METRIC` records which, because a percentile printed with a `%` sign
+reads as "a third of people stayed" when it means "a third worse than typical".
+
+The one window on that video that is genuinely below benchmark — 2:32–2:47,
+bottoming at **-35.9** — is 15 seconds of hedging ("I have not. I am still
+learning. I'm still failing… whatever I'll share here, it will be from
+something that I have actually lived"). It recovers to **+59.8** for the last
+30 s, which is the specifics ("the dream that I gave up, a body that broke").
+Unproven as causation, N=21 — but it is the only window worth acting on, and
+it sits inside the 124.9 s no-change stretch.
