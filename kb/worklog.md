@@ -942,3 +942,54 @@ unchanged, music unchanged, speech within 0.04 dB, untouched picture regions
   same commit; it was in fact 16 commits behind. Confirmed `git log main..origin/local` empty
   before deleting, so nothing was lost. CLAUDE.md, kb/index.md, environment.md and
   new-machine.md all corrected — the claim was in every one of them.
+
+## 2026-09-22 — episode2 ("I Gave Up My Biggest Dream at 15"), cut + treatment
+
+Second episode of the main series. 37 clips, 4K **HLG** (Ep1 was SDR — see gotchas.md),
+~19m20s of usable speech against a script targeting 8–9 min. Work lives in
+`~/Documents/Ambitious/Editing/episode2/edit/`; full record in its `project.md`.
+
+- **Runtime was a real decision, not a default.** Shoaib asked to keep the off-script
+  material. Measured, filler removal only buys 23 s, so "keep everything" lands at 15m30s.
+  Presented that with the specific cut that fixes it — dropping `IMG_3670`, 70 s that
+  restates an earlier beat — and he took it. Final 12m55s, and Scene 6 drops from 4:00 to
+  2:50, which matters because Ep1's retention bottomed out at the end of a 2m50s stretch.
+- **Reading the assembled cut back as prose found 8 defects** that nothing else would have:
+  six segments chopping their own last word, and two wrong word picks (one join read "and I
+  scored somewhere scored around sixty"). This check keeps paying for itself.
+- **Deepgram inverted the thesis line again** — "I just can't *feel*" for "fail", the exact
+  shape of Ep1's "what I do know". The free whisper cross-check caught it, as it did then.
+- **`coverage.py` on the picture lock: 5 visual events in 12m55s.** New gotcha — 75 jump cuts
+  at 1.00-1.10x read as 5 events, correctly. Drove the whole treatment plan.
+- New gotchas recorded: `zoompan` `d` multiplying under `-loop 1` (389 s file for a 3.6 s
+  still), `drawtext` and apostrophes, SDR grade over HLG tone-map, coverage vs push-ins,
+  raising rather than clamping when a graphic's anchor word has been cut, and a third
+  instance of the zsh word-splitting trap (`set -- $var`).
+- Reused from Ep1 with no changes: `brand.json`, the snap-from-word-timings pattern, the
+  sidechain music mixer's structure, and the self-eval's boundary-pop test.
+
+## 2026-09-23 — Open-Higgsfield-AI evaluated; kb/ideation.md added
+
+**Open-Higgsfield-AI** ([repo](https://github.com/Autom8AI/Open-Higgsfield-AI)) — evaluated, and
+**nothing taken**. It is a Next.js/Electron front-end over the hosted Muapi.ai gateway: no local
+inference, no algorithm, and its one open PR is fixing that API client silently dropping
+`negative_prompt`/`video_url`/`request_id` and treating HTTP 408/429 as permanent failures.
+Unlike the two design repos we mined earlier, there is no technique here that survives a rewrite
+into Python — if we ever want Muapi we call its REST API in ~40 lines.
+
+Generative b-roll as a *capability* remains open but is editorially fraught for the main channel:
+Ep1's whole claim is "from something that I have actually lived, and it's not something that I've
+read from somewhere" — which is, per the retention export, the exact line sitting in the worst
+window. Proposed shape if we ever do it: `helpers/generate.py`, prompt + EDL anchor → writes
+`<edit>/generated/` with a prefixed filename so it is auditable at picture lock. Try on a Detour
+episode first, where b-roll is scenery rather than autobiography.
+
+**`kb/ideation.md`** — new topic file, from three videos Shoaib supplied. Covers the A+B=C
+identity formula, recombination over originality, constraints as the cure for creative block,
+presentation over assets, and repetition as the mechanism for style. Marked throughout as
+practitioner opinion rather than measurement, with **[measured]** tags where a claim explains
+something we actually observed on YT1. Linked from `index.md`.
+
+Transcript retrieval: captions via `yt-dlp` for one video, local whisper.cpp for the other two
+after YouTube 429'd the timedtext endpoint. The Hindi one first came back as a hallucination
+loop from the English-only model — both traps now in `gotchas.md`.

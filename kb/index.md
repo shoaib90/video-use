@@ -26,6 +26,8 @@ Transcribe ──> Pack ──> reason over text ──> EDL ──> Render ─�
 | [helpers.md](helpers.md) | Per-script reference: flags, behaviour, EDL schema | Before invoking any helper |
 | [environment.md](environment.md) | This machine: paths, keys, versions, what's installed | Cold start, "is X available?" |
 | [gotchas.md](gotchas.md) | Verified traps that cost real debugging time | Anything fails unexpectedly |
+| [storytelling.md](storytelling.md) | **Retention craft for talking-head cuts** — contrast, rhythm, withholding, the zenith | Planning a cut; before picture lock |
+| [ideation.md](ideation.md) | **Where ideas come from** — recombination, the A+B=C identity formula, constraints | Deciding what to make; choosing a style |
 | [worklog.md](worklog.md) | Dated log of local changes + why | Understanding a local divergence |
 | [check-env.sh](check-env.sh) | Re-verifies everything in environment.md | Cold start, or something broke |
 | [new-machine.md](new-machine.md) | Cloning onto another laptop; what doesn't travel | Setting up a second machine |
@@ -180,6 +182,59 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   windows spanned 84 dB, so one global target left two cues inaudible and one clipping.
   Where a window has no headroom, duck the programme with the ramps outside the cue.
   Mix before loudnorm, never after. See gotchas.md.
+
+- **`zoompan`'s `d` is output-frames-per-INPUT-frame**, so under `-loop 1` every looped frame
+  gets expanded — a 3.6s Ken Burns still came out **389s / 382MB**. Cap with `-frames:v`, and
+  probe the duration of anything built with it. See gotchas.md.
+- **A grade does not travel between episodes if the colour space changed.** Ep2 is HLG where
+  Ep1 was SDR; the tone-map already supplies the punch, so Ep1's grade string measured sat
+  0.407 vs its own delivered 0.29. White-balance off a **known white in frame** (the t-shirt),
+  not a global R/B ratio, and set desaturation *after* the contrast curve.
+- **`coverage.py` counts 75 jump cuts on one locked-off frame as 5 visual events — correctly.**
+  Push-ins below ~1.1x stop a splice reading as a glitch but are invisible as *events*; only
+  something that replaces the frame moves the number. Run it on the picture lock, before
+  building graphics.
+- **Anchor graphics to spoken words and RAISE when the word was cut.** A resolver that clamps
+  to the nearest survivor puts the graphic on a silent frame and nothing looks wrong in the
+  render. Print the words each overlay actually covers, and read them.
+- **`drawtext` cannot take an apostrophe in `text=`** at all — use `textfile=`.
+
+- **Overlays are resolution-specific: render.py composites them at 0:0 with no scaling.**
+  A 4K overlay on a 1080p base shows its top-left quarter, which reads as bad framing rather
+  than a bug. QC overlay geometry at the DELIVERY height, and name the file with its height
+  the way Ep1's `TEASER_BROLL_2160.mp4` does. `ranges[].zoom` is resolution-independent;
+  overlays are not.
+
+- **Creativity is recombination, not talent** — and style is `A + B = C`: A your niche, B
+  something from outside it, C your identity. B is the real decision and it is made once for a
+  channel, not per video. **Repetition is what builds identity**, so consistency across episodes
+  beats novelty within one — `brand.json` is a commitment, not a starting point.
+  See [ideation.md](ideation.md).
+- **Steal the method, never the artifact.** The reconciliation of "don't copy" and "every artist
+  is a thief": lift the methodology and tweak it, not the finished piece. Same file.
+- **Blocked on ideas is usually information OVERLOAD, not a shortage** — the fix is an artificial
+  constraint that shrinks the option space, which is also why our decision table works. Same file.
+- **Name the ZENITH before cutting** — the one moment the whole episode builds to — and then
+  leave it undecorated: no graphic, no music swell, no cutaway across it. In HillierSmith's
+  breakdown of a 75%-retention cut, the highest-retention moment in the video is the one where
+  the editor does nothing and lets it play. Decorating the peak is backwards; decoration belongs
+  on the build. See [storytelling.md](storytelling.md).
+- **Decide the ONE image of the story and withhold its clear reveal.** Anticipation is the
+  retention mechanism, not payoff — show it partial, obscured or brief early, and give the full
+  frame only when the story turns. Ep2 spent its cricket photograph at 1:00 and had nothing left
+  to reveal. Same file.
+- **Wall-to-wall music has no meaning.** Contrast is what creates focus: a naked talking head
+  next to a scored one. If the bed never leaves, its arrival and departure stop being signals.
+
+- **render.py never cleans `clips_*`, so a changed EDL leaves stale segments behind.** Build
+  expected filenames from the EDL, never glob. Same for any cached derived file: check
+  freshness (mtime vs source), not just dimensions.
+- **To prove a window is unscored, diff against a no-music control** — never read an absolute
+  floor. Room tone varies up to 17 dB between takes and swamps a ducked bed.
+- **Generated b-roll: watermark, burned captions, 720p/24fps — and an editorial line.**
+  Environments and objects, not people who could read as the subject or their family; the real
+  photographs carry the people. Scan supplied clips densely, a "reference" montage may hold
+  shots that exist nowhere else. See [gotchas.md](gotchas.md).
 
 ## Maintaining this KB
 

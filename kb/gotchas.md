@@ -392,6 +392,11 @@ zsh keeps `$w` as one word, so `$1` becomes the whole string. Use an explicit fu
 positional args, a proper array, or `${=w}` to force splitting. Bit me twice in one session,
 both times producing empty output that looked like a tool failure rather than a shell bug.
 
+Hit again on 2026-09-22, in the `for spec in "3653 15" "3657 30"; do set -- $spec` form, this
+time feeding `ffmpeg -ss $2 -i "IMG_$1.mov"` — which produced `Invalid duration for option ss:
+-i` and an attempt to open `IMG_3653 15.mov`. Parallel arrays indexed with `{1..N}` are the
+least error-prone fix, because unlike `${=spec}` they are also correct under bash.
+
 ---
 
 ## Piping a command to `tail` masks its exit code
@@ -2002,3 +2007,307 @@ something that I have actually lived"). It recovers to **+59.8** for the last
 30 s, which is the specifics ("the dream that I gave up, a body that broke").
 Unproven as causation, N=21 — but it is the only window worth acting on, and
 it sits inside the 124.9 s no-change stretch.
+
+---
+
+## `zoompan`'s `d` expands EVERY input frame, so `-loop 1` multiplies the clip
+
+A Ken Burns push on a still, written the obvious way:
+
+```bash
+ffmpeg -loop 1 -framerate 30000/1001 -t 3.6 -i photo.png \
+       -vf "…,zoompan=z='1+0.07*on/108':d=108:s=3840x2160" out.mp4
+```
+
+produced a **389-second, 382 MB file** for a 3.6-second still. `d` is not the clip
+length — it is how many OUTPUT frames each INPUT frame becomes. `-loop 1 -t 3.6`
+feeds 108 input frames, and every one of them gets expanded to 108 output frames:
+108 x 108 = 11,664 frames.
+
+`-t` on the input does not help, because the input is what is being multiplied. Cap
+the **output** instead:
+
+```bash
+ffmpeg -loop 1 -framerate 30000/1001 -i photo.png \
+       -vf "…,zoompan=z='1+0.07*on/108':d=108:s=3840x2160" \
+       -frames:v 108 out.mp4
+```
+
+`on` is the global output frame index, so over the first input frame's expansion it
+runs 0..107 and the move completes exactly once. The file is then 5 MB.
+
+It fails loudly only if you check: the encode succeeds, the frames are correct, and
+the picture looks right in any thumbnail. Probe the duration of anything built with
+`zoompan`.
+
+To pull BACK instead of pushing in, `z` must still go from >1 down to 1 —
+`z='1.087+(1-1.087)*on/N'` — because `zoompan` clamps `z` below 1.
+
+---
+
+## `drawtext` cannot take an apostrophe in `text=`, whatever you escape it with
+
+`text='Become Someone You're Proud Of'` exits with code 8. The filter's own
+single-quote parsing runs before any shell escaping you apply, and the usual
+`\'`/`'\''` tricks do not survive both layers.
+
+Use `textfile=` and put the string in a file — which also sidesteps `:`, `%` and
+`\` in the same stroke. `fontcolor` wants `0xRRGGBB`, not the `#RRGGBB` that
+`brand.json` stores, so strip the `#`.
+
+Episode 1 already shipped `build/tagline.txt` and `build/byline.txt` for this
+reason; the lesson had just not been written down.
+
+---
+
+## A grade tuned on SDR footage over-saturates when the source is HLG
+
+Episode 1 was `bt709` 8-bit. Episode 2 was shot on the same phone in the same room
+and is **HLG HDR** — `yuv420p10le`, `bt2020nc`, `arib-std-b67`. `render.py` detects
+the transfer and tone-maps to Rec.709, which is correct and necessary (untone-mapped,
+the output looks washed out and orange in anything that honours the metadata).
+
+What is NOT safe is reusing the previous episode's grade string on top of it. The
+tone-map already supplies the contrast and saturation that a grade written for flat
+SDR was adding. Measured on the same frame:
+
+| | mean luma | p5 | p95 | mean sat | frame R/B |
+|---|---|---|---|---|---|
+| no tone-map | 137.6 | 44.4 | 196.4 | 0.236 | — |
+| tone-map only | 128.0 | 43.7 | 180.7 | 0.358 | 1.45 |
+| tone-map + Ep1 grade | 129.5 | 31.0 | 192.6 | **0.407** | **1.57** |
+| Ep1 as DELIVERED | 98 | 15 | 198 | **0.29** | **1.01** |
+
+Grade the tone-mapped image on its own terms. White-balance off a **known white in
+the frame** rather than a global R/B ratio — a global ratio cannot tell a warm cast
+from a room that genuinely contains a lot of wood and amber. Here the white t-shirt's
+brightest 2% read R/G 1.055, B/G 0.892, and — the part that makes it usable — varied
+by under 0.02 across five takes, so one `colorchannelmixer=rr=0.948:bb=1.121` serves
+the whole shoot and a fixed string beats `"auto"`.
+
+Then restore what the tone-map compressed: a curve took p5 43.7 -> 19.0 and p95
+180.7 -> 196.7, landing on the previous episode's delivered 15 / 198. Note that
+adding contrast puts saturation back up, so the desaturation has to be set after the
+curve, not before it.
+
+---
+
+## `coverage.py` counts 75 jump cuts as 5 visual events, and it is right
+
+A 12m55s single-setup talking head with 75 cuts and per-segment push-ins of
+1.00-1.10x measured **5 visual events, 0.4/min, median hold 204.8 s**. That is not a
+bug in the detector. A cut between two segments of the same locked-off frame, at
+scales 1.03 and 1.06, is not a visual change to a viewer either — the push-ins do
+their job (they stop the splice reading as a glitch) but they are invisible as
+*events*.
+
+Consequences:
+
+- Do not read a low event count as "the cutting is lazy". Read it as "the frame has
+  not changed", which on a one-camera shoot is simply true.
+- Push-ins are not a substitute for cutaways. Only something that replaces the frame
+  — a still, a graphic, a b-roll shot — moves this number.
+- Run `coverage.py` on the picture lock, BEFORE building graphics, so the stretches
+  it names are what you build for. Run it again after, to see what is still bare.
+
+---
+
+## Anchor a graphic to a spoken word, and make the resolver RAISE when the word was cut
+
+Placing overlays by anchoring them to words (`output_time(source, word_start(...))`)
+rather than to timestamps means a re-cut re-places them for free. The load-bearing
+detail is what happens when the anchor word is no longer in the episode.
+
+`"back" #1` in one take was "cycle **back**", inside a stutter that had been trimmed.
+A resolver that clamps, or picks the nearest surviving word, would have put a list
+item on a silent frame 10 s away and nothing would have looked wrong in the render.
+Raising instead surfaced it immediately, and it was re-anchored to "eight".
+
+Same rule for the still cutaways: print the words each overlay actually covers and
+read them. It is the only check that catches an overlay landing on the wrong half of
+a sentence.
+
+---
+
+## An overlay must be authored at the OUTPUT height — render.py does not scale it
+
+`build_final_composite` chains overlays as
+`overlay=enable='between(...)':eof_action=pass:repeatlast=0` with no `x`/`y` and
+no `scale`. Default position is 0:0, so a 3840x2160 overlay on a 1920x1080 base
+shows **its top-left quarter**, full size.
+
+It does not error, and it does not look like a geometry bug — it looks like badly
+chosen framing. A centred photo cutaway came out as an empty field with the subject
+off-frame; a left-hand list ran off the bottom of the picture. Both were "plausible
+enough to argue about" rather than obviously broken.
+
+Episode 1 never hit it because it built one overlay at 2160 and rendered at 2160;
+the filename `prepped/TEASER_BROLL_2160.mp4` records the height, which is worth
+copying as a convention.
+
+Consequences:
+
+- Overlays are **resolution-specific**, unlike `ranges[].zoom`. The same EDL is
+  not valid at two heights once it has overlays.
+- `--preview` (1080) and `--draft` (720) therefore cannot QC a 2160 delivery's
+  overlays. Check overlay geometry on a render at the DELIVERY height, or build a
+  set at the preview height too.
+- Verify by measuring both, not by eye: the base's real width through
+  `scale=-2:<height>` (never predicted — see the SAR gotcha above) against
+  `ffprobe` on each overlay. They must be identical.
+
+A `scale2ref` in the overlay chain would make overlays resolution-independent and
+would be a no-op for a correctly-sized one. Not done here, because it changes
+shared tool behaviour in the middle of a delivery.
+
+---
+
+## render.py never cleans its clips directory, so a changed EDL leaves stale segments
+
+Segments are written as `clips_<quality>/seg_<NN>_<SOURCE>.mp4`. Nothing deletes
+them. Tighten a cut from 75 ranges to 72 and the directory holds **102 files** —
+the 72 new ones, plus every old name that no longer collides.
+
+Anything that measures by globbing then reads a mix of two different cuts. The
+first symptom here was `measure.py` refusing with "102 segments but EDL has 72
+ranges", which is the good case. The bad case is a glob that happens to return
+the right *count* and silently measures the wrong segments, putting every
+overlay position out by seconds.
+
+Build the expected names from the EDL instead, and say so when extras are found:
+
+```python
+segs = [d / f"seg_{i:02d}_{r['source']}.mp4" for i, r in enumerate(ranges)]
+stale = sorted(set(d.glob("seg_*.mp4")) - set(segs))
+```
+
+Same class of bug for any *derived* file cached next to its source. A scaled
+copy of an overlay must be checked for freshness, not just for dimensions —
+`dst.stat().st_mtime >= src.stat().st_mtime` — or rebuilding the master silently
+keeps compositing the previous version.
+
+---
+
+## "Is the music off in this window?" cannot be answered by an absolute level
+
+Measuring the noise floor of a stretch that should be unscored, and comparing it
+against a stretch that is scored, gives a number that looks decisive and is not.
+Measured on this episode: the zenith (deliberately unscored) read **-31.5 dB**
+and a scored section read **-30.7 dB** — apparently identical, apparently a bug.
+
+It was not. The programme's own room tone varies by up to **17 dB** between
+takes and between windows with different speech density, and that swamps a
+ducked bed sitting 15 LU down.
+
+The only valid test is a **control**: measure the same windows on the no-music
+render and on the mix, subtract the mix's own normalisation gain, and look at
+the difference.
+
+```
+window                     no-music   mixed     rise
+zenith (must be naked)       -41.1    -31.5    -1.2 dB   <- confirmed silent
+scene 8 opening (scored)     -58.0    -30.7   +16.4 dB
+the 20cm reveal (unscored)   -48.6    -37.9    -0.1 dB   <- confirmed silent
+```
+
+Generalises to any "did this process change that region" question on audio or
+picture: diff against the same source without the process, never against a
+different region of the same output.
+
+---
+
+## Generated b-roll arrives with three problems, and one of them is editorial
+
+From a batch of ten Gemini/Veo clips supplied for this episode:
+
+1. **A watermark on every clip** — a 44x45px sparkle at a fixed position
+   (x 1138-1181, y 577-621 at 1280x720). `delogo` removes it invisibly over
+   texture and smooth gradients; it smears over hard geometry, so check each
+   one rather than applying it blind. Detect it by finding pixels that are
+   bright in *every* sampled frame — real content moves, the mark does not.
+2. **Burned-in prompt captions** on some clips (bottom-left). A crop that
+   clears the caption can be chosen to clear the watermark at the same time and
+   stay 16:9: here `crop=1138:640:0:0` did both with no delogo at all.
+3. **720p and 24fps** into a 2160p / 30000:1001 delivery. For the frame rate,
+   map one source frame to one output frame (`setpts` x 29.97/24) so the clip
+   plays 0.8x with **no judder** — for footage standing in for memory that
+   reads as a choice. For resolution there is no fix, only mitigation: lanczos
+   plus grain, and a treatment that makes softness look like grade.
+
+The editorial one: a batch generated for a **memoir** included two photorealistic
+children captioned "Childhood Uniform Photo" and "Chair Portrait", styled as
+archival film frames. Those are fabricated photographs of the subject's own
+childhood, in an episode whose premise is correcting a version of the story he
+used to tell wrong — and a real photograph of exactly that already existed.
+
+The line worth holding, and worth stating before assets are generated:
+**environments and objects, not people who could read as the subject or their
+family.** The real photographs carry the people; generated shots carry the world.
+
+Also: a montage clip supplied as a contact sheet may contain shots that exist
+nowhere else. Scan any supplied clip densely (0.25s intervals) rather than
+sampling one frame — a 10s "reference" here held nine distinct sub-shots, four
+of them wanted and unavailable separately.
+
+---
+
+## zsh eats `[a]` after a variable — a third form of the same trap
+
+```bash
+ffmpeg … -filter_complex "[0:a]atempo=$sp[a]" -map "[a]" …
+#   -> "Output with label 'a' does not exist in any defined filter graph"
+```
+
+`$sp[a]` is **array subscripting** in zsh, so the filter label is consumed and
+`atempo=` is left with no value. The error points at the `-map`, which is the
+one place the bug is not.
+
+Brace it: `atempo=${sp}[a]`.
+
+This is the same root cause as the `$VAR:x` history-modifier entry above and the
+word-splitting entry: **in a filter string, brace every variable that is
+followed by punctuation** — `:`, `[`, `{`, `#`, `%`. The rule is not "brace
+before a colon", it is "brace in filter strings, always".
+
+Related, from the same session: a `-filter_complex` whose `fontfile=` path
+contains a space (`…/Supplemental/Arial Bold.ttf`) fails with drawtext's
+misleading "Either text, a valid file, a timecode or text source must be
+provided" — it is the FONT path breaking the parse, not the text option. Use a
+face whose path has no spaces (`/System/Library/Fonts/Helvetica.ttc`), or pass
+the graph via a Python list with `-vf` so no shell is involved.
+
+## An English-only whisper model on Hindi returns a REPEATING LOOP, not gibberish
+
+Verified 2026-09-23 pulling a reference video (`T6VLsGIYqeQ`, Ritu Solanki). YouTube
+rate-limited its captions (HTTP 429 on the timedtext endpoint, while the same run succeeded
+for another video minutes earlier), so the audio was transcribed locally instead.
+
+`ggml-small.en.bin -l en` on Hindi audio produced **1078 words that were one sentence repeated
+~90 times** — *"It's not easy to make a penguin happen."* The danger is that this does not look
+like a failure. It looks like a badly transcribed but real video, or a video that is genuinely
+repetitive, and a summary written from it would be confident and entirely invented.
+
+Two separate lessons:
+
+- `index.md` already warns that **`--language en` on code-switched audio** returns confident
+  gibberish. This is the neighbouring trap: **the `.en` MODEL cannot fall back at all.**
+  `ggml-small.en.bin` is English-only; on Hindi it degenerates rather than mistranslating.
+  Use multilingual `ggml-small.bin`.
+- **Detect the language before transcribing an unknown source**, on a slice from the MIDDLE
+  (an intro is often music or English):
+  `whisper-cli -m ggml-small.bin -f slice.wav -l auto -nt 2>&1 | grep auto-detected`
+  It returned `hi (p = 0.98)` in seconds and explained the whole thing.
+
+For Hindi → English, `ggml-small.bin -l hi -tr` (translate mode) gave a clean, coherent 1531
+words. Sanity-check any whisper output by counting unique lines against total lines before
+reading it as content.
+
+## yt-dlp: captions 429 long before audio does
+
+Same session. Subtitle downloads hit `HTTP Error 429` and stayed blocked across several
+retries and `--sleep-requests 8`, while `-f bestaudio -x` for the *same* videos downloaded
+immediately. `--extractor-args "youtube:player_client=ios"` does not help — that client offers
+no subtitle formats at all and fails with "Requested format is not available".
+
+So when captions are rate-limited, don't wait it out: pull the audio and transcribe locally.
+It is free, it is the pipeline this repo already has, and it sidesteps the limit entirely.
