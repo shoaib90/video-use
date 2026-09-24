@@ -1055,3 +1055,36 @@ loop from the English-only model — both traps now in `gotchas.md`.
 Also written: `episode2/edit/community_posts.md`, six posts to `kb/distribution.md`'s
 rule (the value that did not fit in the thumbnail, never "watch my video"), and
 `build/check_overlays.py` / `build/check_beds.py` as reusable delivery checks.
+
+## 2026-09-24 — b-roll analysis of a reference cut, into storytelling.md §6
+
+Shoaib supplied <https://www.youtube.com/watch?v=uV3CW2zBznE> ("Rebrand your Entire
+Life before 2027", Sankho kun, 16:31) with the observation that the b-roll seems
+unrelated to the narration, and asked what I made of it.
+
+Method, worth reusing for any reference cut: `yt-dlp` at 480p plus auto-captions,
+`select='gt(scene,0.3)'` for cut detection, one frame extracted 0.35s **after** each
+cut (sampling at the cut is what makes the sheet answer "what did he cut TO"), tiled
+into 36-up contact sheets, then aligned against caption timings to compare word
+against picture.
+
+Findings, now in `kb/storytelling.md` §6:
+
+- 205 cuts / 991s = **12.4 cuts/min**, median shot **2.67s**, 57% under 3s, longest
+  hold 62.4s. Our Ep2 is 7.3 events/min for comparison.
+- The premise is **half wrong**. B-roll tiers: **literal** whenever the sentence
+  contains something concrete ("lose 10 kgs" → treadmill, "a camera or a gaming PC" →
+  both, "all-nighters" → a bloodshot eye, a 4-item list each illustrated), and
+  **texture** only when the line is abstract.
+- Why the texture tier works there and does not transfer: every shot is **him**, so
+  the footage is evidence for the claim rather than decoration over it. Stock in the
+  same slots collapses it. The test for a mismatched cutaway is "evidence or
+  wallpaper?".
+- The actionable lesson is upstream of the edit — **a standing library of yourself
+  doing ordinary things**. Ep2's 106s with nothing changing was an asset problem, not
+  a cutting one.
+
+Two ffmpeg notes from doing this: no ImageMagick on this machine, and the `tile`
+fallback with `-pattern_type glob` takes **every** frame, so six "different" contact
+sheets came out byte-identical. Stage each group into its own directory with
+sequential names and use the `%03d` demuxer instead.

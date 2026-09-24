@@ -217,3 +217,76 @@ The two failures worth carrying into every future episode of this channel:
 - **Decide the one image and withhold it.** On Ep2 the obvious move was to show the
   cricket photograph obscured or partial early, and give the clear full frame only at
   the moment the story turns.
+
+---
+
+## 6. B-roll tiering, and why mismatched b-roll is not a transferable licence
+
+Measured on **"Rebrand your Entire Life before 2027"**, Sankho kun, 16:31, 2026-09-24
+(<https://www.youtube.com/watch?v=uV3CW2zBznE>), analysed at Shoaib's request because
+the b-roll looks, on a first watch, unrelated to the narration. Method: `yt-dlp` at
+480p, `select='gt(scene,0.3)'` for cut detection, one frame extracted 0.35s after each
+cut, tiled into contact sheets, then aligned against the auto-caption timings.
+
+**Measured:** 205 cuts in 991s = **12.4 cuts/min**, median shot **2.67s**, 57% of
+shots under 3s, longest hold 62.4s. Roughly **55% of cuts go to b-roll**; the rest are
+jump cuts on the talking head. (The b-roll share is a visual count off the contact
+sheets, so treat it as approximate; the cut statistics are exact.)
+
+### The b-roll splits into two tiers, and the split is by sentence
+
+**Tier 1 — literal, whenever the line contains something concrete.** Far more
+disciplined than it appears on a first watch. Verified against the transcript:
+
+| line | shot |
+|---|---|
+| "not a challenge to **lose 10 kgs**" | treadmill |
+| "something like **a camera or a gaming PC**" | him with a camera, then his PC |
+| "wins, losses, **all-nighters**" | a bloodshot eye, extreme close-up |
+| "**adventures**" | footage with friends |
+| a 4-item list of who he wants to be | each item illustrated, with matching on-screen text |
+| "first **ideate**… **execute**… **analyse**" | a wall of notes, a camera, a monitor |
+
+**Tier 2 — pure texture, whenever the line is abstract.** "Standing at some sort of
+crossroad in life" gets a bookshelf. "Trust the process" gets a rooftop silhouette.
+These carry no information about the sentence at all.
+
+So "his b-roll doesn't match what he's saying" is **half true**, and the half that is
+wrong is the important one: he matches literally every time the sentence gives him
+something to match, and falls back to texture only when it does not.
+
+### Why tier 2 works for him, and why that does NOT transfer
+
+Every shot is **him** — gym, desk, guitar, rooftop, camera, walking, friends. No
+stock, nothing generated.
+
+That changes what the footage *is*. In a video called "Rebrand your Entire Life",
+footage of him living is not decoration over the words, it is **evidence for them**.
+The abstract lines do not need illustrating because the picture is doing a different
+job: proving the life being described exists. Put stock in those same slots and the
+piece collapses into an advert.
+
+**The licence is therefore not transferable.** The moment the b-roll is not you,
+mismatch stops being texture and becomes filler — and 12 cuts/min of filler reads as
+panic. Judge a mismatched cutaway by one question: *is this evidence, or is it
+wallpaper?*
+
+### What to take from it
+
+- **The real lesson is upstream of the edit: keep a standing library of yourself
+  doing ordinary things.** That library is why an abstract line always has somewhere
+  to go. Ep2 had 106s with nothing changing not because the cut was bad but because
+  there was nothing to cut *to*. This is a shooting habit, not an editing one, and it
+  is the highest-leverage item here — a phone and ten minutes a week builds it.
+- **On-screen text carries the structure** (`Step 1/2/3/4`, numbered lists,
+  Ideate/Execute/Analyse), which is precisely what lets the b-roll be loose: the spine
+  is held by the type, so the picture does not have to hold it. We already do this;
+  keep doing it.
+
+### What NOT to take
+
+- **The cut rate.** 57% of shots under 3s suits a present-tense, energetic format.
+  Nothing lands in 2.7s when the subject is a 13-year-old giving up cricket. Pace is
+  a ceiling set by format — the rule already recorded in `index.md`.
+- **Recycling the same six locations.** It reads as identity-through-repetition for a
+  channel with a catalogue behind it; on episode 2 it reads as a thin library.

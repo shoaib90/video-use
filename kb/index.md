@@ -127,6 +127,12 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   stream-copied join reports a mid-stream property change and the graph fails to reinitialise.
 - **Check every B-roll cutaway against the line it sits under.** The dashcam OSD speed readout
   makes this free; it killed 2 of 7 planned cutaways on Detour-2.
+- **B-roll tiers: literal when the line is concrete, texture when it is abstract** — and the
+  texture tier is only licensed when the footage is **you**. Footage of your own life is
+  *evidence* for the claim; anything else in that slot is wallpaper, and 12 cuts/min of
+  wallpaper reads as panic. The transferable lesson is upstream of the edit: **keep a standing
+  library of yourself doing ordinary things**, so abstract lines have somewhere to go. Measured
+  on a 16:31 reference cut in [storytelling.md](storytelling.md) §6.
 - **Place overlays with `-itsoffset`, never `setpts`, and always `repeatlast=0`** — over a long
   render a `setpts`-placed overlay drains ahead of the timeline, runs out early and then freezes
   the picture on its last frame. It hit 4 of 5 overlays on Detour-2 and reproduces only against
