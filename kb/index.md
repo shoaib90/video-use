@@ -28,6 +28,7 @@ Transcribe ──> Pack ──> reason over text ──> EDL ──> Render ─�
 | [gotchas.md](gotchas.md) | Verified traps that cost real debugging time | Anything fails unexpectedly |
 | [storytelling.md](storytelling.md) | **Retention craft for talking-head cuts** — contrast, rhythm, withholding, the zenith | Planning a cut; before picture lock |
 | [ideation.md](ideation.md) | **Where ideas come from** — recombination, the A+B=C identity formula, constraints | Deciding what to make; choosing a style |
+| [distribution.md](distribution.md) | **After the render** — how the algorithm distributes, reading a flop, community posts | Judging performance; deciding what to fix |
 | [worklog.md](worklog.md) | Dated log of local changes + why | Understanding a local divergence |
 | [check-env.sh](check-env.sh) | Re-verifies everything in environment.md | Cold start, or something broke |
 | [new-machine.md](new-machine.md) | Cloning onto another laptop; what doesn't travel | Setting up a second machine |
@@ -54,7 +55,11 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   diarization), ElevenLabs (unconfigured). Each has a different flaw — see [gotchas.md](gotchas.md).
 - Paid transcription is cached per source. Never re-transcribe unnecessarily; iterate with whisper.
 - All three animation engines installed: Manim, HyperFrames, Remotion.
-- Piping to `tail` masks exit codes. Use `set -o pipefail`.
+- Piping to `tail` masks exit codes. Use `set -o pipefail`. It also **hides the whole head of
+  the output** — a `| tail -30` on a self-eval report silently dropped its pops section.
+- **Never wait on a job with `pgrep -f "script.py"`** — `-f` matches full command lines, so the
+  waiting shell matches *itself* and hangs forever after the job finishes. Wait on a marker the
+  job prints, or on the output file. Cost ~10 idle minutes on an already-finished 4K render.
 - **Check what language is actually spoken before transcribing a batch.** `--language en` on
   code-switched (e.g. Hinglish) audio returns confident English gibberish and drops ~a third of
   the words — and since the cut is reasoned from the transcript, it corrupts the *edit*, not just
@@ -135,7 +140,13 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   that skips the words carrying the meaning. Found 5 broken joins in a *delivered* cut.
 - **`freezedetect d=0.4` false-positives on a locked-off talking head** — use `d=1.0`. And a
   dashcam clip at the end of a drive is probably a *parked* car; validate any motion metric on a
-  known-moving control first.
+  known-moving control first. It logs at **INFO**, so a hand-rolled check with `-v error`
+  reports zero freezes — a false negative. Back-to-back spans (each end == the next start)
+  over a static background are **caption changes**, not a stuck picture.
+- **Never hardcode a timestamp in a self-eval probe.** When the cut shortens, the probe lands
+  past the end of the file and reports `-999 dB` in the same column as every real level —
+  indistinguishable from a scene that lost its audio. Anchor to the end card or a spoken word,
+  like graphics and overlays. Cost us a scare on episode2's delivery.
 - **Motion graphics are three layers**: `motion.py` (curves + per-role WEIGHTS + stagger),
   `brand.py` (a palette derived from delivered work), `components.py` (the archetypes).
   Author a **role**, never a duration — a hero landing and an aside fading must not match.
@@ -230,11 +241,42 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   expected filenames from the EDL, never glob. Same for any cached derived file: check
   freshness (mtime vs source), not just dimensions.
 - **To prove a window is unscored, diff against a no-music control** — never read an absolute
-  floor. Room tone varies up to 17 dB between takes and swamps a ducked bed.
+  floor. Room tone varies up to 17 dB between takes and swamps a ducked bed. And read the
+  **magnitude, not the sign**: a SCORED window lands ~1 dB *below* a known-naked reference,
+  because a bed gives the limiter more to take back. The obvious reading inverts the verdict.
+- **A killed render loses only the composite.** `clips_graded/`, `base.mp4` and `master.srt`
+  survive; the partial output mp4 has no moov atom and is unrecoverable. Assert the segments
+  and base post-date `edl.json`, then skip straight to the composite — minutes, not ~18.
+  Pattern in `episode2/edit/build/resume_render.py`. See [gotchas.md](gotchas.md).
 - **Generated b-roll: watermark, burned captions, 720p/24fps — and an editorial line.**
   Environments and objects, not people who could read as the subject or their family; the real
   photographs carry the people. Scan supplied clips densely, a "reference" montage may hold
   shots that exist nowhere else. See [gotchas.md](gotchas.md).
+
+- **Selective speed-up must be a prepped SOURCE with a rescaled transcript**, never a
+  per-range `setpts` — captions inside a sped range drift by the rate (2.6s on a 26s
+  segment) and the frame-count check fails. Keep the SPEC in ORIGINAL times and convert at
+  emit; anything resolving anchors by source name needs the same rename. See gotchas.md.
+- **An effect 9 dB under the programme raises a window's RMS by 0.5 dB**, so "adds nothing"
+  proves nothing — and subtracting two renders leaves a uniform ~2.5 dB limiter/codec
+  residual everywhere. Floor-against-a-control works for beds; peak is useless once a
+  limiter pins every window. Short effects are a mix decision, not a measurement.
+
+- **Impressions are the system's confidence, not a reward withheld.** A video is served in
+  widening waves — loyal audience first, then riskier — and impressions stop when a wave stops
+  converting. So **good CTR + good retention + low impressions usually means the video never
+  left the loyal base**: check new-vs-returning per video before blaming the cut.
+  See [distribution.md](distribution.md).
+- **Ignore the first 24-48 hours** (YouTube labels early figures estimates), compare like with
+  like **in the same window** (first week vs first week, same content pillar — "velocity", not
+  totals), and **put the energy into the next episode rather than rescuing the last**. Our
+  pipeline makes re-rendering cheap, which makes that trap easier to fall into here.
+- **Community posts are the most underused surface** — reportedly ~10% of one channel's
+  impressions. Never "here's my video"; post the value that did not fit in the thumbnail.
+  And a subscriber who never watches costs nothing, so do not optimise subscriber "quality".
+- **Using new features does not buy impressions**, and tags are low-leverage whatever a vendor
+  video claims. Metadata helps the system CLASSIFY a video; viewer behaviour decides how far it
+  TRAVELS. Same file.
 
 ## Maintaining this KB
 

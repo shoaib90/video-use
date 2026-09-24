@@ -2311,3 +2311,181 @@ no subtitle formats at all and fails with "Requested format is not available".
 
 So when captions are rate-limited, don't wait it out: pull the audio and transcribe locally.
 It is free, it is the pipeline this repo already has, and it sidesteps the limit entirely.
+
+---
+
+## Selective speed-up belongs in a prepped SOURCE, not a per-range filter
+
+Delivering part of an episode faster ("1.10x on the expository scenes") looks
+like a job for `ranges[].filter` with `setpts`. It is not.
+
+render.py maps transcript word times into output time using each segment's
+measured start and assumes time runs 1:1 *inside* a segment. Speed a range up
+and every caption inside it drifts by the rate: 10% of the segment's length,
+which on a 26s segment is **2.6s adrift by its end**. The frame-count check
+fails too, because the extractor still expects `round((end-start)*fps)`.
+
+Build the sped clip as a SOURCE instead, with its own transcript whose word
+times are divided by the same rate:
+
+```python
+t = json.loads((TRANS / f"{take}.json").read_text())
+for w in t["words"]:
+    for k in ("start", "end"):
+        w[k] = round(w[k] / RATE, 4)
+```
+
+Every downstream stage then sees an ordinary clip. Keep the hand-written SPEC in
+ORIGINAL timecodes and convert at emit time, so boundary snapping still runs
+against the original transcript and the spec stays readable:
+
+```python
+out.append((speed_src(src), speed_t(src, a), speed_t(src, b), z, beat))
+```
+
+Two traps found doing it:
+
+- Anything that resolves an anchor by source name — graphics, overlays — must
+  apply the same rename and rescale, or it raises "not in the cut" on a word
+  that is plainly still there.
+- A source-path router keyed on the `IMG_` prefix sent `IMG_3657_110` to
+  `../IMG_3657_110.mov`; the retimed clips live in `prepped/` as `.mp4`.
+
+`atempo` preserves pitch and 1.10 is well inside its transparent range. Retime
+video and audio by exactly the same factor in one graph or they drift apart.
+
+---
+
+## An effect 9 dB under the programme cannot be detected by RMS
+
+Checking whether a spot effect actually landed by comparing the window's RMS
+before and after the mix gives "+0.3 dB — inaudible" for every cue, which looks
+like a broken filtergraph and is not. The arithmetic: a signal 9 dB down adds
+`10*log10(1 + 10^-0.9)` = **0.5 dB**. The test cannot resolve what it is asked
+to resolve.
+
+Subtracting the two renders does not rescue it either. The mix path carries a
+limiter and an AAC encode, so `mixed/gain - dry` leaves a uniform residual —
+measured **~2.5 dB in every window**, including ones that are provably silent.
+
+What does work, per element type:
+
+- **Beds** (music, a ticking clock): the 10th-percentile **floor** between
+  sounds, against a no-music control. On this episode that read +14.8 dB where a
+  bed was present and −0.0 dB at the zenith, which is the discrimination wanted.
+- **Transients**: NOT peak. Once a limiter is in the chain every window's peak
+  clamps to the same value — measured 2.0 dB across all six spot effects, which
+  says nothing about any of them.
+- The honest fallback for a short effect is to confirm the chain works with a
+  bed in the same `amix`, then judge the level by ear. Some things are mix
+  decisions, not measurements.
+
+## `pgrep -f` matches the waiting shell's OWN command line, so waiters deadlock
+
+A background waiter written the obvious way:
+
+```zsh
+until ! pgrep -f "render.py" >/dev/null; do sleep 20; done
+```
+
+never exits — because `pgrep -f` matches against **full command lines**, and this
+shell's own command line contains the string `render.py`. One waiter matches
+itself; two waiters watching the same job match *each other* and both hang
+forever after the job is long gone.
+
+Measured on episode2: the 4K composite finished at 13:55 and three chained
+waiters were still sleeping at 13:57, costing ~10 minutes of idle wall clock on a
+job that was already done. It presents as "the render is taking ages", which is
+the expensive misdiagnosis — you go looking at ffmpeg.
+
+Fixes, in order of preference:
+
+- **Wait on the artifact, not the process.** `until grep -q DONE "$logfile"`, or
+  test for the output file. A marker string the job prints on exit cannot
+  self-match, because the waiter greps for it rather than containing it as a
+  process name. This is what we now use.
+- If you must match a process, use the bracket trick — `pgrep -f "[r]ender.py"` —
+  the classic `ps | grep` dodge, which works for the same reason.
+- `pgrep -f` also matches the `/bin/zsh -c source …snapshot… && eval '…'` wrapper
+  the harness builds, so the whole script body is in the matched text, not just
+  the command you think you ran.
+
+## `freezedetect` logs at INFO, so `-v error` silently reports zero freezes
+
+Re-running a freeze check with `ffmpeg -v error … -vf freezedetect` prints
+nothing and reads as "clean" — the filter emits `lavfi.freezedetect.freeze_start`
+as **info-level** metadata, which `-v error` discards. `selfeval.py` gets this
+right with `-v info`; a hand-rolled spot check will not.
+
+This is a false *negative*, which is the dangerous direction: it looks like the
+defect you were chasing has gone away. Verified on episode2's delivery, where the
+same window reported 0 freezes at `-v error` and 9 at `-v info`.
+
+Related: a **black cold open with burned captions produces back-to-back freezes**,
+one per caption change, each `freeze_end` exactly equal to the next
+`freeze_start`. Nine of episode2's twelve are this. Contiguous freeze spans over
+a static background are a caption sequence, not a stuck picture — check whether
+the spans butt up against each other before investigating.
+
+## A self-eval probe with a hardcoded timestamp becomes a fake defect when the cut shortens
+
+`selfeval.py` probed "scene 8 speech" at a literal `700.0, 710.0`. That was inside
+the 12:55 cut. After the recut to 9:00 it lands **past the end of the file**, where
+the slice is empty and the guard returns `-999.0` — printed in the same column as
+every real level, and indistinguishable from a scene that lost its audio entirely.
+
+The cost is real: it is alarming, it is the last thing you see before delivering,
+and chasing it means re-probing a 2.7 GB file. Anchor every probe to something
+that moves with the cut — a segment boundary, the end card, a spoken word — the
+same rule already established for graphics and overlays. A probe outside the file
+must fail loudly as an error, never quietly as a measurement.
+
+## A SCORED window reads BELOW the naked reference, not above it
+
+The companion to "is the music off in this window?" above. Diffing the mix against
+the no-music control per window, the intuition is that a bed shows up as extra
+energy. It does not, once the two-pass loudness chain is in place: the mix applies
+one global gain and then limits, so **adding a bed gives the limiter more to take
+back** and that window's effective gain ends up *smaller* than the global one.
+
+Measured on episode2's delivery (global gain +11.09 dB, matching the mix log's
++11.10 — which is what validates the method):
+
+| window | delta vs the naked reference |
+|---|---|
+| plain talking head (reference) | 0.00 |
+| zenith — must be naked | **-0.19** |
+| 20cm chart — unscored | **-0.02** |
+| known bed, clock | **-1.21** |
+| known bed, mid | **-0.94** |
+
+So read the **magnitude** against a known-naked reference window, and expect
+scored windows to sit about 1 dB below it. Reading the sign the obvious way
+inverts the conclusion and certifies a scored zenith as clean.
+
+## A killed render loses only the composite — segments and base survive, and resuming is cheap
+
+`render.py` has no skip-extract flag, so the reflex after an interrupted render is
+to start it over. On a 9-minute 4K episode that reruns ~18 minutes of per-segment
+grading and extraction for nothing.
+
+What a mid-composite kill actually leaves:
+
+- `clips_graded/` — **complete and valid**, every segment already finalised
+- `base.mp4` — **complete**, if the concat had finished (check its mtime against
+  the newest segment)
+- `master.srt` — complete
+- the output `.mp4` — **unrecoverable**, no moov atom, `ffprobe` says "Invalid
+  data found". Delete it; there is nothing to salvage from a partial mp4.
+
+`episode2/edit/build/resume_render.py` is the pattern: rebuild the expected
+segment names **from the EDL** (never glob — stale segments from a previous EDL
+live in the same directory), assert every one exists and post-dates `edl.json`,
+assert `base.mp4` post-dates the newest segment, then monkeypatch
+`extract_all_segments` to return that list and `concat_segments` to a no-op and
+call `render.main()`. Everything downstream — subtitles, graphics anchoring,
+overlay compositing, captions-last — runs through render.py's own unmodified code,
+so the result is what a full run produces.
+
+The freshness assertions are the whole safety argument. Without them this silently
+composites a stale picture.

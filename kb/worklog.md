@@ -993,3 +993,65 @@ something we actually observed on YT1. Linked from `index.md`.
 Transcript retrieval: captions via `yt-dlp` for one video, local whisper.cpp for the other two
 after YouTube 429'd the timedtext endpoint. The Hindi one first came back as a hallucination
 loop from the English-only model — both traps now in `gotchas.md`.
+
+## 2026-09-24 — episode2 delivered at 4K
+
+`final.mp4`, 3840x2160, 9:01.8, -14.2 LUFS. Full record in the project's `project.md`.
+**Superseded the same day** by a 9:00.37 re-delivery — see the next entry.
+
+- Cut went 12:55 -> 12:27 -> 9:18 -> 9:02 across three sessions, the last on Shoaib's
+  own five-act brief. His brief was written from the SCRIPT not the transcript — about a
+  third of its lines are not in the footage — so the structure was taken and the words
+  came from the takes.
+- **Selective 1.10x on the expository takes only**, built as prepped sources with
+  rescaled transcripts. New gotcha: a per-range `setpts` drifts every caption inside the
+  range by the rate. 31% of the episode is sped; everything emotional is not.
+- Sound design built from the library plus the b-roll's own audio. The best beat is
+  Shoaib's: the bed stops dead under the hang-up beeps when the coach refuses.
+- Two measurement lessons recorded: an effect 9 dB under the programme cannot be
+  detected by RMS at all (0.5 dB), and subtracting two renders leaves a uniform ~2.5 dB
+  limiter/codec residual so it isolates nothing. Floor-against-a-control works for beds;
+  peak is useless once a limiter pins every window.
+- A supplied b-roll clip was 848x478 among 1280x720 siblings, which broke a hardcoded
+  watermark box. Watermark geometry is now a fraction of frame.
+- Held an editorial line twice: a generated "Childhood Uniform Photo" was refused, and
+  the replacement height-chart clip was trimmed to its face-free section. Environments
+  and objects; the real photographs carry the people.
+
+## 2026-09-24 — episode2 re-delivered at 9:00.37, and five gotchas from the delivery
+
+`final.mp4`, 3840x2160, 9:00.37, 40.7 Mbps, -14.2 LUFS, 2.75 GB. Supersedes the
+9:01.8 file above. Full record in the project's `project.md`, session 5.
+
+- **A pad pulled untranscribed Hinglish into the cut.** Shoaib asked for 4:47-4:50
+  ("matlab mereko") to go. The cause is the interesting part: a lone segment holding
+  the word "But" carried a 0.80s pad, and the take had been transcribed with
+  `--language en`, so Deepgram returned "But" and showed *nothing* of the Hinglish
+  that followed. The words were audible in the render and absent from the transcript
+  — invisible in the surface the cut is reasoned from. This is a second, quieter cost
+  of the `--language en` trap already in `gotchas.md`: not just wrong captions, but
+  material entering the cut unseen. Shoaib's other two reported missing-word spots may
+  well be the same class.
+- **`resume_render.py`** — new pattern, after the 4K render was killed mid-composite.
+  Segments, base and SRT all survive a kill; only the output mp4 is unrecoverable (no
+  moov atom). Verify freshness against `edl.json`, neutralise extract and concat, hand
+  to `render.py`'s own composite path. Minutes instead of ~18.
+- **`pgrep -f` self-match deadlock.** Three chained waiters all watching `render.py`
+  matched their own command lines and hung ~10 minutes past the job's completion. Now
+  waiting on a printed marker instead. This one is not video-specific and will recur
+  anywhere in this repo.
+- **`freezedetect` logs at INFO**, so a hand-rolled `-v error` re-check reported 0
+  freezes where there were 9 — a false negative on a delivery check. Also confirmed
+  that a black cold open with burned captions yields back-to-back freeze spans, one
+  per caption change; 9 of episode2's 12 are that, and none are in the picture.
+- **A hardcoded self-eval probe became a fake defect.** `selfeval.py` probed 700s on a
+  540s cut and printed `-999 dB` beside the real levels. Re-anchored to the end card.
+- **The bed-vs-control diff reads backwards.** A *scored* window lands ~1 dB *below* a
+  known-naked reference, because a bed gives the limiter more to take back. Measured
+  global gain +11.09 dB against the mix log's +11.10, which validates the method; the
+  zenith at -0.19 and the 20cm window at -0.02 are naked, the two known beds at -1.21
+  and -0.94. Reading the sign the obvious way would have certified a scored zenith.
+
+Also written: `episode2/edit/community_posts.md`, six posts to `kb/distribution.md`'s
+rule (the value that did not fit in the thumbnail, never "watch my video"), and
+`build/check_overlays.py` / `build/check_beds.py` as reusable delivery checks.
