@@ -1088,3 +1088,16 @@ Two ffmpeg notes from doing this: no ImageMagick on this machine, and the `tile`
 fallback with `-pattern_type glob` takes **every** frame, so six "different" contact
 sheets came out byte-identical. Stage each group into its own directory with
 sequential names and use the `%03d` demuxer instead.
+
+## 2026-09-26 — integrating an externally made motion graphic beside the talking head
+
+Shoaib supplied `routine_10s.mp4`, a 4K routine card generated in a chat session, and
+asked whether it could run beside his talking head. Built
+`episode2/edit/build/routine_card_demo.py` → `routine_card_demo.mp4` (11.4s, 1080p
+preview): split-screen push, the card used as a recap on "So that was my routine",
+time-remapped with two frame holds so Sleep / Every day / For 3 years land on
+"sleep" / "repeat" / "three years". Verified by contact sheets at the reveal times and
+against word times from `gfx.output_time`. Three fixes after the first QC pass: the
+payoff was unreadable over the ghosted list (extra dim), the dim's hard edge showed as a
+band (gradient instead), and the caption sat off-centre after the panel left (`\move`).
+Technique recorded in `gotchas.md`.

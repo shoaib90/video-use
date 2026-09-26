@@ -2489,3 +2489,50 @@ so the result is what a full run produces.
 
 The freshness assertions are the whole safety argument. Without them this silently
 composites a stale picture.
+
+## An externally made motion graphic is opaque, full-frame and fixed-pace — integrate it by pushing and remapping, not overlaying
+
+A graphic made outside this pipeline (here: a 10s 4K `routine_10s.mp4` generated in
+a chat session) arrives as a **flat opaque render with its own pacing**. Both
+properties break the obvious "put it beside the talking head":
+
+- **Opaque and full-frame.** No alpha, and its layout uses the whole width — its
+  payoff ("Every day. For 3 years.") sat at x 0.63-0.93, exactly where the
+  speaker's face goes. Overlaying it hides the speaker; shrinking it whole to a
+  side panel makes its type unreadable.
+- **Fixed pacing.** 10s of reveals against ~59s of spoken routine: played over the
+  itemised passage it would show "Tuition" while he says "lunch".
+
+What worked, verified on `episode2/edit/routine_card_demo.mp4`:
+
+1. **Use it as a RECAP, not an illustration.** Enter on "So that was my routine",
+   after the b-roll has carried the journey. At that cue its native 10s nearly
+   fitted: aligning Sleep (graphic 6.267s) to "sleep" put t=0 at 142.44 — the
+   exact moment he says the recap line.
+2. **Time-remap with frame holds placed in measured static windows.** Measure each
+   element's reveal from region luma, and map where the graphic is animating vs
+   still with `tblend=difference` + `signalstats`. Holds (`trim` + `tpad
+   stop_mode=clone`) inside a still window are invisible; a hold mid-fade freezes
+   a half-drawn element. Here +0.109s and +0.882s put "Every day" on "repeat"
+   and "For 3 years" on "three years" exactly.
+3. **Crop, don't shrink.** Take the column that carries the content (the list),
+   scale by one factor so it fits a half-frame panel, and pad to full height with
+   `fillborders mode=smear` — a flat pad colour shows a seam on a gradient.
+4. **Split-screen PUSH, one curve for both.** The panel slides in as the talking
+   head slides right by the same smoothstep (the pairing rule). Panel right edge
+   (960E) stays ahead of the head's left edge (538E) at every E, so no black gap.
+5. **Lift type out of an opaque render with a lighten blend.** Crush the
+   background to black with `colorlevels`, place on a black canvas, then
+   `blend=lighten` — only the type is added. Poor man's alpha, and it works
+   because the type is brighter than everything it lands on.
+6. **Captions must ride the push** (`\move` in an ASS event, anchored `\an2`),
+   or they cross the panel seam or sit off-centre once the panel leaves.
+
+Two traps hit along the way: **`metadata=print` logs at INFO**, so `-v error`
+prints nothing — the same false negative as `freezedetect`, and it will be true of
+any lavfi `metadata`/`showinfo` probe. And **`bc` drops the leading zero** (`.3`),
+which `ffmpeg -ss` rejects; format times with `awk printf "%.2f"`.
+
+The better long-term route is to get the graphic's SOURCE with a transparent
+background and rebuild its timing here against spoken words — the flat render
+only works because this one happened to have still windows in the right places.
