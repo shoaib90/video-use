@@ -70,7 +70,7 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   compared for meaning); `-l hi`/`-l auto` garble it, and word-level `-ml 1` output is unusable
   for Devanagari, so whisper checks *wording only* — never timings. See gotchas.md.
 - **Grep a `--language multi` transcript for Spanish before burning captions**
-  (`grep -lE '[¿¡áéíóúñ]' <edit>/transcripts/*.json`) — Deepgram drifts into Spanish on short
+  (`grep -nE '[¿¡áéíóúñ]' <edit>/takes_packed.md` — **not** the JSON, which stores `\u00bf` escapes and silently matches nothing) — Deepgram drifts into Spanish on short
   or low-content clips. Hit 3 of 38 on Detour-2, one of them 47% of the clip.
 - **Don't transcribe clips under ~1s** — both engines return pure hallucination for them.
 - **A 0-word transcript is not evidence of silence.** Check with whisper before writing a clip
@@ -238,8 +238,19 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   on the build. See [storytelling.md](storytelling.md).
 - **Decide the ONE image of the story and withhold its clear reveal.** Anticipation is the
   retention mechanism, not payoff — show it partial, obscured or brief early, and give the full
-  frame only when the story turns. Ep2 spent its cricket photograph at 1:00 and had nothing left
-  to reveal. Same file.
+  frame only when the story turns. Ep2's picture lock spent its cricket photograph at 1:00; the
+  delivered cut holds it to 5:03, on "So I just quit quietly". Same file.
+  **But withhold the REVEAL, never the SUBJECT**: the title's promise must
+  land in the first ~10 s, visually if possible. The delivered Ep2 overcorrected — 22 s of black,
+  a brand card, first words "Last time I told you…", and "cricket" not said until 0:28.6.
+  See [storytelling.md](storytelling.md) §7.
+- **Never open an episode on a reference to the previous one.** Nearly every viewer the algorithm
+  brings a small channel is new; a series episode must stand alone. Seed the context inside
+  the action instead ("Katie, I know you're my girlfriend, but…"). Same section.
+- **Packaging before production.** Title first (≥10), a thumbnail brief *before* the shoot,
+  ≥3 differentiated thumbnails, and the expected result written down before publishing.
+  Outliers are ≥3× a channel's *average views*, not measured against its subscribers.
+  See [distribution.md](distribution.md) §10.
 - **Wall-to-wall music has no meaning.** Contrast is what creates focus: a naked talking head
   next to a scored one. If the bed never leaves, its arrival and departure stop being signals.
 
@@ -283,6 +294,11 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
 - **Using new features does not buy impressions**, and tags are low-leverage whatever a vendor
   video claims. Metadata helps the system CLASSIFY a video; viewer behaviour decides how far it
   TRAVELS. Same file.
+
+- **Frame-scan anything with a label at DELIVERY resolution** — a cut spoken serial number was
+  still readable on the box label in two shots on Detour-3, one only at 4K. And where Deepgram
+  tokens touch, move the cut to the quietest 10 ms nearby or it clips the next word's onset
+  (a click at 10.9x its neighbours). Both in gotchas.md.
 
 ## Maintaining this KB
 

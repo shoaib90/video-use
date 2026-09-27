@@ -174,6 +174,92 @@ a substitute for the cut.
 
 ---
 
+## 10. Packaging, and reading performance — from a strategist who does it at scale
+
+Source: **Paddy Galloway** on the Open Residency podcast (2h45m, 2026-09-14,
+<https://www.youtube.com/watch?v=Z2uoA3bhJT0>). His intro and core/casual/new
+rules are in `storytelling.md` §7; this is the packaging and measurement half.
+His claims, not our measurements.
+
+**Packaging is ~50 % of the game, and should get ~10–20 % of the time.** His
+reason is that the algorithm is a multiplier: a thumbnail "maybe 20–30 % better"
+took one video from 1,000 to 40,000 views a day, overnight, on an existing upload.
+
+**The workflow, in order:**
+
+1. **Title first**, minimum **10**. The thumbnail is then designed to *complement*
+   the chosen title — never to repeat it. ("How anyone can go viral" + thumbnail
+   "this is the key" complement; the same words twice do not.) This independently
+   confirms the Ep. 2 critique: "WHY I QUIT" restated "I Gave Up My Biggest Dream".
+2. **A thumbnail brief BEFORE the shoot**: 3–5 concepts, sketched or AI-roughed,
+   so the frames get captured on the day. His biggest frustration is creators who
+   "shoot the video and then afterwards be like, okay, what's the thumbnail?"
+3. **Shoot the thumbnail**: hundreds of stills, varied angles and micro-expressions.
+4. **Design at least 3 *differentiated* thumbnails** — not one shot in three shirt
+   colours — and run YouTube's native A/B test.
+5. **Before publishing, write down the expected result** (where it should rank
+   against recent videos). Judge it against that, not in absolute terms: a video
+   expected to be the best of the last 10 that lands 4th is a problem; a small
+   topic that lands 8th is not.
+6. **Change only when it underperforms expectation.** "Good data beats no data; no
+   data beats bad data." Don't churn titles hourly — you lose the ability to tell
+   what caused what.
+
+**Title rules:** fewest words that are still interesting (a guide, not a hard
+50–60 character cap); readable at a glance; **Title Case, not ALL CAPS** (all caps
+makes every letter the same height and is read less well); **universal language** —
+the "curse of knowledge" (his examples: "D1 athlete", "Goodwill", which cost a US
+creator his non-US audience); human interest over SEO keyword-stuffing (search is
+~5–10 % of most channels' traffic); a contradiction creates the question ("the
+cheapest 911 GT3 on the market… but nobody will buy it").
+
+**The glance test:** if the idea can't be said in one line a stranger understands
+in a second, it isn't a good idea yet — and "can we title and thumbnail this?" is
+his first elimination criterion, which he says removes two-thirds of ideas.
+
+**"Click to unpause":** a thumbnail should look like a paused moment — mid-action,
+mid-sentence — so the viewer clicks to resume it. A posed smile is not that.
+
+### Reading performance
+
+- **Views and retention *curves*, not CTR or average view duration.** CTR falls as
+  a video reaches a wider audience (his lemonade stand: a 20 % conversion outside
+  your house, far lower in Times Square, but more sales), and AVD rewards length.
+  Views are the comprehensive metric. This supports reading Ep. 2's 5.6 % CTR on 36
+  impressions as noise.
+- **A retention curve drops as the audience broadens, but the drop POINTS stay
+  put.** Read where people leave, not the overall level. Conclusion language ("at
+  the end of the day…") triggers drops for every audience.
+
+### Finding outliers
+
+**An outlier is a video at ≥3× that channel's own average views** — measured against
+the channel's average, not its subscriber count, which he calls close to a vanity
+metric in 2026. Scan your niche *and adjacent niches* for the last year or two,
+and ask "what's my twist on each?" His best example borrowed a thumbnail from a
+Canadian cooking video, a title from Hormozi and a concept from a short-form creator
+to make "asking millionaires how they got rich" (5M views).
+
+Ideas come from three sources: **internal** (redo what already worked for you —
+audiences forget), **external** (outliers), **innovation** (combine two things; he
+suggests ~20 % of output).
+
+### Topic overlap is smaller than you think
+
+His estimate for Call of Duty vs Battlefield players: ~20 %. The **80 % rule**: 80 %
+of videos should be topics whose audiences overlap ~80 %. Start narrow and expand
+outward; "you can't really start broad and go narrow." **Open question for this
+channel:** how much do the Detour viewers overlap with the essay viewers? Check it
+in YouTube Studio before assuming three formats help each other.
+
+### What not to take
+
+The 500-ideas-a-month machine and five designers per video assume a team.
+"Don't listen to your comment section" is advice for channels that already have a
+core — we are still building ours. And he is candid that he is a **view
+maximalist**; for a memoir channel, the audience feeling connected is the brand,
+not a cost.
+
 ## What this changes for how we work
 
 1. **Judge Episode 2 against Episode 1's first week**, in the same window — not
@@ -189,3 +275,6 @@ a substitute for the cut.
 5. **Waterfall each episode into community posts** — the value that did not fit
    in the thumbnail, never "watch my video".
 6. Fill in Upload Defaults once. Do not expect it to do anything dramatic.
+7. **Title first, thumbnail brief before the shoot, three differentiated thumbnails,
+   expected result written down before publishing** (§10). And measure outliers
+   against a channel's average views (≥3×), not its subscriber count.

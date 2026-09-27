@@ -290,3 +290,89 @@ wallpaper?*
   a ceiling set by format — the rule already recorded in `index.md`.
 - **Recycling the same six locations.** It reads as identity-through-repetition for a
   channel with a catalogue behind it; on episode 2 it reads as a thin library.
+
+---
+
+## 7. Deliver the promise; withhold the reveal — and the other intro rules
+
+Source: **Paddy Galloway**, YouTube strategist (Red Bull, MrBeast, Philadelphia
+Eagles; claims 50B+ views), on the Open Residency podcast, 2h45m, 2026-09-14.
+<https://www.youtube.com/watch?v=Z2uoA3bhJT0>. Read in full from the captions.
+**His claims, not our measurements** — except where a line below says *measured*,
+which means checked against our own delivered files.
+
+### Withholding the reveal is not withholding the subject
+
+§1's "withhold the payoff" and the index's "decide the one image and withhold its
+clear reveal" are right, but they were applied too broadly on Ep2. Galloway's
+first intro rule is the correction:
+
+> **Deliver on the promise in the first ~10 seconds** — visually if you can.
+> He has seen 60–70 % of viewers leave in the first 10 s, "nearly always because
+> you click the video and you're just not getting what you came for."
+
+The two rules do not conflict once they are separated:
+
+- **The subject** — what the title and thumbnail promised — must arrive
+  immediately. Show that it is a cricket story in the first seconds.
+- **The reveal** — the one image that pays the story off (the clear childhood
+  photograph) — is what gets withheld until the turn.
+
+**Measured on Ep2's delivered file**, which withheld both:
+
+| Time | What the viewer gets |
+|---|---|
+| 0:00–0:22 | black screen, voice and captions |
+| 0:22–0:25 | brand card |
+| 0:25.3 | first face; first words *"Last time I told you…"* |
+| 0:28.6 | the word "cricket", for the first time |
+| 0:56.5 | first cricket image (BR_BALL) |
+
+The thumbnail said "WHY I QUIT". A new viewer waited 28 s to learn what was quit.
+
+### His other two intro rules
+
+- **Create intrigue with the least context possible.** Open small hooks, not
+  statements ("in this video we'll cover…"). **Drip-feed context** — his MrBeast
+  example: "This is an FBI agent. He's got 24 hours to catch me. Go." The name and
+  backstory come later, if at all.
+- **Seamless flow: the best intro doesn't feel like an intro.** It should feel as if
+  the video simply started. A brand card between the cold open and the first
+  scene is the opposite — an explicit seam, and Ep. 1's own curve says viewers
+  leave at seams. (The *end* tagline is different: Ep. 1 rebounded over it.)
+
+Under ~45 s for the whole intro, in his experience.
+
+### Core / casual / new — a serialized season is a core-viewer format
+
+His **CCN** test: the best videos can be enjoyed by someone who has watched
+everything, someone who dips in, and someone who has never seen the channel.
+His pet hate: *"You probably saw my last video." No, I didn't.*
+
+This bites harder on a small channel than a big one, because **almost every
+viewer the algorithm ever brings to an episode is new** — at 36 impressions, nearly
+all of them. So an episode must stand alone, and above all its **opening** must:
+
+- **Never open on a reference to the previous episode.** Ep. 2's first words at
+  0:25 were "Last time I told you…" (measured).
+- **Seed context instead of requiring it.** His example: a creator who kissed a
+  woman on camera that new viewers didn't know was his girlfriend. Re-introducing
+  her every video annoys the core; the fix is to fold it into action — *"Katie, I
+  know you're my girlfriend, but can you go do this?"* For a series: keep the
+  promise from last time, but phrase it so a stranger gets it without having
+  seen last time.
+
+### Stakes
+
+"A good storytelling structure is basically useless without stakes." Stakes need
+not be theatrical — for information, it is **the cost of not paying attention**.
+For a memoir, it is what was at risk for you, established early.
+
+### The pendulum — where the effort should be
+
+His stages: (1) make the video **watchable**, (2) put the effort into **ideas and
+packaging**, (3) only then back into production. The common failure is staying
+on "how can I make it look better" while the idea, title, thumbnail and story go
+unexamined. **Our channel is at stage 2 and our effort has been at stage 3**: HLG
+grading, a sound-design pass and motion graphics, against one title and a
+thumbnail pulled from a video frame after the shoot.

@@ -1101,3 +1101,57 @@ against word times from `gfx.output_time`. Three fixes after the first QC pass: 
 payoff was unreadable over the ghosted list (extra dim), the dim's hard edge showed as a
 band (gradient instead), and the caption sat off-centre after the panel left (`\move`).
 Technique recorded in `gotchas.md`.
+
+## 2026-09-27 — Detour-3 (Goa) inventory + transcription
+
+180 a-roll clips / 158 min, 672 dashcam files. Transcribed 175 clips ≥1s with Deepgram
+`multi` after confirming Hinglish on one clip first. Two things learned:
+
+- **The KB's Spanish-drift grep never worked.** It grepped `transcripts/*.json`, which the
+  helpers write ASCII-escaped (`¿`), so it matches nothing. Grepping `takes_packed.md`
+  found 4 Spanish lines. Corrected in `index.md` and `gotchas.md`.
+- **macOS `xargs -I{}` fails with "command line cannot be assembled, too long"** on a long
+  per-file command, and exits 0 — the batch appeared to finish with 1 of 175 files done.
+  Use a Python `ThreadPoolExecutor` driver instead (scratch `tx.py`), which also logs per file.
+
+## 2026-09-27 — Detour-3 pass-1 story cut
+
+Built `Detour-3/edit/build/`: `spec.py` (beats as phrase times) → `build_edl.py` (word snap,
+contiguous-edge energy refine, beep list, `__nc` alias for caption-less picture ranges, prose
+read-back) → `edl.json`; `prep.py` (4K SDR preps); `render_cut.py` (render.py wrapper: 4-way
+parallel extraction + master.srt corrections); `selfeval.py`. 105 ranges, 30.8 min.
+
+- **Parallel extraction** via monkeypatching `render.extract_segment` into a pool: serial ran
+  ~2.3 segments/min on 4K HLG sources, 4 workers ran ~5/min (106 segments in ~21 min).
+- **Beeps as one `aeval` per range** (`if(between(t,a,b)+…, 0.18*sin(2π·1000t), val(ch))`,
+  segment-relative because render seeks with `-ss` before `-i`). Verified by FFT on the
+  render: 100% of energy at 1000 Hz in all 3 windows. Captions masked in the SRT post-pass.
+- **Deepgram dropped 15 s** of IMG_3571 (53.4-68.3s) outright; whisper small caught it. Patched as
+  two caption cues at the measured segment offset.
+- v2 self-eval: 0 freezes, uniform 1920x1080@30, duration within 0.1 s, 0 real pops.
+  New traps in `gotchas.md`: contiguous-token clicks, box-label serials, WhatsApp forwards.
+
+## 2026-09-27 — Paddy Galloway masterclass read in full; Ep2's opening measured against it
+
+Source: <https://www.youtube.com/watch?v=Z2uoA3bhJT0> (Open Residency, 2h45m), read in
+full from auto-captions (~39.6k words) via `yt-dlp` + the VTT flattener.
+
+Filed as `storytelling.md` §7 (intro rules, core/casual/new, stakes, the pendulum) and
+`distribution.md` §10 (packaging workflow, title rules, reading performance, outliers,
+topic overlap). Index updated, including a stale line: it still said the cricket photo
+was spent at 1:00, which was true at picture lock but not in the delivered cut (5:03).
+
+The finding that matters, **measured on the delivered Ep2** (`blackdetect`, the burned
+captions, `actual_bounds.json`): 22 s of black, a brand card 0:22–0:25, first face at
+0:25.3 opening on "Last time I told you…", and "cricket" first said at 0:28.6 against a
+thumbnail reading "WHY I QUIT". That breaks his first intro rule (deliver the promise in
+~10 s) and his core/casual/new rule at once. It also resolves a contradiction in our own
+KB: withhold the *reveal* (the photograph), never the *subject*.
+
+Caught in passing: the Ep. 3 draft in channel-kb (v2, 2026-09-27) repeats all three —
+"Visual: Black. Total silence", a brand card before the first scene, and Scene 2 opening
+"In the last episode, I told you…" — citing learnings rule 1 as permission. Partly our
+fault: the 2026-09-25 rewording had a prescriptive headline and an "unresolved" sub-bullet,
+which read as licence. Rewritten in channel-kb to separate what Ep. 1 proved from what
+Ep. 2 is still testing. The script itself was left untouched — it's Shoaib's work in
+progress.
