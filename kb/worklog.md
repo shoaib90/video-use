@@ -1155,3 +1155,33 @@ fault: the 2026-09-25 rewording had a prescriptive headline and an "unresolved" 
 which read as licence. Rewritten in channel-kb to separate what Ep. 1 proved from what
 Ep. 2 is still testing. The script itself was left untouched — it's Shoaib's work in
 progress.
+
+## 2026-09-29 — Detour Ep2 day-3 analytics
+
+First performance data this channel has fed back into the KB. Recorded in
+[distribution.md](distribution.md) §11, which until now was entirely an
+unverified model from one podcast.
+
+Headline: 125 views / 746 impressions / 1.88% CTR / 4:10 AVD (15.32%) / ~1h14m
+watch time, at day 3.
+
+**The numbers contradict each other.** `impressions x CTR` = 14 views and
+`watch time / AVD` = 18 views, against a reported 125 — and ">95% of views from
+Home" cannot coexist with 746 impressions, since Home is an impression surface.
+AVD alone is internally consistent (250/1634 = 15.30% vs reported 15.32%). So
+the real audience so far is ~15-18 people, not 125, and §3's "do not read the
+first 24-48 hours" now has our own evidence behind it rather than just a claim.
+
+**The one actionable signal** is AVD 4:10 against a turn at 16:46 — the average
+viewer leaves 12.6 min before the episode's point. Ep2's runtime grew
+17:20 -> 27:14 during the edit to keep content; this is that decision showing up
+downstream. Per §5 the response is Ep3 built turn-first, not a re-cut of Ep2.
+
+Also logged: three places YouTube's auto-generated feedback was wrong about our
+own video (recommended chapters we had already written, put the turn at ~18:00
+when it starts at 16:46, advised teasing the reflection in the first 30-45s when
+the cold open already carries one line from the turn by design). Diff platform
+advice against the EDL before treating it as a finding.
+
+Not done, and not derivable from what was supplied: new-vs-returning split,
+Ep1's first-three-days comparison, the retention graph.

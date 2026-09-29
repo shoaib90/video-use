@@ -279,6 +279,16 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   residual everywhere. Floor-against-a-control works for beds; peak is useless once a
   limiter pins every window. Short effects are a mix decision, not a measurement.
 
+- **Day-3 analytics do not reconcile — check them against each other before believing any of
+  them.** On Ep2, `impressions x CTR` implied 14 views and `watch time / AVD` implied 18, while
+  the dashboard said 125. The two derivations agreed with each other, not with the headline.
+  AVD was internally consistent and trustworthy; the view count was not. See
+  [distribution.md](distribution.md) §11.
+- **Diff YouTube's auto-feedback against the actual EDL before acting on it.** It told us to add
+  chapters we had already written, and put the turn two minutes from where it is.
+- **The turn must arrive before the average viewer leaves.** Ep2's AVD was 4:10 with the turn at
+  16:46 — 12.6 minutes past the exit. Runtime had grown 17:20 -> 27:14 to keep content. Build the
+  next one turn-first rather than re-cutting the last (§5).
 - **Impressions are the system's confidence, not a reward withheld.** A video is served in
   widening waves — loyal audience first, then riskier — and impressions stop when a wave stops
   converting. So **good CTR + good retention + low impressions usually means the video never

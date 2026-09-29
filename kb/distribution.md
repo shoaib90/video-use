@@ -278,3 +278,76 @@ not a cost.
 7. **Title first, thumbnail brief before the shoot, three differentiated thumbnails,
    expected result written down before publishing** (§10). And measure outliers
    against a channel's average views (≥3×), not its subscriber count.
+
+---
+
+## 11. First real measurement against this model — Detour Ep2, day 3
+
+Everything above this section is Gorbachevskaya's model, explicitly unverified
+against this channel. This is the first set of our own numbers. Published
+2026-09-26 as "Hard Work Guarantees Nothing." (27:14).
+
+**Reported at day 3:** 125 views · 746 impressions · 1.88% CTR · 4:10 AVD
+(15.32%) · ~1 h 14 min watch time · 2 likes · >95% of views attributed to Home.
+
+### The figures do not reconcile, and that is itself the finding
+
+| derivation | implied views |
+|---|---|
+| impressions x CTR (746 x 1.88%) | **14** |
+| watch time / AVD (74 min / 4:10) | **18** |
+| reported | **125** |
+
+14 and 18 agree; 125 does not — it is 7x the watch-time figure. And ">95% of
+views from Home" cannot hold alongside 746 impressions, because Home is an
+impression surface: if 119 views came from Home, Home CTR would be ~16%.
+
+AVD is internally consistent (250 s / 1634 s = 15.30% vs the reported 15.32%),
+so the *duration* number is trustworthy in a way the *view* number is not.
+
+This is §3 — "do not read the first 24-48 hours" — showing up in our own data
+rather than as someone's advice. View counting runs through a reconciliation
+pipeline, and at day 3 it has visibly not converged. **Treat the ~15-18 figure
+as the real audience so far**, not 125.
+
+### What is safe to conclude anyway
+
+- **746 impressions is the headline, not the 1.88% CTR.** The video barely left
+  the loyal base. §2's diagnostic — split new vs returning viewers — is the
+  first thing to check, and it is a Studio lookup we have not done.
+- **CTR on 14 clicks carries almost no information.** Two clicks either way
+  moves it by ~0.3 points. Do not re-package on this.
+- **AVD 4:10 against a turn at 16:46 is the one real signal.** The average
+  viewer leaves **12.6 minutes before the thing the episode exists for**. This
+  is a structural fact about the cut, independent of the reconciliation problem,
+  and it is the only number here worth acting on.
+
+### Where YouTube's own auto-feedback was wrong
+
+Worth recording because it will recur:
+
+- It recommended **adding chapters to the description** — 15 chapters were
+  written for this upload. Either they were not pasted or the advice is
+  generated without reading the description. Check before acting on it.
+- It placed the philosophical section at **"around the 18-minute mark"**; the
+  turn starts at **16:46**.
+- It advised **teasing the core reflection in the first 30-45 s**. The cold open
+  already carries exactly one line from the turn, by deliberate design
+  (`notes.md`: "One line as a promise is right; more is spending it").
+
+Generic platform feedback does not know the cut. Diff it against the EDL before
+treating any of it as a finding.
+
+### The standing lesson
+
+Ep2's runtime grew **17:20 -> 27:14** during the edit, to keep content the user
+did not want dropped. The cost was flagged at the time; this is what it looks
+like in analytics. For a format whose whole value is the turn, **the turn has to
+arrive before the average viewer leaves** — either much earlier in the cut, or
+the episode has to be short enough that 15% of it still reaches the turn.
+
+Per §5, this does not mean re-cutting Ep2. It means Ep3 is built turn-first.
+
+**Still to check in Studio** (none of it derivable from the numbers given):
+new vs returning; Ep1's first three days for a velocity comparison (§4); the
+retention graph, which `helpers/coverage.py` can consume directly.
