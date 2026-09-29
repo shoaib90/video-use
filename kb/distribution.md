@@ -281,7 +281,7 @@ not a cost.
 
 ---
 
-## 11. First real measurement against this model — Detour Ep2, day 3
+## 11. First real measurement against this model — Detour-2, day 3
 
 Everything above this section is Gorbachevskaya's model, explicitly unverified
 against this channel. This is the first set of our own numbers. Published
@@ -340,14 +340,14 @@ treating any of it as a finding.
 
 ### The standing lesson
 
-Ep2's runtime grew **17:20 -> 27:14** during the edit, to keep content the user
+Detour-2's runtime grew **17:20 -> 27:14** during the edit, to keep content the user
 did not want dropped. The cost was flagged at the time; this is what it looks
 like in analytics. For a format whose whole value is the turn, **the turn has to
 arrive before the average viewer leaves** — either much earlier in the cut, or
 the episode has to be short enough that 15% of it still reaches the turn.
 
-Per §5, this does not mean re-cutting Ep2. It means Ep3 is built turn-first.
+Per §5, this does not mean re-cutting Detour-2. It means Detour-3 is built turn-first.
 
 **Still to check in Studio** (none of it derivable from the numbers given):
-new vs returning; Ep1's first three days for a velocity comparison (§4); the
+new vs returning; Detour-1's first three days for a velocity comparison (§4); the
 retention graph, which `helpers/coverage.py` can consume directly.
