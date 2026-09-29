@@ -1185,3 +1185,28 @@ advice against the EDL before treating it as a finding.
 
 Not done, and not derivable from what was supplied: new-vs-returning split,
 Ep1's first-three-days comparison, the retention graph.
+
+## 2026-09-29 — Learn By Leo's "addictive editing" video, into storytelling.md §8
+
+Source: <https://youtu.be/sLgHqZSe2o0> (14:32, 5.8M views), read in full from auto-captions.
+Note: the link Shoaib pasted *displayed* the Galloway URL but pointed here.
+
+Recorded only what is new or corrective: style follows the experience the viewer came for;
+a motion graphic should carry an essential-but-boring beat and the speech should be *cut*
+to match (which reverses how the routine card demo was built: it stretched the graphic);
+eye trace across cuts; music as structure (stop spotlights, a fade reads as an ending,
+changes land on topic shifts); his three-words-at-a-time caption rule, marked *test, don't
+adopt*; and what not to take.
+
+**Verified against our own code:** `episode2/edit/build/mix_music.py` places spot effects
+by anchor word but music beds by hardcoded output time. That's why every bed after ~4:48
+needed a manual −1.40s shift when "matlab mereko" was cut (the comment is still in `BEDS`).
+
+**Open work, not built:**
+- Pin music bed entries/exits to spoken words, as the spot effects already are.
+- An eye-trace check: per cut, the distance between the speaker's centroid on the
+  out-frame (`matte.py`) and the subject position on the in-frame, flagged above a
+  threshold.
+
+`gotchas.md` was deliberately left untouched: it carried uncommitted Detour-3 findings from
+another session at the time, which aren't this entry's to commit.

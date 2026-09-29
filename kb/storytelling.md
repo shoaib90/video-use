@@ -376,3 +376,109 @@ on "how can I make it look better" while the idea, title, thumbnail and story go
 unexamined. **Our channel is at stage 2 and our effort has been at stage 3**: HLG
 grading, a sound-design pass and motion graphics, against one title and a
 thumbnail pulled from a video frame after the shoot.
+
+---
+
+## 8. Editing for the experience the viewer came for — Leo's four pillars
+
+Source: **"How to edit SO good your viewers get addicted to your videos"**, Learn
+By Leo, 14:32, 2024-03-19, 5.8M views on a 188K-subscriber channel.
+<https://www.youtube.com/watch?v=sLgHqZSe2o0>. Read in full from the captions.
+It's a funnel (coaching calls, an Epidemic Sound affiliate, free presets).
+**His claims, not our measurements**, except where a line says *verified*.
+
+His four pillars: match the style to the experience, visual variety, visual
+continuity, and immersive audio. Most of it restates what this file already says;
+what follows is only the new or corrective part.
+
+### The style follows the experience the viewer came for
+
+His opening case: a creator whose 26-minute video has only 17 cuts, about 90 s
+apart, with no other editing, and still has a big audience, because his viewers
+"just want to feel like they're spending time with someone." Rapid cutting would
+ruin that. **Disrupting the experience the viewer came for is, in his words, the
+fastest way to make them stop watching.** Removing every pause is "easily the most
+important thing for entertainment, but it takes away from authenticity."
+
+That is the same rule as "pacing is a ceiling set by format" (index), stated from
+the viewer's side, and it is the reason a memoir's pauses can be *chosen*.
+
+### Use a motion graphic for an essential-but-boring beat, and cut the words it carries
+
+His example is a puzzle in a Dude Perfect video that has to be understood for the
+story to work. On camera it would be "either too slow or terribly confusing," but
+an animation explains it cleanly in seconds.
+
+**This corrects how we first used an external graphic.** The routine card demo
+(`episode2/edit/routine_card_demo.mp4`) stretched a 10 s graphic with frame holds
+to fit ~59 s of spoken routine. His rule points the other way: **let the graphic
+carry the list, and trim the speech to match it.** Keep only the lines the voice
+does better than any graphic ("Gandhinagar's scorching heat… almost forty
+degrees… that heavy kit bag"), and let the card carry the times. The passage
+gets shorter, the card stops competing with the voice, and a speed-up is needed
+less. Plan this at script stage: a list the speaker would otherwise *recite* is a
+graphic's job.
+
+### Eye trace: keep the viewer's focus in the same place across a cut
+
+He shows it on himself: the out-frame of one clip has the viewer looking at his
+eyes, and the in-frame of the next puts the point of interest on the other side
+of the screen. He calls that jarring. Do it at every cut and the video is tiring to
+watch. **Not previously in this KB, and not checked by any helper.**
+
+**To build:** `helpers/matte.py` already locates the speaker per frame. Comparing
+the speaker's centroid on the out-frame of each A-roll segment with the subject
+position on the in-frame of the cutaway (a saliency estimate for b-roll, the
+matte for A-roll) would give a per-cut eye-jump distance, flagged above a
+threshold. That's cheap on top of what exists. It would also have flagged the
+routine card's push: that is a *continuous* move, which is allowed, where a hard
+cut of the same distance would not be.
+
+### Music as structure
+
+- **Stopping the music suddenly puts a spotlight on a moment**, and the silence
+  draws attention to everything else. We already do this: Ep2's bed stops dead
+  on the coach's refusal.
+- **Fading the music out tells the viewer the segment is ending.** He says that
+  builds anticipation. Our Ep1 data says viewers leave at section seams
+  (learning #3 in channel-kb), and Galloway (§7) says conclusion signals
+  cause drops. So **a mid-video fade needs the next hook to land before the fade
+  finishes**; otherwise it is an exit sign.
+- **Line music changes up with topic shifts.** In his own video, the music lifts
+  on the exact moment he moves from the problem to the solution.
+
+**Verified weakness in our own mix:** `episode2/edit/build/mix_music.py`
+positions its spot effects by **anchor word**, but its eight music beds by
+**hardcoded output time**. When the "matlab mereko" cut removed 1.40 s, the
+effects moved with the edit automatically. Every bed after ~4:48 had to be
+shifted by hand (the comment is still at the top of `BEDS`). **Pin bed entries
+and exits to spoken words the same way**, so they survive a recut and land on
+the story beat by construction rather than by approximation.
+
+### Captions: his rule, which we test rather than adopt
+
+He says to use captions only when you want attention on particular words, at
+most three words at a time, because captions as filler "can quickly become
+obnoxious" and take the space a better visual could use. Ep2 burns
+full-sentence captions throughout. Much mobile viewing is with the sound off,
+so this is a question for a retention comparison, not a rule to adopt on his
+word. See also the caption-chunking gotcha.
+
+### Smaller techniques worth having
+
+- **Guide attention inside a still**, beyond scale and position: animate the key
+  region, **darken or blur the surround**, circles/arrows/underlines, a glow on
+  the subject. A darken-the-surround "spotlight" would be a natural addition to
+  `components.py`.
+- **A graphic should enter by moving, or be motivated by a sound** (his: a
+  shutter or a pop). It should never just blink into existence.
+
+### What not to take
+
+- **"B-roll… use it as much as possible."** This contradicts his own
+  visual-mush warning and §6's tiers. For a memoir, b-roll has to be evidence.
+- **A whoosh on every move, and risers, hits and drones as standard.** By his
+  own first pillar that's wrong for a quiet personal essay. He also warns that
+  risers lose their effect if nothing big follows them.
+- **Red or green hue shifts to signal mood.** Heavy-handed on real family
+  photographs.

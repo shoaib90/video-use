@@ -253,6 +253,14 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   See [distribution.md](distribution.md) §10.
 - **Wall-to-wall music has no meaning.** Contrast is what creates focus: a naked talking head
   next to a scored one. If the bed never leaves, its arrival and departure stop being signals.
+  A sudden stop spotlights a moment; a mid-video **fade reads as "this is ending"**, so land the
+  next hook before it finishes. And **pin bed entries/exits to spoken words, like spot effects**:
+  Ep2's beds were hardcoded times and needed a manual −1.40 s shift after a recut; the
+  word-anchored effects moved by themselves. See [storytelling.md](storytelling.md) §8.
+- **A list the speaker would recite is a graphic's job — cut the words it carries**, don't
+  stretch the graphic to fit the speech. And keep the viewer's **eye in the same place across a
+  cut** (eye trace); nothing checks this yet, and `matte.py` gives most of what a check needs.
+  Same section.
 
 - **render.py never cleans `clips_*`, so a changed EDL leaves stale segments behind.** Build
   expected filenames from the EDL, never glob. Same for any cached derived file: check
