@@ -290,37 +290,58 @@ against this channel. This is the first set of our own numbers. Published
 **Reported at day 3:** 125 views · 746 impressions · 1.88% CTR · 4:10 AVD
 (15.32%) · ~1 h 14 min watch time · 2 likes · >95% of views attributed to Home.
 
-### The figures do not reconcile, and that is itself the finding
+### The figures reconcile once you know feed autoplay is not a click
 
-| derivation | implied views |
+**Corrected 2026-09-30.** This section first concluded the numbers contradicted
+each other and that the real audience was "~15-18 people, not 125". That was
+wrong, and the error is worth keeping because it is an easy one to repeat.
+
+Day-4 figures: 921 impressions · 2.06% CTR · 150 Home views (95.5% of ~157
+total) · 4:10 AVD · ~1 h 14 min watch time.
+
+| derivation | implied |
 |---|---|
-| impressions x CTR (746 x 1.88%) | **14** |
-| watch time / AVD (74 min / 4:10) | **18** |
-| reported | **125** |
+| impressions x CTR (921 x 2.06%) | **19.0** clicked views |
+| watch time / AVD (74 min / 4:10) | **17.8** views' worth of watching |
 
-14 and 18 agree; 125 does not — it is 7x the watch-time figure. And ">95% of
-views from Home" cannot hold alongside 746 impressions, because Home is an
-impression surface: if 119 views came from Home, Home CTR would be ~16%.
+Those two agree to within 1.2 views. The reported ~157 views does not — and the
+resolution is that **they are counting different things**:
 
-AVD is internally consistent (250 s / 1634 s = 15.30% vs the reported 15.32%),
-so the *duration* number is trustworthy in a way the *view* number is not.
+- **Feed autoplay is a view but not a click.** Videos auto-play muted in the
+  Home feed; dwell past a few seconds logs a **view** attributed to Home, with
+  **no thumbnail click**, so it never enters CTR. Studio's "Impressions and how
+  they led to watch time" funnel says this explicitly — it excludes autoplay
+  views, direct/link traffic and some notification surfaces.
+- **The pipelines run at different speeds.** Views and traffic sources update in
+  near-real time; impressions and CTR pass through verification and spam
+  filtering that lags 24-48 h. Observed here: impressions went **746 -> 921**
+  between day 3 and day 4 while the view count barely moved.
 
-This is §3 — "do not read the first 24-48 hours" — showing up in our own data
-rather than as someone's advice. View counting runs through a reconciliation
-pipeline, and at day 3 it has visibly not converged. **Treat the ~15-18 figure
-as the real audience so far**, not 125.
+Checked against the data: if AVD covers only the clicked views,
+19 x 4:10 = **1.32 h** against a reported **1.23 h** — a match. If it covered all
+157 views it would be **10.91 h**, seven times the reported figure. So AVD and
+watch time describe the ~19 who chose to watch; the other ~138 are autoplay.
+
+**The generalisable rule: on a small channel, `views` and `CTR` are not two
+views of one funnel.** Reconcile `watch time / AVD` against `impressions x CTR`
+— those two share a denominator. Never reconcile either against the headline
+view count.
 
 ### What is safe to conclude anyway
 
-- **746 impressions is the headline, not the 1.88% CTR.** The video barely left
-  the loyal base. §2's diagnostic — split new vs returning viewers — is the
-  first thing to check, and it is a Studio lookup we have not done.
-- **CTR on 14 clicks carries almost no information.** Two clicks either way
-  moves it by ~0.3 points. Do not re-package on this.
-- **AVD 4:10 against a turn at 16:46 is the one real signal.** The average
-  viewer leaves **12.6 minutes before the thing the episode exists for**. This
-  is a structural fact about the cut, independent of the reconciliation problem,
-  and it is the only number here worth acting on.
+- **The thumbnail is the weak link, not the opening.** 15.0% of impressions
+  dwelled long enough to log an autoplay view, against a 2.06% thumbnail click
+  rate. The moving footage sells the video roughly 7x better than the still
+  does. That is the clearest packaging signal in this data.
+- **CTR on 19 clicks carries almost no information.** Two clicks either way moves
+  it ~0.2 points. Do not re-package on the percentage; re-package because of the
+  autoplay/click gap above, which is a ratio and more robust.
+- **AVD 4:10 is a better signal than it first looked.** It describes people who
+  *actively chose* to watch, not passers-by — and they still leave **12.6 minutes
+  before the turn at 16:46**. This is the one finding that survives every
+  correction above.
+- **Impressions were still climbing** (746 -> 921 in a day), so exposure had not
+  settled. §3 holds.
 
 ### Where YouTube's own auto-feedback was wrong
 

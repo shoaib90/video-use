@@ -1210,3 +1210,36 @@ needed a manual −1.40s shift when "matlab mereko" was cut (the comment is stil
 
 `gotchas.md` was deliberately left untouched: it carried uncommitted Detour-3 findings from
 another session at the time, which aren't this entry's to commit.
+
+## 2026-09-30 — correcting yesterday's analytics reading
+
+Yesterday's §11 concluded Detour-2's day-3 figures "do not reconcile" and that
+the real audience was "~15-18 people, not 125". **Wrong, and now corrected in
+place** rather than caveated.
+
+The missing mechanism: **feed autoplay logs a view but not a thumbnail click.**
+A muted auto-play in the Home feed, dwelled on for a few seconds, counts as a
+view attributed to Home and never enters CTR. Studio's own funnel card says it
+excludes autoplay views, direct traffic and some notification surfaces. Plus the
+two pipelines run at different speeds — views near-real-time, impressions/CTR
+lagging 24-48 h behind verification and spam filtering.
+
+Verified against day-4 figures (921 impressions / 2.06% CTR / ~157 views /
+4:10 AVD / 1 h 14 m): `impressions x CTR` = 19.0 and `watch time / AVD` = 17.8,
+agreeing within 1.2 views. AVD over the clicked views alone predicts 1.32 h
+against 1.23 h reported; over all 157 views it predicts 10.91 h, 7x out. So AVD
+and watch time describe the ~19 who clicked, and ~138 views are autoplay.
+Impressions also moved 746 -> 921 in a day, confirming the lag directly.
+
+**What the correction changes:**
+
+- The reconciliation rule is now "`watch time / AVD` against `impressions x CTR`
+  — they share a denominator", not "distrust the view count".
+- A new and better packaging signal falls out: **15.0% autoplay-view rate against
+  a 2.06% click rate**. The footage sells ~7x better than the still, so the
+  thumbnail is the weak link, not the opening seconds.
+- The AVD finding gets *stronger*: 4:10 is the behaviour of people who actively
+  chose to watch, and they still leave 12.6 min before the turn at 16:46.
+
+Source: explanation supplied by the user from YouTube's own analytics guidance,
+checked here against the numbers rather than taken on trust.

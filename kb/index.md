@@ -287,11 +287,12 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   residual everywhere. Floor-against-a-control works for beds; peak is useless once a
   limiter pins every window. Short effects are a mix decision, not a measurement.
 
-- **Day-3 analytics do not reconcile — check them against each other before believing any of
-  them.** On Detour-2, `impressions x CTR` implied 14 views and `watch time / AVD` implied 18, while
-  the dashboard said 125. The two derivations agreed with each other, not with the headline.
-  AVD was internally consistent and trustworthy; the view count was not. See
-  [distribution.md](distribution.md) §11.
+- **`views` and `CTR` are not two views of one funnel — feed autoplay is a view but not a click.**
+  Reconcile `watch time / AVD` against `impressions x CTR` (they share a denominator), never
+  against the headline view count. On Detour-2 those two agreed at ~19 while the dashboard said
+  ~157; the gap is autoplay, not an error. **The autoplay-view rate vs the click rate is the real
+  packaging signal**: 15.0% vs 2.06% means the footage sells ~7x better than the thumbnail.
+  See [distribution.md](distribution.md) §11.
 - **Diff YouTube's auto-feedback against the actual EDL before acting on it.** It told us to add
   chapters we had already written, and put the turn two minutes from where it is.
 - **The turn must arrive before the average viewer leaves.** Detour-2's AVD was 4:10 with the turn at
