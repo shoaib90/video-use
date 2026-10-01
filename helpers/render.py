@@ -143,6 +143,15 @@ except ImportError:                      # run directly as a script
     graphics_mod = _ilu.module_from_spec(_spec)
     _spec.loader.exec_module(graphics_mod)
 
+try:                                    # normal package import
+    from . import cards as cards_mod
+except ImportError:                      # run directly as a script
+    import importlib.util as _ilu
+    _spec = _ilu.spec_from_file_location(
+        "video_use_cards", Path(__file__).with_name("cards.py"))
+    cards_mod = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(cards_mod)
+
 
 def probe_video_height(video: Path) -> int:
     """Actual output height, for sizing graphics that are declared as fractions."""
@@ -1058,8 +1067,12 @@ def build_final_composite(
     brand_bg: str = "#0B0B0C",
     fps: str = "30",
     matte: Path | None = None,
+    cards: list[dict] | None = None,
 ) -> None:
-    """Final pass: base → overlays → text graphics → subtitles LAST → out.
+    """Final pass: base → overlays → glass cards → text graphics → subtitles LAST → out.
+
+    `cards` are rendered entries from `cards.py` (card + mask MOVs and their window). They
+    come after the overlays so their frosted glass blurs whatever is beneath, b-roll included.
 
     `graphics` are resolved entries from `graphics.py`. They are drawn after the
     overlays and before the subtitle burn, so a caption is never hidden behind a
@@ -1070,11 +1083,12 @@ def build_final_composite(
     """
     graphics = graphics or []
     demotions = demotions or []
+    cards = cards or []
     has_overlays = bool(overlays)
     has_subs = subtitles_path is not None and subtitles_path.exists()
     has_graphics = bool(graphics)
 
-    if not has_overlays and not has_subs and not has_graphics and not demotions:
+    if not has_overlays and not has_subs and not has_graphics and not demotions and not cards:
         # Nothing to do — just rename/copy base to final name
         run(["ffmpeg", "-y", "-i", str(base_path), "-c", "copy", str(out_path)], quiet=True)
         return
@@ -1160,6 +1174,15 @@ def build_final_composite(
                 f"{current}[subj]overlay=eof_action=pass:repeatlast=0[vsubj]")
             current = "[vsubj]"
 
+    # Glass cards: after the overlays (their glass blurs the b-roll too), before text
+    # graphics and subtitles. See cards.py for the blur/mask/601->709 details.
+    if cards:
+        out_w, out_h = cards_mod._dims(base_path)
+        n_inputs = sum(1 for a in inputs if a == "-i")
+        c_inputs, c_parts, current = cards_mod.build_filter(cards, current, n_inputs, out_w, out_h)
+        inputs += c_inputs
+        filter_parts += c_parts
+
     # Text graphics: after the overlays, before the subtitles. Sized against the
     # real output height so one EDL entry is correct at every resolution.
     if has_graphics:
@@ -1178,7 +1201,7 @@ def build_final_composite(
         out_label = "[outv]"
     else:
         # Rename the last stage's output to [outv] for consistency
-        if has_overlays or has_graphics:
+        if has_overlays or has_graphics or cards or demotions:
             filter_parts.append(f"{current}null[outv]")
             out_label = "[outv]"
         else:
@@ -1199,7 +1222,7 @@ def build_final_composite(
         str(out_path),
     ]
     print(f"compositing → {out_path.name}")
-    print(f"  overlays: {len(overlays)}, subtitles: {'yes' if has_subs else 'no'}")
+    print(f"  overlays: {len(overlays)}, cards: {len(cards)}, subtitles: {'yes' if has_subs else 'no'}")
     subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
 
@@ -1330,8 +1353,15 @@ def main() -> None:
             matte_path = None
 
     graphics = edl.get("graphics") or []
+    card_specs = edl.get("cards") or []
+    durations = [probe_duration(p) for p in segment_paths] if (graphics or card_specs) else []
+    cards = []
+    if card_specs:
+        # Rendered at the base's own size and frame rate: overlays are resolution-specific.
+        print(f"cards: {len(card_specs)}")
+        cards = cards_mod.prepare(card_specs, edl, edit_dir, durations, base_path,
+                                  probe_source_fps(base_path) or str(args.fps or 30))
     if graphics:
-        durations = [probe_duration(p) for p in segment_paths]
         graphics = graphics_mod.resolve_anchors(graphics, edl, edit_dir, durations)
         print(f"graphics: {len(graphics)} resolved")
         for g in graphics:
@@ -1343,7 +1373,7 @@ def main() -> None:
                               force_style=sub_force_style,
                               crf=gen2_crf, preset=gen2_preset, graphics=graphics,
                               demotions=demotions, brand_bg=brand_bg,
-                              fps=str(args.fps or 30), matte=matte_path)
+                              fps=str(args.fps or 30), matte=matte_path, cards=cards)
     else:
         # Composite to a temp file, then run loudnorm → final output
         tmp_composite = out_path.with_suffix(".prenorm.mp4")
@@ -1351,7 +1381,7 @@ def main() -> None:
                               force_style=sub_force_style,
                               crf=gen2_crf, preset=gen2_preset, graphics=graphics,
                               demotions=demotions, brand_bg=brand_bg,
-                              fps=str(args.fps or 30), matte=matte_path)
+                              fps=str(args.fps or 30), matte=matte_path, cards=cards)
         print("loudness normalization → social-ready (-14 LUFS / -1 dBTP / LRA 11)")
         apply_loudnorm_two_pass(tmp_composite, out_path, preview=args.draft)
         tmp_composite.unlink(missing_ok=True)

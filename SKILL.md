@@ -122,6 +122,11 @@ Helpers (`helpers/transcribe.py`, `helpers/render.py`, etc.) live alongside this
 - **`matte.py <video> -o <matte.mp4>`** — a person matte so a graphic can pass BEHIND the
   speaker. Bootstraps its own interpreter (mediapipe needs one, like DeepFilterNet). The picture
   never round-trips through Python — only the matte is computed.
+- **`cards.py`** — **glass cards**, the default look for structured beats: word-anchored `list`
+  and `stat` cards from a `cards` block on the EDL, rendered by HyperFrames (card + mask pass)
+  and composited by render.py as frosted glass after the overlays, before text and subtitles.
+  `uv run python helpers/cards.py <edl> --clips clips_graded` prints the word each element lands
+  on — read it before rendering. See *Glass cards*.
 - **`graphics.py`** — declarative on-screen text (titles, lower thirds, chapter cards) from a
   `graphics` block on the EDL. Anchored to sources/segments/spoken phrases, sized as fractions
   of the output height, drawn in the composite pass *before* subtitles. See *Text graphics*.
@@ -439,6 +444,95 @@ Everything renders to ProRes 4444 with alpha and composites as an `overlays` ent
 subtitles. Always check alpha on the ENCODED file (`motion.verify_alpha`) — VP9 in this build
 returns a valid, fully opaque file.
 
+## Glass cards (the default for structured beats)
+
+A **glass card** is a frosted panel that builds on the spoken word: a schedule assembling row by
+row, a figure flipping from its change to its value. It is the channel's default treatment for
+any **structured beat** — a list the speaker recites, a schedule, a number, a before/after —
+and it is DATA in the EDL, not an animation file: what the card says, and the phrase each part
+lands on. A re-cut moves it for free.
+
+### When to use one (and when not)
+
+- **Use it** for lists, schedules, steps, figures and comparisons — the beats `script_scan.py`
+  reports as enumerations and figures. A recited list is the card's job: cut the words it now
+  carries rather than stretching the card to fit the speech.
+- **Never** on the zenith, on a feeling, or on a regret. Those get a held face.
+- **It can sit across b-roll.** A card that stays up through a montage gives the montage a spine;
+  the glass blurs whatever is beneath, cutaways included. Prefer that to choosing between them.
+- **One focus at a time**: accent marks only CHANGE (`stat`) or the newest step (`list`). At
+  most two accents in frame. Two cards on screen together is the ceiling.
+
+### The two kinds
+
+**`list`** — a vertical timeline. Each row lands on its phrase; the card grows with its rows,
+then scrolls by whole rows once full (never a half-clipped row). Optional `time` column, `chips`
+under a row, a `tag` in the header and a `footer` payoff:
+
+```json
+"cards": [{
+  "id": "routine", "kind": "list", "label": "The routine", "icon": "clock", "position": "top-left",
+  "rows": [
+    {"time": "2 PM",  "text": "School ends", "at": "till two pm"},
+    {"time": "2 km",  "text": "Cycle to bus stand", "at": "bicycle",
+     "chips": [{"text": "40°C", "at": "forty degrees"}, {"text": "Heavy kit bag", "at": "heavy kit bag"}]},
+    {"time": "15 km", "text": "Bus", "at": "bus for fifteen"},
+    {"text": "Sleep", "at": "sleep"}
+  ],
+  "tag":    {"text": "Every day", "at": "on repeat"},
+  "footer": {"text": "On repeat for", "at": "on repeat", "value": "3 years", "value_at": "three years"},
+  "out":    {"word": "where everything else"}
+}]
+```
+
+**`stat`** — one figure that flips on its words, typically the change (accent) then the absolute
+(cream) with the change kept as a sub-line. Stack several with `stack: 0, 1, …` in one column:
+
+```json
+{"id": "reading", "kind": "stat", "label": "Daily reading", "icon": "star", "position": "top-right",
+ "steps": [{"at": "twenty more pages", "value": "+20", "unit": "pages", "tag": "this month", "accent": true},
+           {"at": "forty pages a day", "value": "40", "unit": "pages", "tag": "Now",
+            "sub": "20 pages more than June", "sub_dir": "up"}],
+ "out": {"word": "and that is"}}
+```
+
+Fields: `position` `top-left | top-right` · `icon` `clock | drop | bolt | scale | list | star` ·
+`after: {"word": …}` starts the phrase search later (use it when the first phrase also occurs
+earlier) · `out: {"word": …, "offset": s}` or `hold: s` (default 3 s after the last event).
+
+### Anchoring rules — the part that goes wrong
+
+1. **Every `at` is a spoken PHRASE, searched forward from the previous event.** A single common
+   word lands on its next occurrence, which may not be the one you mean: after "to bus stand",
+   `"bus"` hits "cycle to the **bus** stand", not "this **bus** for fifteen". Write
+   `"bus for fifteen"`.
+2. **A phrase that is not in the cut raises.** That is deliberate: fix the anchor, never relax it.
+3. **Read the resolution before rendering** — `cards.py <edl> --clips clips_graded` prints every
+   element against the time of its word, measured from the extracted segments.
+4. Elements land 0.15 s *before* their word, so they are readable as it is said; the card itself
+   settles 0.55 s before its first word. Anchor the `out` on the line that moves *past* the beat,
+   not on the last item.
+
+### Placement
+
+Upper third, on the calmest side of the frame (measure it — hands rise into the lower half of a
+seated talking head). Captions own the bottom centre. A card that would extend below
+y = 1016 (1080 units) is refused.
+
+### What render.py does with it
+
+Per card, at the base's own size and frame rate (`30000/1001` stays exact): HyperFrames renders
+the card (ProRes 4444) and a mask pass, both cached under `<edit>/animations/cards/<id>/` and
+re-rendered only when something affecting pixels changes. `hyperframes check` runs first, and
+its layout audit **fails the render** on clipped or overflowing text. The composite blurs the
+picture once at quarter resolution, cuts it to each card's mask, draws the card (converted
+BT.601→709, which HyperFrames does not tag), then text graphics, then subtitles.
+
+Needs Node (`npx`). Brand colours come from `brand.json` (or `"brand": "<path>"` on the EDL);
+the font from its `card_font` (default Helvetica Neue, loaded by system name — no font file is
+ever copied). Two kinds is deliberate: add a third to `cards_runtime/glass.js` only when a beat
+needs one, and give it the same treatment (Python resolves, the runtime only draws).
+
 ## Text graphics (titles, lower thirds, chapter cards)
 
 For on-screen *text*, use the EDL's `graphics` block rather than hand-writing `drawtext`. It
@@ -570,7 +664,7 @@ Match the source unless the user asked for something specific. Common targets: `
 }
 ```
 
-`grade` is a preset name or raw ffmpeg filter. `overlays` are rendered animation clips. `subtitles` is optional and applied LAST.
+`grade` is a preset name or raw ffmpeg filter. `overlays` are rendered animation clips. `cards` are word-anchored glass cards (see *Glass cards*), drawn after overlays. `subtitles` is optional and applied LAST.
 
 `audio_filter` is an optional global audio chain (denoise, EQ) applied per segment **before** the 30ms fades, so the fades stay on the true segment edges (Hard Rule 3).
 

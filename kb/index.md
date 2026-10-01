@@ -55,6 +55,10 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   diarization), ElevenLabs (unconfigured). Each has a different flaw — see [gotchas.md](gotchas.md).
 - Paid transcription is cached per source. Never re-transcribe unnecessarily; iterate with whisper.
 - All three animation engines installed: Manim, HyperFrames, Remotion.
+- **Glass cards are the house look for structured beats** (lists, schedules, figures): a `cards`
+  block in the EDL, word-anchored, rendered by HyperFrames and composited by render.py. Guide in
+  `SKILL.md` "Glass cards"; read `cards.py <edl> --clips …` output before rendering. **Anchor on
+  2-4 word phrases** — search runs forward, so a lone common word lands on its NEXT occurrence.
 - Piping to `tail` masks exit codes. Use `set -o pipefail`. It also **hides the whole head of
   the output** — a `| tail -30` on a self-eval report silently dropped its pops section.
 - **Never wait on a job with `pgrep -f "script.py"`** — `-f` matches full command lines, so the
@@ -71,7 +75,8 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   for Devanagari, so whisper checks *wording only* — never timings. See gotchas.md.
 - **Grep a `--language multi` transcript for Spanish before burning captions**
   (`grep -nE '[¿¡áéíóúñ]' <edit>/takes_packed.md` — **not** the JSON, which stores `\u00bf` escapes and silently matches nothing) — Deepgram drifts into Spanish on short
-  or low-content clips. Hit 3 of 38 on Detour-2, one of them 47% of the clip.
+  or low-content clips. Hit 3 of 38 on Detour-2, one of them 47% of the clip (re-verified 2026-09-30 with the
+  `takes_packed.md` command above: exactly those 3).
 - **Don't transcribe clips under ~1s** — both engines return pure hallucination for them.
 - **A 0-word transcript is not evidence of silence.** Check with whisper before writing a clip
   off; loud music reads as "empty" and the −60 dBFS silence guard never trips. See gotchas.md.
@@ -319,8 +324,15 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   tokens touch, move the cut to the quietest 10 ms nearby or it clips the next word's onset
   (a click at 10.9x its neighbours). Both in gotchas.md.
 
+- **A same-niche talking-head channel's hits and flops are edited IDENTICALLY** (1M vs 6K), so
+  the variance is topic, angle, title and first two sentences. Winners are daily, self-diagnosable
+  struggles (sleep, scrolling, procrastination, fear of failure), never abstract ones. The 1M shape:
+  mirror the viewer, then one mechanism, against-the-grain thesis, a mind-read, one action tonight,
+  and a punchline. See [storytelling.md](storytelling.md) §9.
+
 ## Maintaining this KB
 
 At the end of a task, append to [worklog.md](worklog.md) and fold any durable, reusable
-lesson into the right topic file. Rules: record only what was **verified**, note how it was
+lesson into the right topic file. **Script-stage lessons** (idea, packaging, opening, structure) also
+go into the private channel-kb's `08-script-playbook.md`, which is where scripts are written. Rules: record only what was **verified**, note how it was
 verified, and keep this index short — it loads into every session.

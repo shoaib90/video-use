@@ -3,6 +3,99 @@
 Newest first. Records local divergence from upstream and *why*, so a future session doesn't
 re-derive it or mistake a deliberate change for a bug.
 
+---
+
+## 2026-10-01 (end) — glass cards wired into the EDL (`cards` block, `helpers/cards.py`)
+
+Shoaib approved the look ("this is just sick") and asked for it in every future video, wired into
+the EDL and written into the script's edit section.
+
+**Built:** `helpers/cards.py` + `helpers/cards_runtime/{glass.js,glass.css}`. Two kinds, the two
+proven by hand: `list` (rows on phrases, grows then scrolls by whole rows, chips, tag, footer)
+and `stat` (value flips, accent = change, stackable). Python resolves every phrase against the
+KEPT words using measured segment durations, searching forward, and raises on a cut phrase;
+it also resolves all geometry, so the runtime only draws. render.py renders card + mask through
+HyperFrames at the base's own size and fps (cached by content hash under
+`<edit>/animations/cards/<id>/`), runs `hyperframes check` and fails on errors, then composites
+after overlays / before graphics + subtitles, with the quarter-res blur, `tpad`-padded mask and
+601->709 conversion. EDL `brand` points an episode at a brand.json (Episode 2 -> YT1's).
+Also fixed: demotions with nothing else drawn mapped `[0:v]` and dropped the demotion output.
+
+**Verified:** 21 new tests (anchors forward + raising, measured-duration shift, scroll snapping,
+growth, stage independence, 601->709, mask padding, layer order); suite 198 passing. End to end:
+Episode 2 `edl.json` (backup `edl.pre_cards.json`; only `brand` + `cards` added) rendered with
+`--preview` to `preview_cards.mp4` (1080p, 9:00.37, 20 overlays + 1 card + subtitles), the card
+resolved to the same words as the hand-built test, frames checked inside and outside the window.
+`local()` fonts pixel-identical to extracted TTFs (0 / 377,912 px). `final.mp4` untouched.
+
+**Docs:** SKILL.md "Glass cards" (when / two kinds / anchoring rules / placement / what render.py
+does), kb/helpers.md, index line, gotchas #10-11. channel-kb (private): playbook §7 + rule 11 +
+checklist line; Episode 3's edit-direction section rewritten as glass-card specs.
+**Not built:** the shrink-to-corner tracker Episode 3's pillars card asks for; SFX on landings.
+
+---
+
+## 2026-10-01 (later still) — HyperFrames test 2: Episode 2 routine as a glass timeline, at 4K
+
+Shoaib asked for the routine clip next. project.md records that Scene 4's routine was
+deliberately made "a montage, not a list" (GFX_ROUTINE dropped), so the test COMBINES them
+rather than overriding that: one glass timeline card that builds the day row by row on the
+spoken word and persists across the five montage cutaways (cycle, road, bus, nets, books).
+
+Window: output 92.60-157.19, rebuilt in render.py's layer order from `base.mp4` + the EDL's
+b-roll overlays + glass + cards + `master.srt` (shifted) LAST, with `final.mp4`'s mix. Anchors
+are IMG_3657_110 / IMG_3658_110 words mapped through `build/actual_bounds.json` — they matched
+the caption cue starts to the millisecond. Exit lands on "that routine is" (154.9). Delivered
+`routine_glass_2160.mp4` + `routine_compare.mp4` (delivered above, glass below). Verified with
+two QC sheets at every landing, over every cutaway, the scroll steps, payoff and exit; mask
+growth measured from snapshots. Four more traps in gotchas.md (#6-#9). First pass rejected on
+its own QC: type too small for a list, and an empty full-height panel for 10 s.
+
+---
+
+## 2026-10-01 (later) — first HyperFrames graphics: glass stat cards, Detour-3 body-fat passage
+
+Shoaib approved installing Node and testing on his own footage. Chose Detour-3 IMG_3321
+114.25-148.00 (in the cut) because the same window already carries the current approach, a
+baked InBody screenshot card, so the test is a true before/after.
+
+Built in `Detour-3/edit/animations/slot_glass_bodycomp/`: three brand-palette glass cards (body
+fat, muscle mass, weight) in the upper third (his hands own the lower half all window), each
+landing on its spoken number from Deepgram word times, with delta -> absolute flips (the
+two-week change, then the current reading; figures kept out of this public repo). Rule adopted: **accent = change**, absolutes in cream, which keeps <=2 accents.
+Delivered `glass_after_1080.mp4` + `glass_compare.mp4` (stacked before/after), 33.77 s, audio
+copied, every pass exactly 1013 frames. Verified by contact sheets at each anchor and the exit,
+and by measuring the accent colour in the final.
+
+Five traps written to gotchas.md (BT.601 untagged MOV, glass needs a mask pass, one root per
+project, static guard ignores external scripts, clipped glyphs). Not yet done: SFX on card
+landings, burned captions in the test, 4K, and wiring HyperFrames into the EDL `graphics` block.
+
+---
+
+## 2026-10-01 — reference: Nate Herk, "Opus 5.5 Just Changed Video Editing Forever" (motion graphics)
+
+Shoaib supplied <https://www.youtube.com/watch?v=7jHXoPGnA4c> (19:22) as the motion-graphics
+look he wants. Method: `yt-dlp` 720p (captions 429'd again, as gotchas.md predicts), local
+whisper `small.en`, 3 s contact sheets for the whole video + 2 fps sheets for the 0:00-0:46 intro.
+
+**What the outputs are made with:** every edit is HyperFrames (HTML/CSS/GSAP rendered
+frame-by-frame), written by the model per prompt, plus fetched assets (logos, site screenshots,
+screen recordings), Kling image-to-video, music/SFX, and a self-check loop on rendered frames.
+
+**Talking-head vocabulary in the intro (the transferable part):** icon+label glass cards placed
+on the side the speaker POINTS to, on the spoken word (0:05 / 0:06.5); a lower-third phrase with
+words highlighting as spoken, on a dark scrim (0:09-0:10); a typed prompt bar (0:10.5, 0:41);
+paired left/right proof cards with a caption tag ("Screen recording", "Screenshot", "Generated
+image") that swap contents as the list is spoken (0:31-0:37); a full-screen showreel takeover
+cut into the talking head (0:12-0:27). Other edits: hand-drawn whiteboard + split-screen,
+rounded-crop face cam over a dark slide, a 9:16 reel with a step tracker, a product spec ad.
+
+**Gap against this repo (verified by grep):** our graphics are PIL components; nothing does
+backdrop blur (glass), SVG/logos, or asset fetching, and HyperFrames — documented in SKILL.md —
+has never been used in any episode. **Node is no longer installed**, so HyperFrames cannot run
+at all right now (environment.md corrected).
+
 
 ---
 
@@ -1211,6 +1304,33 @@ needed a manual −1.40s shift when "matlab mereko" was cut (the comment is stil
 `gotchas.md` was deliberately left untouched: it carried uncommitted Detour-3 findings from
 another session at the time, which aren't this entry's to commit.
 
+## 2026-09-29 — Competitor study: Akshath Sharma, into storytelling.md §9
+
+Shoaib asked for a study of <https://www.youtube.com/@akshathsharma/videos>, a same-niche,
+talking-head-only channel with recent 1M/514K/288K hits. **Verified how:** `yt-dlp -J` plus
+per-video metadata for all 324 long-form uploads (views, likes, comments, duration, date,
+description), full auto-captions for 4 videos, storyboard sprites (`-f sb0`) for 4, and
+thumbnails for 24. I also read the top comments on the 1M video in the browser pane. The
+channel-specific study and its recommendations are in the private channel-kb,
+`07-research/akshath-sharma.md`. Only the craft is here.
+
+**Tooling notes** (verified this session; not yet promoted to gotchas.md, which carried
+someone else's uncommitted work):
+- Running the metadata pass and caption downloads at the same time got the caption endpoint
+  **HTTP 429** for the rest of the session. `--sleep-subtitles` and the `tv` player client
+  didn't clear it. Storyboards and thumbnails (i.ytimg.com) kept working. Next time, pull
+  captions **first**, before any bulk metadata pass.
+- YouTube's transcript panel never loads in a signed-out browser pane, and a caption
+  `baseUrl` fetched from the page returns an empty body.
+- The storyboard `.mhtml` is a MIME bundle. Unpack it with `email.message_from_bytes` and
+  re-tile the 3×3 sheets (320×180 frames) to see a whole video's shot pattern at once.
+- **Rescoped the same day, by Shoaib:** learn the *types of video* that blow up, not editing.
+  The editing takeaways were removed (the coverage.py calibration, "stay minimal for short
+  pieces", caption language), and §9 now records only script and packaging. I got the 1M
+  video's Hindi auto-captions on a retry (English still returned 429) and analysed them line by
+  line in the channel-kb study, along with a topic and title-angle table for 160 videos and
+  seven video ideas drawn from our own story notes.
+
 ## 2026-09-30 — correcting yesterday's analytics reading
 
 Yesterday's §11 concluded Detour-2's day-3 figures "do not reconcile" and that
@@ -1243,3 +1363,33 @@ Impressions also moved 746 -> 921 in a day, confirming the lag directly.
 
 Source: explanation supplied by the user from YouTube's own analytics guidance,
 checked here against the numbers rather than taken on trust.
+- **2026-09-30: the learnings were moved into channel-kb for scripting**, at Shoaib's request.
+  Scripts are written in that repo, so its new `08-script-playbook.md` gathers every
+  script-stage rule from this KB (storytelling §1–8, ideation, distribution §10–11) together with
+  `04-learnings.md` and the Akshath study, tagged by where each came from, and ends in a
+  pre-shoot checklist. Also added: `03-formats/short-advice.md` (the 2–3 min format and its
+  skeleton), `01-roadmap/idea-bank.md` (seven ideas from the story notes), and a `CLAUDE.md`
+  there. Rule from now on: a script-stage lesson goes in the playbook too; editing lessons
+  stay here.
+
+## 2026-10-01 — Detour-3 v3 (Shoaib's 20 notes + title-driven opening)
+
+Packaging chosen before edit feedback: title "I Drove 621 km to Goa and Came Back Without My Car",
+thumbnail A (ghats selfie + 621 KM). On Detour-2, 15.0% autoplay views vs 2.06% CTR showed the
+packaging undersold the ride. The cut was then restructured to show "Goa" by 0:06 (it had been
+2:45) and to seed the car line in a 34 s cold open. v3: 31:58, 113 ranges. Self-eval clean.
+New in `gotchas.md`: ASR spells Hindi cuss words in English, phone numbers in screenshots,
+plates in multiple clips, and baking cards into prepped sources.
+
+## 2026-10-01 — Detour-3 v4: second-iteration notes, dashcam, graphics, music
+
+12 notes from Shoaib, applied. New pieces in `Detour-3/edit/build/`:
+- `plate_track.py`: CSRT plate masks; hand-keys where CSRT fails.
+- `prep3.py`: masked blur.
+- `gfx.py` + `prep4.py`: animated corner cards, Project December card, labels, dual-capture
+  inset, dashcam cutaway, time-lapse. All baked into prepped sources in source time.
+- `mix_music.py`: beds on picture-only runs, ambience ducking, two-pass loudnorm.
+
+The dashcam clock matched the phone to ~1 s, and the OSD speed decided which takes get the
+inset: only 1 of 7 in-car takes was actually moving. Three new gotchas: CSRT on small plates,
+relative bed levels, and image-sequence holes.

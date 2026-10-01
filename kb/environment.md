@@ -22,7 +22,7 @@ The **whole directory** is symlinked, not just `SKILL.md` — `helpers/` must si
 | ffmpeg / ffprobe | **9.0.1** (`ffmpeg-full`) | libass present ⇒ subtitles work |
 | Python | 3.12.13 (uv-managed) | system python3 is 3.9, too old for this repo |
 | uv | 0.12.2 | |
-| Node | v24.9.0 | satisfies HyperFrames' Node 22+ requirement |
+| Node | **v26.10.0** (`brew install node`, 2026-10-01) | had silently disappeared (was v24.9.0) — `node -v` before trusting any JS engine row |
 | yt-dlp | 2026.08.19 | for URL sources |
 
 ### The ffmpeg situation — important
@@ -132,7 +132,7 @@ Never echo key values into tool output. Never write a key anywhere but `.env` at
 | Engine | Status | Invoke |
 |---|---|---|
 | Manim | **0.21.0 installed**, render verified | `uv run manim -ql --format=mp4 scene.py Scene` |
-| HyperFrames | **v0.8.27**, npx cache warmed | `npx --yes hyperframes ...` |
+| HyperFrames | **v0.8.105**, render verified 2026-10-01 (1013 frames ProRes 4444 in ~14 s capture) | `npx --yes hyperframes ...`; slots pin `hyperframes@0.8.105`. `init` installed 10 skills into `~/.claude/skills/` (hyperframes*, media-use): v0.8.105 prints *"--skip-skills is temporarily ignored"*. `init` also refuses a non-empty directory — init first, then add `work/` |
 | Remotion | 4.0.520 reachable, scaffolded per-slot | `npx create-video@latest` |
 
 Manim needed system libs that aren't obvious: `brew install pkgconf cairo pango cmake`, and

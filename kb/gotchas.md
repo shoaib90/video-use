@@ -718,8 +718,15 @@ straight into a caption as Spanish text over a Hindi video. `multi` is still the
 orthography, which Hindi/English transliteration never produces:
 
 ```bash
-grep -lE '[¿¡áéíóúñ]' <edit>/transcripts/*.json
+grep -nE '[¿¡áéíóúñ]' <edit>/takes_packed.md
 ```
+
+**Grep `takes_packed.md`, never the JSON.** The transcribe helpers write with `json.dumps`'
+default `ensure_ascii=True`, so `¿Qué` is stored as `\u00bfQu\u00e9` and a grep over
+`transcripts/*.json` returns **nothing, silently**. Verified on Detour-3 (2026-09-27): the JSON
+grep found 0 files, the same pattern over `takes_packed.md` found 4 Spanish lines (IMG_3341,
+IMG_3370, IMG_3421, IMG_3561, all under 5s). Ep2's transcripts are escaped the same way, so this
+instruction never worked as written.
 
 Sub-second clips are worthless to both engines: IMG_3181 (0.75s) gave Deepgram `Feuilleton` and
 whisper `♪ Fertile ♪`. Exclude clips under ~1s from transcription rather than reasoning about
@@ -2536,3 +2543,160 @@ which `ffmpeg -ss` rejects; format times with `awk printf "%.2f"`.
 The better long-term route is to get the graphic's SOURCE with a transparent
 background and rebuild its timing here against spoken words — the flat render
 only works because this one happened to have still windows in the right places.
+
+---
+
+## Contiguous Deepgram tokens: a cut on the token edge clips the neighbour's first syllable
+
+Verified on Detour-3 (2026-09-27). `IMG_3321` "…I have lost." / "Although…" were contiguous
+tokens (`lost.` ends 102.33 = `Although` starts 102.33). The snapped OUT sat on that edge, but in
+the audio "Although" had already begun, so 30-50 ms of it leaked past the 30 ms fade and read as
+a **click**. The self-eval step ratio at that join was **10.9x its neighbours**, while both sides
+were near-silent — the signature of a clipped onset, not a codec pop.
+
+Fix (in `Detour-3/edit/build/build_edl.py`, `refine()`): only where the neighbour touches
+(gap < 30 ms), move the edge to the quietest 10 ms RMS frame in a window around it
+(OUT: `[end-0.20, end+0.02]`, IN: `[start-0.10, start+0.10]`), and only if that frame is under
+half the level at the original edge. 5 of ~90 speech edges moved; the join fell from 0.19 to
+0.007 RMS and dropped off the pop list on re-render.
+
+Also: a **60 ms pop window flags loud content just after the fade-in** as well as real pops
+(7 flags on v1, 1 real). Re-measure flagged cuts with ±8 ms at the join against the programme
+50-250 ms either side before believing them.
+
+---
+
+## Serial numbers are on the BOX LABEL too, not only in what is said
+
+Verified on Detour-3: the spoken MacBook serial was cut, but two unrelated shots held the box
+label in focus — serial no., AirPort ID and Bluetooth MAC **readable at 1080p** in one, and at 4K
+in another that looked motion-blurred at 1080p. Anything with a label (boxes, boarding passes,
+invoices, number plates, screens) gets a dense frame scan at the DELIVERY resolution. Blur with a
+per-range `filter` and a segment-relative `enable='lt(t,N)'` rather than dropping the beat.
+
+---
+
+## WhatsApp-forwarded clips: no capture date, sometimes no audio, sometimes sideways
+
+Detour-3's forwarded MP4s had no `com.apple.quicktime.creationdate` (their `creation_time` was
+the forward date, 4 days late), one was sideways with no rotation tag, and the three drone
+forwards were 464p **with no audio stream**. Place them by content, fix orientation by eye
+(`transpose=2` was right here — test both), and give silent clips an `anullsrc` stereo track in
+the prep so the per-segment fades and the audio concat have something to act on. (That the render
+fails without it is a precaution, **not verified**.)
+
+---
+
+## Deepgram writes a Hindi cuss word as an English word, so a cuss list misses it
+
+Verified on Detour-3: "बहनचो" came back as the token `bench` (IMG_3397), and a mic-check run of
+another word came back as plain "Testing audio" with the rest dropped (whisper small `-l en`
+rendered it "Andy, Andy…"). A Devanagari-only cuss list caught neither. Read the transcript of
+any range with banter, and add the ASR's own spellings to the list.
+
+## Screenshots and paperwork carry phone numbers
+
+An InBody printout's "ID" field was the subject's full mobile number; the machine screen showed
+it masked. Blur in the image's RAW pixel coordinates before rotating it upright (HEIC from an
+iPhone is stored sideways). Number plates turned up in three clips of one car, not one —
+scan every clip where the car appears, and use a moving box (`crop` + `overlay` with
+piecewise-linear `t` expressions) for a handheld or moving plate.
+
+## Bake screenshot cards into a prepped SOURCE, not output-timeline overlays
+
+Cards over a talking head (`Detour-3/edit/build/prep2.py`): loop the RGBA PNG for the source's
+duration, `fade=…:alpha=1` in/out, `overlay=…:enable='between(t,a,b)'` in SOURCE seconds, and
+encode under the original key with no retime (verified within 20 ms on all three). The card then
+rides with its words through every re-cut. An output-time overlay would need re-measuring after
+each change.
+
+
+---
+
+## HyperFrames overlays: five traps, all hit on the first glass-card build
+
+Verified 2026-10-01 building glass stat cards over Detour-3 IMG_3321 (slot:
+`Detour-3/edit/animations/slot_glass_bodycomp/`, which is the working pattern to copy).
+
+1. **Its ProRes 4444 MOV is BT.601-encoded and UNTAGGED.** Measured on the accent text:
+   decoded as 601 it is exactly `#F25435` (242,84,53); decoded as 709 — which is what overlaying
+   it on our bt709 base does, since yuv->yuv overlay does no matrix conversion — it is
+   (255,98,50), clipped red. Convert before the overlay:
+   `scale=in_color_matrix=bt601:out_color_matrix=bt709:in_range=tv:out_range=tv,format=yuva444p`.
+   With it the final measured (240,82,49): chroma rounding only.
+2. **Frosted glass = a second MASK render, blur in ffmpeg.** A transparent overlay cannot see the
+   picture behind it, so CSS `backdrop-filter` is useless unless the footage goes through
+   Chrome (which we don't do: colour tax, HLG). Render the same timeline with cards as opaque
+   white silhouettes, then `base -> split -> gblur -> alphamerge(alphaextract(mask)) -> overlay`,
+   then the cards on top. Both passes must come from ONE script (`cards.js` + `build.py`) or the
+   blur drifts off the card. Use sigma ~40 at 1080p: at 26 a dark object behind the card (a
+   picture frame on the wall) read as a stain, at 40 it reads as a gradient.
+3. **One root composition per project** (`multiple_root_compositions` lint error), so the mask
+   is its own project in `mask/`, with no `@font-face` (any named `font-family` without one is a
+   lint error).
+4. **The static guard does not follow `<script src>`.** Registering `window.__timelines` in an
+   external file fails `check` with "missing data-composition-id / dimensions / timeline
+   registry" — misleading, the attributes were there. Inline the script at build time.
+5. **`check`'s layout audit catches clipped glyphs — believe it.** A value row with
+   `overflow:hidden` (needed for the number flip) clipped the tops of 84 px Helvetica Neue
+   digits. Two causes: the row was shorter than the glyph box (92 -> 110 px), and a smaller
+   inline unit span ("kg") inheriting the big line-height inflated the line box by a constant
+   18 px until given `line-height: 1`. A PIL component would have shipped this silently.
+
+Also: `check` reports `0/0 text checks` for contrast on a transparent overlay — it cannot
+measure against footage it never sees. Judge contrast on the composite.
+
+Second build (Episode 2 routine, 4K, `episode2/edit/animations/slot_glass_routine/`) added:
+
+6. **Match the cut's frame rate explicitly.** Episode 2 is 29.97 (30000/1001), not 30. Pass
+   `--fps 30000/1001` to `render` and leave `data-fps` off the root; the card, mask and base
+   window then all came out at exactly 1936 frames for 64.59 s.
+7. **`check` fails a static-by-design mask with `sweep_static` ("Timeline did not advance").**
+   A single card that only moves at its entrance and exit looks frozen to evenly spaced samples.
+   It is a false positive — prove it with `hyperframes snapshot --at` inside the motion windows
+   and measure the alpha (0 %, 14.01 % held vs 14.04 % expected, then falling through the exit).
+8. **A list card must GROW with its content, then scroll.** At full height from the first row
+   it read as an empty panel for 10 s. Tween the card's `height` in BOTH passes so the glass
+   grows with it, and snap scroll offsets to row tops so no row is ever half-clipped. The
+   resulting `escaped_container` note on the fixed-height viewport is expected and harmless.
+9. **Lists need body-size type, not caption-size.** 26 px rows at 1080p (brand body is 36)
+   read as fine print on a 4K frame; 32 px rows / 26 px times fixed it. The body-fat cards got
+   away with smaller labels only because their numbers were 84 px.
+10. **Load brand fonts with `src: local("<PostScript name>")`, never by copying the file.**
+    Measured 2026-10-01: a card snapshot with Helvetica Neue via `local("HelveticaNeue-Bold")`
+    etc. vs the same faces extracted to TTF — **0 of 377,912** opaque pixels differ. So no
+    licensed font is copied into a public repo or a project, and `lint` accepts a `local()`
+    face. Chrome will not load a `.ttc` collection by URL reliably, which is what forced the
+    extraction in the first place.
+11. **Anchor phrases are searched FORWARD, so a lone common word lands on its next
+    occurrence.** On the routine card, `"bus"` after the kit-bag chip resolves to "cycle to the
+    **bus** stand" (115.5 s), not "this **bus** for fifteen" (119.2 s); `"so sleep"` lands on
+    "So", 0.8 s early. Use 2-4 word phrases and read `cards.py --clips` output before rendering.
+
+---
+
+## CSRT cannot track a small number plate on a moving car — and it fails silently
+
+Verified on Detour-3 (opencv 5 `TrackerCSRT` in the matte env). It held a close, large plate
+perfectly (IMG_3533, 84/84 frames). But on a car driving away (plate ~110 px wide at 4K, shrinking,
+with a passing SUV and a signboard occluding it) it reported `ok` on nearly every frame while the
+box slid off the plate by 95 s and locked onto a signboard. After a plate left frame, it
+re-acquired onto a FACE. The `lost` count does not catch either. Verify every tracked mask with
+zoomed raw-vs-blurred crops, including the frames between keys. For a small, far plate, hand-key
+one box per second from gridded 4K crops and interpolate. Keep the mask in Python and the pixels
+in ffmpeg (`alphamerge` + `overlay`).
+
+## A music bed set relative to the window's ambience fails both ways
+
+A bed placed "N LU above the montage's own audio" landed at -33 LUFS (inaudible) on silent drone
+clips, and would have been buried under scooty wind. For picture-only montages, use one fixed bed
+level (~1 LU under the speech average) and duck any ambience louder than bed-5 LU, with short
+ramps inside the window. Then verify against a no-music control **before loudnorm**: after
+two-pass loudnorm the gain varies over time, and the same diff reads ±5 dB of noise.
+Pre-norm, the speech control read exactly 0.00 dB and every 1.2 s window outside a cue read 0.00.
+
+## A numbered image sequence stops at its first missing frame
+
+A dashcam time-lapse grabbed one frame per file at `-ss 20`. Some chunks were shorter than 20 s,
+so the grab failed silently, and `-i %04d.png` stopped at the first hole: 64 of 167 frames, no
+error. Number only successful grabs, and count the frames in the output.

@@ -1,0 +1,65 @@
+/* Glass-card runtime styles. Lengths are 1080-high stage units (the stage is scaled to the
+   output height). Colours arrive as CSS variables from the episode's brand.json, set by
+   helpers/cards.py: --fg, --muted, --accent, --bg-rgb (the tint), --fg-rgb.
+   The frosted blur itself is NOT here: a transparent overlay cannot see the footage behind it,
+   so ffmpeg blurs the picture through the mask pass. This layer is tint, light and type. */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { margin: 0; overflow: hidden; background: transparent; }
+#root { position: relative; width: 100%; height: 100%; font-family: "CardFont", sans-serif; }
+.stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.card { position: absolute; }
+.shell { position: absolute; inset: 0; border-radius: 30px; }
+
+body.overlay .shell {
+  background: linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 32%), rgba(var(--bg-rgb), 0.58);
+  border: 1.5px solid rgba(255,255,255,0.20);
+  box-shadow: 0 18px 48px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.22);
+}
+body.mask .shell { background: #fff; }
+
+.content { position: absolute; inset: 0; color: var(--fg); }
+.icon { width: 40px; height: 40px; border-radius: 20px; background: rgba(var(--fg-rgb), 0.14); flex: none;
+        display: flex; align-items: center; justify-content: center; }
+.icon svg, .loop svg { width: 22px; height: 22px; fill: var(--fg); }
+.label { margin-left: 14px; font-size: 30px; font-weight: 500; letter-spacing: 0.01em; white-space: nowrap; }
+.tag, .tag span { font-size: 18px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase;
+                  color: rgba(var(--fg-rgb), 0.82); white-space: nowrap; }
+
+/* ---- list: rows that land on their words, grow the card, then scroll by whole rows ---- */
+.list .head, .card.list .head { position: absolute; left: 30px; right: 30px; top: 30px; height: 40px; display: flex; align-items: center; }
+.card.list .tag { margin-left: auto; height: 32px; padding: 0 14px; border-radius: 16px; display: flex; align-items: center;
+                  background: rgba(var(--fg-rgb), 0.16); }
+.view { position: absolute; left: 30px; right: 30px; overflow: hidden; }
+.view .list { position: absolute; left: 0; right: 0; top: 0; }
+.row { position: absolute; left: 0; right: 0; }
+.time { position: absolute; left: 0; top: 0; width: 130px; height: 64px; line-height: 64px; text-align: right;
+        font-size: 26px; font-weight: 500; font-variant-numeric: tabular-nums; color: rgba(var(--fg-rgb), 0.62); white-space: nowrap; }
+.dot { position: absolute; top: 25px; width: 14px; height: 14px; border-radius: 7px; background: var(--accent); }
+.spine { position: absolute; top: 32px; width: 2px; background: rgba(var(--fg-rgb), 0.18); }
+.what { position: absolute; top: 0; height: 64px; line-height: 64px; font-size: 32px; font-weight: 500; white-space: nowrap; }
+.chips { position: absolute; top: 60px; display: flex; gap: 10px; }
+.chip { height: 34px; padding: 0 14px; border-radius: 17px; display: flex; align-items: center; white-space: nowrap;
+        font-size: 22px; font-weight: 500; color: rgba(var(--fg-rgb), 0.9); border: 1.5px solid rgba(var(--fg-rgb), 0.32); }
+.foot { position: absolute; left: 30px; right: 30px; bottom: 24px; height: 64px; display: flex; align-items: center;
+        border-top: 1.5px solid rgba(var(--fg-rgb), 0.14); padding-top: 10px; }
+.loop { width: 22px; height: 22px; flex: none; }
+.rep { margin-left: 12px; font-size: 26px; font-weight: 500; color: rgba(var(--fg-rgb), 0.72); white-space: nowrap; }
+.years { margin-left: auto; font-size: 40px; font-weight: 700; letter-spacing: -0.02em; color: var(--accent); line-height: 1; white-space: nowrap; }
+
+/* ---- stat: one figure that flips on its words (delta -> absolute), accent = change ---- */
+.card.stat .content { padding: 26px 30px 24px; }
+.row1 { display: flex; align-items: center; height: 40px; }
+.card.stat .tag { margin-left: auto; position: relative; height: 32px; min-width: 110px; }
+.card.stat .tag span { position: absolute; right: 0; top: 0; height: 32px; padding: 0 14px; border-radius: 16px;
+                       display: flex; align-items: center; background: rgba(var(--fg-rgb), 0.16); }
+.valwrap { position: relative; height: 110px; margin-top: 10px; overflow: hidden; }
+.val { position: absolute; left: 0; bottom: 0; font-size: 84px; font-weight: 700; line-height: 110px;
+       letter-spacing: -0.03em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.val .unit { font-size: 38px; line-height: 1; font-weight: 500; letter-spacing: 0; margin-left: 10px; color: var(--muted); }
+.val.accent { color: var(--accent); }
+.val.accent .unit { color: var(--accent); opacity: 0.75; }
+.subwrap { position: relative; height: 30px; }
+.sub { position: absolute; left: 0; top: 0; display: flex; align-items: center; height: 30px; font-size: 24px; font-weight: 500;
+       color: var(--accent); white-space: nowrap; }
+.sub.muted { color: var(--muted); }
+.sub .tri { width: 13px; height: 13px; margin-right: 8px; fill: var(--accent); }

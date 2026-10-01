@@ -131,5 +131,11 @@ These three fields are local extensions (not upstream). All optional and backwar
   `"sentence"`), and `force_style` (ASS override string). `"sentence"` keeps the ASR's own
   capitalization but capitalizes any cue that opens the file or follows sentence-final
   punctuation — needed because a cut can make a mid-sentence word start a sentence.
+- **`cards`** + **`brand`** — glass cards (`helpers/cards.py`, added 2026-10-01). Word-anchored
+  `list` / `stat` specs; rendered by HyperFrames into `<edit>/animations/cards/<id>/` (card + mask
+  MOVs, cached by content hash) and composited after `overlays`, before `graphics` and subtitles.
+  `brand` is an optional path to a `brand.json` when the episode has none of its own (Episode 2
+  points at YT1's). Full guide: `SKILL.md`, "Glass cards". Resolve before rendering:
+  `uv run python helpers/cards.py <edl> --clips clips_graded`. Needs Node.
 - `force_style`'s `MarginV` is relative to `PlayResY=288`. The shipped default of 90 is tuned
   for **vertical** video; for 16:9 landscape ~28 sits the caption about 10% up from the bottom.

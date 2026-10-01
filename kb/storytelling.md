@@ -482,3 +482,53 @@ word. See also the caption-chunking gotcha.
   risers lose their effect if nothing big follows them.
 - **Red or green hue shifts to signal mood.** Heavy-handed on real family
   photographs.
+
+---
+
+## 9. A same-niche channel where the edit is constant — so the variance is elsewhere
+
+Source: **Akshath Sharma** (@akshathsharma; 66K subs; Hinglish self-improvement for
+Indian students, one person talking to a phone in a bedroom). His whole long-form
+catalogue (324 videos) was measured on 2026-09-29 with `yt-dlp` metadata, plus full
+captions for five videos (including the 1M) and storyboard frames for four. The channel-specific study is
+in the private channel-kb (`07-research/akshath-sharma.md`). This section keeps only
+the craft.
+
+**What the storyboards show.** His **1M-view** video (2026-09-01) and his **6K** video
+(2026-09-28) look identical: the same room, the same locked-off shot, jump cuts and captions.
+Visual density is constant across a **160×** spread in views, so on this channel the variance
+is in **the topic, the angle, the title and the first two sentences**, not the edit.
+**This section takes no editing lessons from him**, by Shoaib's call (2026-09-29): the
+editing craft in §1–8 stands. It records only the script and packaging.
+
+**How his hits are scripted** (from the transcripts; his flops break steps 1, 2 and 4):
+1. Sentence 1 names the viewer's current, specific situation (the app, the hour, the
+   excuse), not the speaker's.
+2. The payoff is promised in plain words within ~10 s.
+3. There's one reframe and one mechanism.
+4. A named, numbered method, concrete enough to do tonight. His step one arrives at
+   ~0:38. In the latest flop it arrives at 0:51, after the same metaphor has been
+   said twice.
+5. A short close on personal cost.
+
+**Packaging observations** (the data, with the causes unproven):
+- One title template, "I FIXED My Whole Life In 1 Night, Learn How In N Seconds",
+  produced his **1M** *and* his **514K**. The 1M is a remake of the 514K, eight months
+  later. That's §10 of `distribution.md` ("redo what worked, audiences forget")
+  working at full scale. Across 11 videos, "Learn How In N Seconds" has a median of
+  **58.6K**, against ~4.5K for everything else. Stating the exact cost of watching in
+  the title looks like a real lever for short advice content.
+- Since the breakout, his thumbnails are **raw frames from the video, with no text**:
+  mid-sentence, often outdoors and gesturing. It's "click to unpause" taken literally.
+  The switch coincides with the format change, so it's a correlation and needs an A/B
+  test before we act on it.
+- **Brevity was the first hook**: "World's SHORTEST ___ Course" was his first breakout,
+  after two years of 15–90 min guides at a median of 419 views.
+
+### What not to take
+- **Hyperbole a memoir can't back up** ("…My Whole Life In 1 Night"), and
+  "UNSUBSCRIBE if…" bait. His own comments have started asking whether he does "any
+  real work". The advice isn't earned, and that is the gap a story-led channel fills.
+- **His Sep 2026 view counts, as a benchmark.** The median like/view ratio fell from
+  7.5% to 2.3% in the same month views rose. The cause is unexplained (colder traffic,
+  or paid promotion); it isn't dubbing, because there's only one audio track.
