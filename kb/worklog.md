@@ -1393,3 +1393,12 @@ plates in multiple clips, and baking cards into prepped sources.
 The dashcam clock matched the phone to ~1 s, and the OSD speed decided which takes get the
 inset: only 1 of 7 in-car takes was actually moving. Three new gotchas: CSRT on small plates,
 relative bed levels, and image-sequence holes.
+
+## 2026-10-01 — Detour-3 v5 / 4K final
+
+- Body-comp section (5:27–6:01): the InBody machine card was replaced by Shoaib's HyperFrames glass
+  stat cards (`animations/slot_glass_bodycomp`), re-rendered natively at 4K and baked into the
+  IMG_3321 prep by `prep4.py` (`kind: glass`).
+- The 1.25x badge from Episode 2 is reused for 5 s at 0:34.7, with a dark backing for the white
+  wall (`build/gfx_badge.py`, baked into the IMG_3279 prep, `kind: movie`).
+- Final: render.py final mode at `--height 2160`, then `mix_music.py` on `clips_graded`.

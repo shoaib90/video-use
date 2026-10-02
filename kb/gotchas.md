@@ -2700,3 +2700,23 @@ Pre-norm, the speech control read exactly 0.00 dB and every 1.2 s window outside
 A dashcam time-lapse grabbed one frame per file at `-ss 20`. Some chunks were shorter than 20 s,
 so the grab failed silently, and `-i %04d.png` stopped at the first hole: 64 of 167 frames, no
 error. Number only successful grabs, and count the frames in the output.
+
+---
+
+## A 1080 HyperFrames graphic does not need a 4K request: re-render it with `--resolution landscape-4k`
+
+Verified on Detour-3: `npx hyperframes render --format mov --resolution landscape-4k` on the
+1920x1080 composition produced a 3840x2160 ProRes 4444 (`yuva444p12le`) with an identical timeline
+(33.767 s both). It supersamples with Chrome's `deviceScaleFactor`, so text and vector edges come
+out natively sharp, not upscaled. It forces screenshot capture (logged: "drawElementImage ignores
+deviceScaleFactor"), about 46 s capture for 1013 frames on this machine. Render the mask project
+the same way. When compositing, keep the slot's measured BT.601→709 conversion of the ProRes, and
+double the backdrop `gblur` sigma (40 → 80) so the frost reads the same at twice the pixels.
+Checked against the 1080 reference at 7 matching times: same cards on the same words.
+
+## A white-type badge vanishes on a bright wall
+
+Episode 2's "SWITCH TO 1.25X" badge (white type, white sub-plate) was invisible over Detour-3's
+white bathroom tiles. Fix: a rounded dark backing (~65% alpha). The motion Canvas clips it, so
+inset the badge inside its canvas, or the backing's corners come out square. Check any reused
+graphic on the actual frame it will sit over.
