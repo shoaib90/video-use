@@ -179,6 +179,63 @@ class GeometryTests(unittest.TestCase):
                 cards.resolve([bad], self.e.edl, self.e.dir, self.e.durs, 1920, 1080)
 
 
+class StampTests(unittest.TestCase):
+    """A stamp is one word in a pill. It lands AS its phrase is said, holds briefly, and its
+    width is computed in Python so the mask pass (no text) gets the same silhouette."""
+
+    def setUp(self):
+        self.e = _Edit()
+
+    def resolve(self, **over):
+        c = {"id": "deg", "kind": "stamp", "text": "40°C", "at": "forty degrees"}
+        c.update(over)
+        return cards.resolve([c], self.e.edl, self.e.dir, self.e.durs, 1920, 1080)[0]
+
+    def test_lands_as_its_word_is_said_not_a_settle_lead_before(self):
+        s = self.resolve()
+        self.assertAlmostEqual(s["in"] + s["start"], self.e.t("forty") - cards.LEAD, places=3)
+
+    def test_default_hold_is_short(self):
+        s = self.resolve()
+        self.assertAlmostEqual(s["exit"] + s["start"], self.e.t("forty") + cards.STAMP["hold"], places=3)
+
+    def test_out_word_overrides_the_hold(self):
+        s = self.resolve(out={"word": "heavy kit bag"})
+        self.assertAlmostEqual(s["exit"] + s["start"], self.e.t("heavy"), places=3)
+
+    def test_text_is_shown_in_caps_and_width_grows_with_it(self):
+        a = self.resolve(text="ten")
+        b = self.resolve(text="heavy kit bag")
+        self.assertEqual(a["stamp"]["text"], "TEN")
+        self.assertGreater(b["box"]["w"], a["box"]["w"])
+        self.assertEqual(a["box"]["h0"], cards.STAMP["h"])
+
+    def test_positions(self):
+        c = self.resolve(position="top-center")
+        self.assertAlmostEqual(c["box"]["x"] * 2 + c["box"]["w"], 1920, places=2)
+        self.assertEqual(c["box"]["side"], "center")
+        r = self.resolve(position="top-right")
+        self.assertEqual(r["box"]["x"] + r["box"]["w"], 1920 - cards.MARGIN)
+        st = self.resolve(stack=1)
+        self.assertEqual(st["box"]["y"], cards.MARGIN + cards.STAMP["h"] + cards.STAMP["gap"])
+
+    def test_bad_stamps_raise(self):
+        for over in ({"text": ""}, {"at": ""}, {"text": "this is a whole sentence not a stamp at all"},
+                     {"at": "tuition classes"}):
+            with self.assertRaises(cards.CardError):
+                self.resolve(**over)
+        lst = {"id": "l", "kind": "list", "position": "top-center", "rows": [{"text": "x", "at": "lunch"}]}
+        with self.assertRaises(cards.CardError):
+            cards.resolve([lst], self.e.edl, self.e.dir, self.e.durs, 1920, 1080)
+
+    def test_page_draws_the_text_and_the_mask_does_not(self):
+        s = self.resolve(text="heavy kit bag")
+        self.assertIn("stamp-text", cards.page(s, "overlay", 1920, 1080))
+        self.assertIn("HEAVY KIT BAG", cards.page(s, "overlay", 1920, 1080))
+        mask = cards.page(s, "mask", 1920, 1080)
+        self.assertNotIn("CardFont", mask)
+
+
 class PageTests(unittest.TestCase):
     def setUp(self):
         e = _Edit()

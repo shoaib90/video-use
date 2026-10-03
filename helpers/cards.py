@@ -45,8 +45,15 @@ EDL block (all lengths in 1080-high units; all `at` values are spoken phrases):
                   "tag": "this month", "accent": true},
                  {"at": "forty pages a day", "value": "40", "unit": "pages", "tag": "Now",
                   "sub": "20 pages more than June", "sub_dir": "up"}],
-       "out": {"word": "and that is"}, "after": {"word": "this month"}}
+       "out": {"word": "and that is"}, "after": {"word": "this month"}},
+      {"id": "late", "kind": "stamp", "text": "3 AM", "at": "three in the morning",
+       "position": "top-right", "accent": true}
     ]
+
+A `stamp` is one word or figure in a glass pill: it lands AS its phrase is said (no settle
+lead, unlike a card), holds ~1.8 s (or exits on `out`), and is shown in caps. Use it for the
+word a line turns on, 3-8 per episode, never repeating a card already on screen. Positions:
+top-left, top-right or top-center; `stack` moves it down a row.
 """
 from __future__ import annotations
 
@@ -71,6 +78,14 @@ HOLD = 3.0                      # default hold after the last event when no `out
 LIST = {"w": 600, "pad": 30, "head": 40, "head_gap": 14, "bot": 24, "foot": 72,
         "view_h": 442, "row": 64, "row_detail": 104}
 STAT = {"w": 440, "h": 234, "gap": 20}
+STAMP = {"h": 96, "pad": 44, "font": 52, "track": 0.04, "gap": 20, "hold": 1.8, "max_w": 1100}
+# Advance widths of Helvetica Neue Bold caps, in em. The pill's width is set here, not by the
+# browser, because the mask pass draws no text and must still get the identical silhouette.
+# Over-estimating only adds padding; the HyperFrames check catches any clipped glyph.
+_ADV = {**{c: 0.72 for c in "ABCDEFGHKNOPQRSUVXYZ"}, "I": 0.30, "J": 0.56, "L": 0.61, "M": 0.89,
+        "T": 0.63, "W": 0.98, **{d: 0.58 for d in "0123456789"}, " ": 0.28, "%": 0.93, "×": 0.60,
+        ".": 0.28, ",": 0.28, ":": 0.28, "-": 0.39, "–": 0.56, "'": 0.28, "&": 0.72, "+": 0.60,
+        "/": 0.33, "?": 0.61, "!": 0.30, "₹": 0.60, "$": 0.58}
 ICONS = {"clock", "drop", "bolt", "scale", "list", "star", None}
 
 DEFAULT_BRAND = {"bg": "#0A0A0A", "fg": "#DED3BD", "muted": "#8A8375", "accent": "#F25435"}
@@ -177,6 +192,13 @@ def _list_geometry(rows: list[dict]) -> dict:
     return {"view_top": view_top}
 
 
+def stamp_width(text: str) -> int:
+    """The stamp pill's width in 1080 units: measured advance widths plus tracking and padding."""
+    f, track = STAMP["font"], STAMP["track"]
+    em = sum(_ADV.get(ch, 0.75) for ch in text) + track * max(0, len(text) - 1)
+    return int(round(em * f + 2 * STAMP["pad"]))
+
+
 def resolve(cards: list[dict], edl: dict, edit_dir: Path, segment_durations: list[float],
             out_w: int, out_h: int) -> list[dict]:
     """Turn EDL `cards` into fully resolved runtime specs, one per card."""
@@ -195,13 +217,14 @@ def resolve(cards: list[dict], edl: dict, edit_dir: Path, segment_durations: lis
             raise CardError(f"{where}: duplicate id")
         seen_ids.add(cid)
         kind = c.get("kind")
-        if kind not in ("list", "stat"):
-            raise CardError(f"{where}: kind must be 'list' or 'stat', got {kind!r}")
+        if kind not in ("list", "stat", "stamp"):
+            raise CardError(f"{where}: kind must be 'list', 'stat' or 'stamp', got {kind!r}")
         if c.get("icon") not in ICONS:
             raise CardError(f"{where}: unknown icon {c.get('icon')!r}; one of {sorted(i for i in ICONS if i)}")
         pos = c.get("position", "top-left")
-        if pos not in ("top-left", "top-right"):
-            raise CardError(f"{where}: position must be top-left or top-right")
+        if pos not in ("top-left", "top-right") and not (kind == "stamp" and pos == "top-center"):
+            raise CardError(f"{where}: position must be top-left or top-right"
+                            + (" or top-center" if kind == "stamp" else ""))
 
         after = 0.0
         if c.get("after"):
@@ -249,6 +272,20 @@ def resolve(cards: list[dict], edl: dict, edit_dir: Path, segment_durations: lis
             spec["_rows"], spec["_geo"], spec["_tag"], spec["_footer"] = rows, geo, tag, footer
             box_w, box_h0 = LIST["w"], rows[0]["card_h"]
             y = MARGIN
+        elif kind == "stamp":
+            text = str(c.get("text", "")).strip()
+            if not text:
+                raise CardError(f"{where}: a stamp needs text")
+            if not c.get("at"):
+                raise CardError(f"{where}: a stamp needs an 'at' phrase")
+            at(c["at"], "at")
+            shown = text.upper()
+            box_w = stamp_width(shown)
+            if box_w > STAMP["max_w"]:
+                raise CardError(f"{where}: {shown!r} is too long for a stamp (one word or figure)")
+            box_h0 = STAMP["h"]
+            y = MARGIN + int(c.get("stack", 0)) * (STAMP["h"] + STAMP["gap"])
+            spec["_stamp"] = {"text": shown, "accent": bool(c.get("accent", False))}
         else:
             steps_in = c.get("steps") or []
             if not steps_in:
@@ -275,19 +312,22 @@ def resolve(cards: list[dict], edl: dict, edit_dir: Path, segment_durations: lis
             exit_t = find_phrase(words, c["out"]["word"], max(events) + 1e-3, f"{where} out")
             exit_t += float(c["out"].get("offset", 0.0))
         else:
-            exit_t = max(events) + float(c.get("hold", HOLD))
+            exit_t = max(events) + float(c.get("hold", STAMP["hold"] if kind == "stamp" else HOLD))
         exit_t = min(exit_t, total - EXIT_DUR - 0.05)
-        card_in = max(0.0, first_word - CARD_LEAD)
+        # A card settles before its first word; a stamp IS the word, so it lands as it's said.
+        card_in = max(0.0, first_word - (LEAD if kind == "stamp" else CARD_LEAD))
         start = max(0.0, card_in - 0.1)
         dur = round(exit_t + EXIT_DUR + 0.1 - start, 3)
         loc = lambda t: round(t - start, 3)   # noqa: E731  window-local seconds
 
-        x = MARGIN if pos == "top-left" else round(stage_w - MARGIN - box_w, 3)
+        x = (MARGIN if pos == "top-left" else round((stage_w - box_w) / 2, 3) if pos == "top-center"
+             else round(stage_w - MARGIN - box_w, 3))
+        side = {"top-left": "left", "top-right": "right", "top-center": "center"}[pos]
         spec.update({
             "start": round(start, 3), "duration": dur,
             "in": loc(card_in), "exit": loc(exit_t),
             "stage": {"w": stage_w, "h": 1080, "scale": round(scale, 6)},
-            "box": {"x": x, "y": y, "w": box_w, "h0": box_h0, "side": "left" if pos == "top-left" else "right"},
+            "box": {"x": x, "y": y, "w": box_w, "h0": box_h0, "side": side},
             "colors": {"dot_done": f"rgba({_hex_rgb(brand['fg'])},0.45)"},
             "heights": [],
             "_brand": brand,
@@ -323,6 +363,11 @@ def resolve(cards: list[dict], edl: dict, edit_dir: Path, segment_durations: lis
                            if footer else None),
             }
             spec["_words"] = [(r["text"], r["w"]) for r in rows]
+        elif kind == "stamp":
+            st = spec.pop("_stamp")
+            spec["stamp"] = {"text": st["text"], "accent": st["accent"],
+                             "font": STAMP["font"], "track": STAMP["track"]}
+            spec["_words"] = [(st["text"], first_word)]
         else:
             steps = spec.pop("_steps")
             spec["stat"] = {"steps": [{

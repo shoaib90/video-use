@@ -63,3 +63,9 @@ body.mask .shell { background: #fff; }
        color: var(--accent); white-space: nowrap; }
 .sub.muted { color: var(--muted); }
 .sub .tri { width: 13px; height: 13px; margin-right: 8px; fill: var(--accent); }
+
+/* ---- stamp: one word or figure in a glass pill, landing on its word ---- */
+.card.stamp .shell { border-radius: 48px; }
+.stamp-text { position: absolute; left: 0; right: 0; top: 0; height: 96px; line-height: 96px; text-align: center;
+              font-weight: 700; white-space: nowrap; color: var(--fg); }
+.stamp-text.accent { color: var(--accent); }

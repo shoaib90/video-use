@@ -425,6 +425,7 @@ def extract_segment(
     crf: str | None = None,
     zoom: float = 1.0,
     zoom_x: float = 0.45,
+    zoom_to: float | None = None,
 ) -> None:
     """Extract a cut range as its own MP4 with grade + 30ms audio fades baked in.
 
@@ -448,37 +449,6 @@ def extract_segment(
     out_w, out_h = probe_scaled_dims(source, target_h, portrait)
     scale = f"scale={out_w}:{out_h}"
 
-    vf_parts: list[str] = []
-    if is_hdr_source(source):
-        vf_parts.append(TONEMAP_CHAIN)
-    vf_parts.append(scale)
-    if grade_filter:
-        vf_parts.append(grade_filter)
-    # Per-segment reframe (push-in to disguise a jump cut on a static camera).
-    # Expressed as a plain number so one EDL stays correct at any output
-    # resolution: crop to 1/zoom of the frame, then scale back to the exact
-    # frame size. The scale-back is mandatory - every segment must share
-    # dimensions or the `-c copy` concat (Rule 2) fails.
-    if zoom and abs(zoom - 1.0) > 1e-6:
-        if zoom < 1.0:
-            raise ValueError(f"zoom must be >= 1.0 (got {zoom}); it crops in, never out")
-        cw = max(2, (int(out_w / zoom) // 2) * 2)
-        ch = max(2, (int(out_h / zoom) // 2) * 2)
-        cx = int((out_w - cw) * min(max(zoom_x, 0.0), 1.0))
-        cy = (out_h - ch) // 2
-        vf_parts.append(f"crop={cw}:{ch}:{cx}:{cy},scale={out_w}:{out_h}")
-    if extra_vf:
-        vf_parts.append(extra_vf)
-    vf = ",".join(vf_parts)
-
-    if draft:
-        preset, default_crf = "ultrafast", "28"
-    elif preview:
-        preset, default_crf = "medium", "22"
-    else:
-        preset, default_crf = "slow", "16"
-    crf = crf if crf is not None else default_crf
-
     # Frame rate: use the rate the caller resolved once for the whole render
     # (every segment must share it — concat -c copy in Rule 2 requires a uniform
     # frame rate). When called standalone with no rate, preserve this source's
@@ -496,6 +466,7 @@ def extract_segment(
     # construction, for every segment, so there is nothing to accumulate.
     fps_value = _rate_to_float(out_rate)
     t_epsilon = 0.0
+    n_frames = 0
     if fps_value > 0:
         n_frames = max(1, round(duration * fps_value))
         duration = n_frames / fps_value
@@ -504,6 +475,63 @@ def extract_segment(
         # boundary and makes ffmpeg emit one extra frame. Bias the string a hair
         # low. 1e-5 s is under one sample at 48 kHz, so the audio is unaffected.
         t_epsilon = 1e-5
+
+    zoom = float(zoom or 1.0)
+    if zoom < 1.0:
+        raise ValueError(f"zoom must be >= 1.0 (got {zoom}); it crops in, never out")
+    if zoom_to is not None and float(zoom_to) < 1.0:
+        raise ValueError(f"zoom_to must be >= 1.0 (got {zoom_to}); it crops in, never out")
+    animated = zoom_to is not None and abs(float(zoom_to) - zoom) > 1e-6
+    bias = min(max(zoom_x, 0.0), 1.0)
+
+    vf_parts: list[str] = []
+    if is_hdr_source(source):
+        vf_parts.append(TONEMAP_CHAIN)
+    if animated:
+        # Animated push-in (or pull-out): the zoom moves linearly from `zoom` on
+        # the first frame to `zoom_to` on the last. `crop` can't animate its size
+        # (w/h are evaluated once), so this uses `zoompan` with one output frame
+        # per input frame. zoompan places its window on whole pixels, so it works
+        # on a frame at 2x the output size: each 1 px step lands as 0.5 px in the
+        # output, which keeps a ~1%/s push from visibly stepping. Its output is
+        # the exact measured frame size, so the concat (Rule 2) still matches.
+        z0, z1 = zoom, float(zoom_to)
+        span = max(1, n_frames - 1)
+        rate_expr = out_rate.replace(":", "/")
+        vf_parts.append(
+            f"scale={2 * out_w}:{2 * out_h}:flags=lanczos,"
+            f"zoompan=z='{z0}+({z1}-{z0})*on/{span}'"
+            f":x='(iw-iw/zoom)*{bias}':y='(ih-ih/zoom)/2'"
+            f":d=1:s={out_w}x{out_h}:fps={rate_expr}"
+        )
+        if grade_filter:
+            vf_parts.append(grade_filter)
+    else:
+        vf_parts.append(scale)
+        if grade_filter:
+            vf_parts.append(grade_filter)
+        # Per-segment reframe (push-in to disguise a jump cut on a static camera).
+        # Expressed as a plain number so one EDL stays correct at any output
+        # resolution: crop to 1/zoom of the frame, then scale back to the exact
+        # frame size. The scale-back is mandatory - every segment must share
+        # dimensions or the `-c copy` concat (Rule 2) fails.
+        if abs(zoom - 1.0) > 1e-6:
+            cw = max(2, (int(out_w / zoom) // 2) * 2)
+            ch = max(2, (int(out_h / zoom) // 2) * 2)
+            cx = int((out_w - cw) * bias)
+            cy = (out_h - ch) // 2
+            vf_parts.append(f"crop={cw}:{ch}:{cx}:{cy},scale={out_w}:{out_h}")
+    if extra_vf:
+        vf_parts.append(extra_vf)
+    vf = ",".join(vf_parts)
+
+    if draft:
+        preset, default_crf = "ultrafast", "28"
+    elif preview:
+        preset, default_crf = "medium", "22"
+    else:
+        preset, default_crf = "slow", "16"
+    crf = crf if crf is not None else default_crf
 
     # 30ms audio fades at both edges (Rule 3) — prevent pops. Computed AFTER the
     # frame snap above so the fade-out sits on the segment's real end.
@@ -602,7 +630,11 @@ def extract_all_segments(
         seg_vf = r.get("filter") or ""
         seg_zoom = float(r.get("zoom") or 1.0)
         seg_zoom_x = float(r.get("zoom_x", 0.45))
-        if seg_zoom != 1.0:
+        seg_zoom_to = r.get("zoom_to")
+        seg_zoom_to = None if seg_zoom_to is None else float(seg_zoom_to)
+        if seg_zoom_to is not None:
+            print(f"        zoom:  {seg_zoom:.3f}x -> {seg_zoom_to:.3f}x  (push, x-bias {seg_zoom_x})")
+        elif seg_zoom != 1.0:
             print(f"        zoom:  {seg_zoom:.3f}x  (x-bias {seg_zoom_x})")
         if seg_vf:
             print(f"        vf:    {seg_vf}")
@@ -617,7 +649,8 @@ def extract_all_segments(
         extract_segment(src_path, start, duration, seg_filter, out_path,
                         preview=preview, draft=draft, rate=out_rate,
                         extra_vf=seg_vf, audio_prefilter=seg_audio,
-                        height=height, crf=crf, zoom=seg_zoom, zoom_x=seg_zoom_x)
+                        height=height, crf=crf, zoom=seg_zoom, zoom_x=seg_zoom_x,
+                        zoom_to=seg_zoom_to)
         seg_paths.append(out_path)
 
     return seg_paths

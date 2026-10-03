@@ -532,3 +532,174 @@ editing craft in §1–8 stands. It records only the script and packaging.
 - **His Sep 2026 view counts, as a benchmark.** The median like/view ratio fell from
   7.5% to 2.3% in the same month views rose. The cause is unexplained (colder traffic,
   or paid promotion); it isn't dubbing, because there's only one audio track.
+
+---
+
+## 10. Long-form essays that hold for 17–19 minutes: James Jani, cut by cut
+
+Source: two **James Jani** videos (2.2M subs), taken apart shot by shot on 2026-10-03:
+"The Toxic World of Self Help" (18:50, 6.1M views) and "The Untold Truth About Money"
+(17:26, 19.3M views), both 2020. Method: `yt-dlp` at 720p, `scene>0.25` cut detection, every
+shot tiled onto contact sheets (start/middle/end for shots ≥3 s), the auto-captions' word
+timings, and a librosa pass for speech gaps, silences, low-band hits and high-band rises,
+each checked against the cuts. The script-stage findings and the full beat tables are in the
+private channel-kb (`07-research/james-jani/`). This section keeps only the editing craft.
+
+**Format caveat first.** He narrates over borrowed film footage. His face is ~10% of the
+runtime and film/TV is 45–53%. None of the footage transfers; the mechanisms below do.
+
+**Measured:** real pace is **one edit every ~2.8–3.2 s**, not the 0.4–0.8 s the raw detector
+reports (see `gotchas.md`, scene detection on 24 fps film). About 11% of each video has no
+voice, and 13% of the Money video is pure black.
+
+### The techniques
+
+1. **Silence first, then the hit.** The music bed never stops under narration, so every
+   drop-out registers as a structural event. At each reversal the order is the same: the bed
+   drops out, a dark or still shot, one line, and then an impact plus a new music cue **on
+   the next cut**. Self Help 1:15 → 1:23, 6:09 → 6:13, 11:52 → 12:01. Money 1:46 → 1:51.9. One
+   sentence is split by 4.5 s of silence before its last three words. This sharpens §1's
+   "music build-and-break": the break is the silence, and the impact comes after it, not on
+   it.
+2. **The cut rate follows the emotion.** The compulsion chapter has a median shot of ~0.4 s,
+   the confession chapter 3.5 s, and the last minute two cuts. Fast for lists and compulsion,
+   still for feeling. This is the in-video version of "pace is a ceiling set by format".
+3. **One accelerating loop per video, at the peak.** The same 4–5 clips repeat with shrinking
+   durations (0.52 s → 0.10 s), then snap to black. It's a wheel spinning until it breaks.
+   Use it once; it's the only place where cut speed *is* the meaning.
+4. **One picture per list item; one held picture per idea.** Lists cut on each noun (~0.7–1.1 s).
+   Explanations hold 5–15 s shots and 9–17 s cards.
+5. **The edit performs the verb.**
+   - The colour drains on "pause".
+   - One shot multiplies into a ×7 grid on "seven".
+   - The frame shrinks into a box on "gone".
+   - A bubble pops on "burst".
+   - Red verdict stamps (WRONG, NO SCALE, LIMITED), and **the same shot re-stamped in green**
+     (UNLIMITED) for the reframe.
+
+   Mark every verb or metaphor in the script that the picture can *do*.
+6. **Callbacks reuse identical footage.** The opening's montage shots come back near the end
+   with new words over them, so the ending re-reads the opening. A shot first used for
+   euphoria returns later labelled as a drug high. Plan these shots at script time, so
+   they're shot once and used twice.
+7. **A recurring location for the spoken metaphor, graded by mood.** Money's desert road is in
+   daylight for the promise, purple at dusk for doubt, and glitched at a seam. For a
+   one-camera channel: one real place, filmed at day and at dusk.
+8. **The face is lit brighter than the b-roll.** His talking head is high-key window daylight;
+   the story footage is dark and filmic. The present-day self reads as the honest one, and the
+   face lands on the pivot and concession lines. For a talking-head channel the proportion
+   inverts (the face is the default), but the job is the same: **come back to the face for
+   the turn line.**
+9. **One text system per video:** one sans-serif family, one accent colour, one background
+   texture. Six card types:
+   - a quote of your past self
+   - a one-word punch at a feeling
+   - the section's thesis, held 6–12 s
+   - a definition with its source
+   - a tiny one-word question on black ("WHO?", "WHY?") at a seam
+   - a verdict stamp
+10. **The seam recipe.** The last line is a question; then music only (3–18 s for him; keep
+    ours to 2–3 s, see "What not to take"); a title card that echoes the last spoken line; a
+    hit on the cut; **a new music cue per chapter** (7–11 beds per video); and **the voice
+    comes back before the card leaves** (a J-cut). The card echoing the line is what keeps the
+    seam a pull rather than an exit.
+11. **Dips to black as punctuation.** 0.4 s dips between the steps of a scale graphic; 1.5–3 s
+    before a turn; black as the background for a one-word question.
+
+### What not to take
+
+- **The footage.** Film and TV clips are a Content ID and fair-use risk, and borrowed emotion.
+  The *jobs* they do transfer: the stand-in for "you" becomes a re-enactment of your younger
+  self; the literal noun becomes your own b-roll; the visual joke becomes your own screen
+  recording.
+- **35–43 s wordless title-and-disclaimer blocks after the hook, and 10–18 s seams.** They're
+  earned by a 19-minute documentary after a twist. On our channel, viewers leave at seams
+  (channel-kb learning #3). Keep the idea as a 2–3 s breath with the voice running.
+- **His narration speed** (~180–195 wpm of voice-over read over footage). Copy the pauses,
+  not the speed.
+
+---
+
+## 11. A face-led documentary: how 21% face stays alive (Saqlain Khan)
+
+Source: **Saqlain Khan**, "Why 99.6% of you will never be RICH | The Education Trap"
+(Hindi, 19:30, 6.1M views, 2024), taken apart on 2026-10-03 with the same method as §10. Two
+extras: a zoom tracker that measures the talking head's scale against the background shelves,
+and a pop-in detector for changes inside a shot. The full study is in the private channel-kb
+(`07-research/saqlain-khan.md`).
+
+**Why it's here:** it's the same documentary-essay skeleton as §10, but his face is on screen
+**21%** of the time (Jani's is ~10%). The face mechanics are the most transferable craft in
+either study for a talking-head channel.
+
+**Measured:**
+- 214 real cuts (247 detected; the 14 at one money-rain shot are stock flicker), so **1 cut
+  per 5.5 s**.
+- 242 in-shot changes: stamps, icon pops, tints, torn-paper insets, punch-ins.
+- So **one visual change every 2.6 s**, flat across every section (2.0–2.8 s). Over half the
+  visual change happens *without a cut*.
+
+### The face techniques
+
+1. **The face asks; the b-roll answers.** The face arrives on a question or a pivot word ("but
+   what's the reality?", "what was the sole purpose?", "do you know the stats?"). The cutaway
+   arrives on the noun or number that answers it ("1806", a name, an institution). Cut on that
+   grammar and the face never outstays its line.
+2. **A slow digital push on almost every face take of 4 s or more.** It runs ×1.00 → ×1.07 over
+   4–9 s takes and → ×1.12–1.20 over 11–20 s takes, at **~0.7–1% per second**. Of 35 face
+   runs, 17 push. Short stings (0.9–2 s), the turn line and the outro stay **static**: stillness
+   is kept for the reframe.
+   - This is a *continuous* move, which reads as camera life. It's not the static sub-1.1× step
+     between two cuts that the coverage finding says doesn't register.
+   - **Built 2026-10-03 as `ranges[].zoom_to`** (an animated push from `zoom` to `zoom_to` across
+     the range; see `SKILL.md`, EDL format).
+3. **Three hard punch-ins to ~×1.2 in 19 minutes**, each on a punchline, two of them
+   re-centred. Scarcity is what makes them land.
+4. **The face owns the seams; b-roll owns the middles.** The long holds (11–20 s) are at the
+   turn, at each chapter's end and start, and at the final dare. The middles use 0.9–2 s
+   stings.
+5. **The first face appears on the first reversal**, head bowed, then a punch-in as he looks up
+   into the lens. *(A channel whose face is the brand shouldn't hold it back for 1:44, but the
+   move translates: punch in at the turn.)*
+6. **Wardrobe matched to the graphic accent**: a red polo, the same in every take, against red
+   torn masks and red grids on a teal-grey set. Face and graphics read as one brand.
+
+### The in-shot techniques (the cheap way to a 2–3 s change rate)
+
+- **One still, a dozen pop-ins.** A 25 s shot with zero cuts carries a clause-by-clause list:
+  an icon or keyword lands on each clause. It's the cheapest diagnosis montage there is.
+- **Torn-paper insets:** a second image opens beside the subject (then and now, a
+  consequence).
+- **Colour shifts to red** on defeat or pain.
+- **Keyword stamps in English** (one word, one font, a blur-in), 3–8 a section.
+- **The browser-frame receipt:** 1–2 s of the source page in a frame (title readable), then a
+  push or cut to full frame. About 20 uses, so every claim looks sourced and every hard cut
+  into foreign footage is covered.
+- **Highlighter sweeps** on the key line of a screenshot.
+- **SFX are sparse:** only ~12% of pop-ins carry a measurable transient. Most land silent.
+
+### Sound
+
+- **Silence first, then the hit, at every chapter seam**, the same mechanism as §10.1. The
+  bed builds, fades to ~1 s of digital silence, a wordless card, silence again, then a hit on
+  the first word.
+- **The bed swells toward each chapter's end and resets lighter after the seam.**
+- **The turn line gets a *thinned* bed (−10 to −15 dB in the low band), not a full stop**, then
+  a heavier bed on the next cut.
+- **The outro is one unscored take.**
+
+### Where he differs from §10, and which one to follow
+
+- **His cut rate is flat; Jani's follows the emotion.** For personal material, follow Jani:
+  the stillest stretch belongs at the zenith.
+- **His inward stretch (60–75%) is his fastest and loudest.** Again follow Jani for a personal
+  story.
+
+### What not to take
+
+- **AI stills as the main b-roll** (36% of the runtime; the same graduate cut-out appears six
+  times). It reads generic, and on a personal channel it's dishonest about people.
+- **A wall of third-party clips.**
+- **No captions on narration.** That works for his audience, but a muted 16–22 audience needs
+  them.
+- **Conspiracy styling:** censor bars over "conspirators", a devil-emoji crowd motif.

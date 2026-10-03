@@ -1402,3 +1402,33 @@ relative bed levels, and image-sequence holes.
 - The 1.25x badge from Episode 2 is reused for 5 s at 0:34.7, with a dark backing for the white
   wall (`build/gfx_badge.py`, baked into the IMG_3279 prep, `kind: movie`).
 - Final: render.py final mode at `--height 2160`, then `mix_music.py` on `clips_graded`.
+
+## 2026-10-03 — James Jani study (craft only)
+
+Two 17–19 min James Jani essays taken apart shot by shot (`yt-dlp` 720p, `scene>0.25`, contact
+sheets of every shot, caption word timings, librosa hit/silence pass). The craft went into
+`storytelling.md` §10 and the index. The detector overcounted ~2× on 24 fps film in a 60 fps
+file and on particle effects, a new gotcha. The script findings and beat tables live in the
+private channel-kb (`07-research/james-jani/`).
+
+Same day: added Saqlain Khan's "The Education Trap" (Hindi, 6.1M views) as `storytelling.md`
+§11, the face-led counterpart: question-led face cuts, slow digital pushes, and in-shot change
+instead of cuts. Tool gaps it exposed: an animated push (`zoom_to`), a one-word `stamp` card
+kind, a seam template in the mix, and a structural SFX palette (`effects/` is all foley today).
+
+**Built the same day: `ranges[].zoom_to`**, an animated push-in in `render.py`. It uses
+`zoompan` on a 2× frame, so a whole-pixel window lands as 0.5 px and a ~1%/s push doesn't
+step. The output matches static siblings exactly (size, frames, rate, SAR), so the `-c copy`
+concat holds. Measured on Episode 2's IMG_3665 (16.1 s, 1.00→1.15): 1.035 / 1.075 / 1.110 /
+1.150 at 4 / 8 / 12 / 16 s against 1.037 / 1.075 / 1.112 / 1.149 expected, and it concats
+with a static range. Two traps: `crop` can't animate w/h (evaluated once), and an explicit
+`setsar=1` made the pushed segment's SAR differ from its unset-SAR siblings, so don't set it.
+Tests: `tests/test_render_push.py` (201 pass).
+
+**Also built: the `stamp` card kind** (`helpers/cards.py`, `cards_runtime/`). It's one word or figure in a
+glass pill. It lands as its phrase is said (`LEAD`, not `CARD_LEAD`), holds 1.8 s, and can sit
+top-left, top-right or top-center. The width comes from a Helvetica Neue Bold advance table in
+Python, because the mask pass draws no text and must still match the silhouette. Rendered on
+Episode 2's IMG_3665 with a 1.00→1.12 push: the HyperFrames check passed and the pills sit clear
+of the face. Tests: `StampTests` (208 pass).
+

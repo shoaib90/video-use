@@ -32,11 +32,17 @@
   card.className = `card ${C.kind}`;
   card.id = "card";
   card.style.cssText = `left:${C.box.x}px;top:${C.box.y}px;width:${C.box.w}px;height:${C.box.h0}px;` +
-    `transform-origin:${C.box.side} top;`;
+    `transform-origin:${C.kind === "stamp" ? "center center" : `${C.box.side} top`};`;
   stage.appendChild(card);
 
   if (MODE === "mask") {
     card.innerHTML = '<div class="shell"></div>';
+  } else if (C.kind === "stamp") {
+    const P = C.stamp;
+    card.innerHTML = `
+      <div class="shell"></div>
+      <div class="content"><span class="stamp-text${P.accent ? " accent" : ""}" id="stext"
+        style="font-size:${P.font}px;letter-spacing:${P.track}em">${esc(P.text)}</span></div>`;
   } else if (C.kind === "list") {
     const L = C.list;
     const rows = L.rows.map((r, k) => `
@@ -70,14 +76,22 @@
   }
 
   const tl = gsap.timeline({ paused: true });
-  const side = C.box.side === "left" ? -1 : 1;
+  const side = C.box.side === "left" ? -1 : C.box.side === "right" ? 1 : 0;
   // Curve for opacity, spring for transforms (motion.py: alpha must never overshoot).
-  tl.fromTo("#card", { opacity: 0 }, { opacity: 1, duration: 0.45, ease: "power2.out" }, C.in);
-  tl.fromTo("#card", { x: 70 * side, scale: 0.93 }, { x: 0, scale: 1, duration: 0.85, ease: "back.out(1.4)" }, C.in);
-  // Container height: shared by both passes, so the frosted backdrop grows with the card.
-  for (const [t, h] of C.heights) tl.to("#card", { height: h, duration: 0.5, ease: "power3.out" }, t);
-  tl.fromTo("#card", { opacity: 1 }, { opacity: 0, duration: C.exit_dur, ease: "power2.in", immediateRender: false }, C.exit);
-  tl.to("#card", { x: 40 * side, scale: 0.96, duration: C.exit_dur, ease: "power2.in" }, C.exit);
+  if (C.kind === "stamp") {
+    // A stamp lands ON its word: quick, a small press-in, no slide. Shared by both passes.
+    tl.fromTo("#card", { opacity: 0 }, { opacity: 1, duration: 0.22, ease: "power2.out" }, C.in);
+    tl.fromTo("#card", { scale: 1.14, y: -6 }, { scale: 1, y: 0, duration: 0.45, ease: "back.out(2.0)" }, C.in);
+    tl.fromTo("#card", { opacity: 1 }, { opacity: 0, duration: 0.35, ease: "power2.in", immediateRender: false }, C.exit);
+    tl.to("#card", { scale: 0.96, duration: 0.35, ease: "power2.in" }, C.exit);
+  } else {
+    tl.fromTo("#card", { opacity: 0 }, { opacity: 1, duration: 0.45, ease: "power2.out" }, C.in);
+    tl.fromTo("#card", { x: 70 * side, scale: 0.93 }, { x: 0, scale: 1, duration: 0.85, ease: "back.out(1.4)" }, C.in);
+    // Container height: shared by both passes, so the frosted backdrop grows with the card.
+    for (const [t, h] of C.heights) tl.to("#card", { height: h, duration: 0.5, ease: "power3.out" }, t);
+    tl.fromTo("#card", { opacity: 1 }, { opacity: 0, duration: C.exit_dur, ease: "power2.in", immediateRender: false }, C.exit);
+    tl.to("#card", { x: 40 * side, scale: 0.96, duration: C.exit_dur, ease: "power2.in" }, C.exit);
+  }
 
   if (MODE !== "mask" && C.kind === "list") {
     const L = C.list;

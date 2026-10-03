@@ -463,7 +463,7 @@ lands on. A re-cut moves it for free.
 - **One focus at a time**: accent marks only CHANGE (`stat`) or the newest step (`list`). At
   most two accents in frame. Two cards on screen together is the ceiling.
 
-### The two kinds
+### The three kinds
 
 **`list`** — a vertical timeline. Each row lands on its phrase; the card grows with its rows,
 then scrolls by whole rows once full (never a half-clipped row). Optional `time` column, `chips`
@@ -496,7 +496,18 @@ under a row, a `tag` in the header and a `footer` payoff:
  "out": {"word": "and that is"}}
 ```
 
-Fields: `position` `top-left | top-right` · `icon` `clock | drop | bolt | scale | list | star` ·
+**`stamp`** — one word or figure in a glass pill, shown in caps. It lands **as** its phrase is
+said (a card settles 0.55 s early; a stamp *is* the word), holds 1.8 s unless `out` or `hold`
+says otherwise, and exits quickly. Use it for the word a line turns on, 3–8 per episode, and
+never to repeat a card already on screen. `accent` turns the text the brand accent. It can also
+sit `top-center`. The pill's width is computed in Python from measured glyph widths, so the
+mask pass (which draws no text) gets the identical silhouette:
+
+```json
+{"id": "late", "kind": "stamp", "text": "3 AM", "at": "three in the morning", "position": "top-right", "accent": true}
+```
+
+Fields: `position` `top-left | top-right` (stamps also `top-center`) · `icon` `clock | drop | bolt | scale | list | star` ·
 `after: {"word": …}` starts the phrase search later (use it when the first phrase also occurs
 earlier) · `out: {"word": …, "offset": s}` or `hold: s` (default 3 s after the last event).
 
@@ -669,6 +680,8 @@ Match the source unless the user asked for something specific. Common targets: `
 `audio_filter` is an optional global audio chain (denoise, EQ) applied per segment **before** the 30ms fades, so the fades stay on the true segment edges (Hard Rule 3).
 
 `ranges[].zoom` is an optional per-segment push-in (a number ≥ 1.0, with `zoom_x` 0–1 biasing the crop horizontally, default 0.45). Use it to disguise jump cuts on a static single-camera shot: crop to 1/zoom of the frame, then scale back. It is a plain number rather than a filter string precisely so one EDL stays correct at every output resolution. `ranges[].filter` remains available as a raw per-segment escape hatch, but a hardcoded `crop` is only valid at one output height, and **any per-segment dimension mismatch breaks the lossless concat** (Hard Rule 2).
+
+`ranges[].zoom_to` makes that push **animated**: the zoom moves linearly from `zoom` (default 1.0) on the segment's first frame to `zoom_to` on its last, with the same `zoom_x` bias. It's the slow push that keeps a held talking head alive (`kb/storytelling.md` §11): about 1% a second, e.g. `"zoom": 1.0, "zoom_to": 1.07` on a 6 s take, or `1.0 → 1.15` on a 15 s one. Leave the turn line, the zenith and short stings static; the stillness is the emphasis. It renders through `zoompan` on a 2× frame, so a pushed range takes about 2× as long to extract as a static one, and its output matches static siblings exactly (verified by `tests/test_render_push.py`). A hard punch-in is still a static `zoom` on the next range.
 
 ## Output quality
 

@@ -329,6 +329,19 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   struggles (sleep, scrolling, procrastination, fear of failure), never abstract ones. The 1M shape:
   mirror the viewer, then one mechanism, against-the-grain thesis, a mind-read, one action tonight,
   and a punchline. See [storytelling.md](storytelling.md) §9.
+- **Silence first, then the hit.** In two 17–19 min essays that hold to the end (James Jani),
+  the bed runs under all narration, so every drop-out is an event. At each reversal the bed
+  drops out, the shot goes dark, one line lands, and the impact and a new cue come **on the
+  next cut**. The cut rate follows the emotion (0.4 s median for compulsion, 3.5 s for the
+  confession). The opening's own shots come back at the end with new words. The real pace is
+  one edit per ~3 s: raw `scene>` counts overstated it ~2× (24 fps cadence and particles, see
+  gotchas.md). See [storytelling.md](storytelling.md) §10.
+- **For a face-led cut: the face asks, the b-roll answers.** A face-heavy documentary (21% face,
+  Saqlain Khan) cuts to the face on every question or pivot and away on every noun or number. It
+  slow-pushes every face take of 4 s or more at ~1%/s (×1.07–1.20; static for the reframe line),
+  saves 3 hard ~1.2× punch-ins for punchlines, and gets to a visual change every 2.6 s with only
+  one cut per 5.5 s: stamps, insets and tints inside the shot. The push is `ranges[].zoom_to`
+  (animated, built 2026-10-03). See [storytelling.md](storytelling.md) §11.
 
 ## Maintaining this KB
 

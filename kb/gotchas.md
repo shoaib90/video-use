@@ -2720,3 +2720,18 @@ Episode 2's "SWITCH TO 1.25X" badge (white type, white sub-plate) was invisible 
 white bathroom tiles. Fix: a rounded dark backing (~65% alpha). The motion Canvas clips it, so
 inset the badge inside its canvas, or the backing's corners come out square. Check any reused
 graphic on the actual frame it will sit over.
+
+## Scene-cut detection overcounts badly on 24 fps film inside a 60 fps file, and on particle effects
+
+Measured on the James Jani study (2026-10-03, `storytelling.md` §10). ffmpeg
+`select='gt(scene,0.25)'` reported a **0.05 s median shot** for a whole chapter and a
+"91-cut minute". Frame differencing at the native 59.94 fps showed **two continuous shots**:
+24 fps film in 3:2 cadence (each film frame held for 2 or 3 video frames, with identical
+repeats between them). On a fast crowd pan, every new film frame changes enough to cross the
+threshold, and the alternating 0.03 / 0.05 s "shots" are just the cadence. In the other video,
+falling glowing letters crossing the lens produced ~44 false cuts in 5 s.
+
+**Fix:** treat any run of "shots" under ~0.2 s as suspect. Merge them, or check them with
+frame differencing (a real cut is one spike; cadence is a 2-3-2-3 pattern of spikes and exact
+zeros). Report the real count. Here the raw figures overstated the pace about 2×: the real
+pace was one edit every ~3 s.
