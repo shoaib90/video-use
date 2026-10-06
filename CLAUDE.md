@@ -23,6 +23,22 @@ durable, reusable lesson into the topic file where it belongs — a new trap int
 - Keep `kb/index.md` short — it loads into every session.
 - Correct or delete entries that turn out to be wrong rather than stacking caveats.
 
+## Before any preview reaches Shoaib (every video, every iteration)
+
+Shoaib's time is the scarcest resource. A preview he has to rewatch end to end to find our
+mistakes is a failed delivery. So:
+
+1. **Run `helpers/review.py`** on the render (see kb/helpers.md). Clear every HIGH flag: fix it,
+   or record why it is fine in `<edit>/review/accepted.json`. Read the MED story edges too.
+2. **Walk the READ items in [kb/mistakes.md](kb/mistakes.md)**, the ledger of every mistake
+   Shoaib has caught on any video.
+3. **Deliver the watch-list, not just the file.** When there is a previous version, deliver the
+   changes reel (`review/<label>/reel.mp4`): only what changed, ~14 s each. He should not need
+   to rewatch the whole video.
+4. **When Shoaib reports a mistake, add it to kb/mistakes.md the same day.** If it can be
+   checked automatically, add the check to review.py in the same change, with a test, so it
+   can never reach him twice.
+
 ## Working rules
 
 - Run helpers as `uv run python helpers/<name>.py`. There are no console scripts.
