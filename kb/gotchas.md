@@ -173,6 +173,11 @@ uv run --with pytest python -m pytest tests/
 concat (Hard Rule 2) breaks if segments differ. If an EDL mixes a 30fps and a 60fps source,
 the default (first source's rate) is applied to all — pass `--fps` explicitly when mixing.
 
+The default also bites with ONE frame rate. iPhone MOVs can report an average rate like
+`114057/3802` (29.9992), not `30/1`, and render.py carries that odd rational through every
+segment into the output. That's harmless to the concat but a strange delivery rate. Seen on
+podcast Episode 1 (2026-10-03). **Pass `--fps 30` for iPhone footage.**
+
 ---
 
 ## `speechnorm` destroys speech/noise separation on noisy footage
@@ -697,6 +702,28 @@ It was not. Two cheap checks killed it:
 Deepgram was right to stop. **Treat a whisper-only tail as suspect by default**, especially when
 it appears after the last Deepgram word and describes things not visible in frame. Check the
 level and look at a frame before concluding the paid transcript dropped anything.
+
+---
+
+## …but on a long Hinglish two-hander, Deepgram `multi` really does drop 6-18% of the speech
+
+The opposite case, and the level check above is what tells them apart. On podcast Episode 1
+(three locked-off clips of 31, 61 and 63 min, two people, one mixed lapel track), `nova-3
+--language multi` left **63 gaps of 5s or more between words, about 20 minutes in all**: 6%, 18%
+and 12% of the three clips. The longest were 46s.
+
+They were not silence. Five gap windows measured **−18.5 to −19.5 dB RMS**, against −18.9 dB
+for the whole clip, so they were at speech level. Translating each gap with `ggml-small.bin -l hi
+-tr` returned coherent content that fits the story on both sides of it. Some of it mattered to
+the edit, for example a guest saying he never told his family he had quit.
+
+**How to apply:** after any long conversational transcript, list the gaps of 5s or more and
+measure their RMS. If they sit at speech level, fill them with whisper so you can *read* them.
+Whisper has no usable word timings on Devanagari, so any gap you decide to cut into needs a
+Deepgram re-run **of that slice only** to get timings. The edit is reasoned from the transcript,
+so a dropped fifth of the talk is a fifth of the story you never considered.
+Unverified: whether it is worse on long files than on short clips (Detour-2's 38 short clips
+showed no such loss).
 
 ---
 
@@ -2735,3 +2762,301 @@ falling glowing letters crossing the lens produced ~44 false cuts in 5 s.
 frame differencing (a real cut is one spike; cadence is a 2-3-2-3 pattern of spikes and exact
 zeros). Report the real count. Here the raw figures overstated the pace about 2×: the real
 pace was one edit every ~3 s.
+
+---
+
+**The opposite failure: it UNDERcounts on a dark set.** On a black-background podcast
+(Figuring Out FO556, 2026-10-04) `scene>0.25` found **62 cuts in 2h47m**, 49 of them in the
+intro. A change between two singles on black barely moves the frame histogram. Mean absolute
+difference of 64×36 grey frames at 12 fps, flagged when a frame's diff is ≥6 and ≥4× the
+median of its ±8 neighbours, found 802. Its intro cut times matched the 1 fps contact sheets.
+So on any dark or locked-off multicam, check a minute of the detector's output against a
+contact sheet before trusting the count, in either direction.
+
+---
+
+## Deepgram can transcribe ONE spoken phrase as TWO copies, and an anchor lands on the ghost
+
+Podcast Episode 1, 2026-10-05. Deepak says "Senior product designer" once. Deepgram returned it
+twice, back to back: `Senior[2853.02-2853.26] product[2853.26-2853.41] designer.[2853.41-2853.49]`,
+then `Senior[2853.49-2853.89] product designer.[...-2854.86]`. The first copy is squeezed into
+0.47 s, and its last word lasts 0.08 s. A text anchor ending on "Senior product designer."
+matched the FIRST copy, so v5 cut at 2853.5 and dropped the word "designer" at the episode's
+reveal, in two places. The prose read-back showed nothing wrong, because the text was all there.
+
+10 ms RMS showed the truth: speech runs from 2853.0 to 2854.55, then −49 dB. **Before trusting
+an anchor on a repeated phrase, look for words under ~0.1 s and check the RMS.** The captions
+need the same fix: drop the ghost words and move the real copy's start to where the speech
+starts. Otherwise the phrase is burned in twice.
+
+---
+
+## force_style does not stop inline ASS tags, so kinetic captions can share the caption file
+
+render.py burns one subtitle file with the EDL's `force_style`. That override applies to every
+style in an `.ass` file, so a separately defined "Kinetic" style would be flattened to the
+caption font size. Inline override tags (`{\fs20\c&H3554F2&\pos(..)\t(..)}`) still win
+over it. Verified 2026-10-05 by burning `master_A.ass` onto a flat clip with the episode's
+force_style: Captions A cues rendered in the forced style, and the kinetic two-tier lines
+rendered at their inline size, colour and position. So build ONE `.ass` file: Captions A cues
+as plain Default events outside the kinetic windows, plus kinetic events with every property
+inline. Use `PlayResX/Y 384x288` so the inline numbers share the SRT coordinate space that
+force_style's MarginV already assumes. Episode 1: `build/intro_assets.py`.
+
+---
+
+## Glass stamps render in CAPS, so a lowercase plural turns into a typo
+
+`kind: stamp` is shown in capitals, so `"24 SSBs"` came out as **"24 SSBS"** (render log,
+podcast Episode 1, 2026-10-05). Write stamp text that survives upper-casing (`"SSB × 24"`), and
+read the `cards:` lines in the render log before calling the render done. A card-only fix
+needs no re-extract: reuse the segments and `base_preview.mp4`, and re-run the composite
+(`episode-1/edit/build/recomposite.py`, which checks each segment against its range's
+frame-snapped duration instead of comparing edl.json mtimes, because a card edit rewrites
+edl.json).
+
+---
+
+## A context audit that only checks punctuation misses a question whose SETUP was cut
+
+Podcast Episode 1, 2026-10-05. The v5 audit flagged an IN only when the source word before it
+was not sentence-final (55 flags, all fixed). Shoaib still found starts mid-thought. At 7:20 the
+cut opened on "तो for मतलब what I have seen for you that was sports", but the question begins
+three sentences earlier ("अभी तूने बोला कि mostly school was about meeting friends… कुछ तो ऐसी एक
+चीज़ होती है हर किसी इंसान के लिए…"). Each of those ends in a full stop, so the IN looked like a
+clean start.
+
+The fix is `episode-1/edit/build/context_audit.py`. For every range it prints the whole
+preceding turn, back to a ≥2 s pause or the previous range's end, and what follows the OUT.
+Read every one, not only the flagged ones. On 87 ranges it found 29 more problems:
+- questions missing their setup, or missing entirely ("Bhopal or Allahabad" answering nothing)
+- answers opening on "तो/और/But" that refer to cut material
+- OUTs ending mid-sentence ("…हर", "so hungry कि यार")
+- a merge's gap that held the very question being answered
+
+Typical fixes are moving an IN back 5-40 s, or merging two ranges.
+
+---
+
+## Whisper does not mark laughter; find laughs as loud, untranscribed and rhythmic, then LOOK
+
+whisper.cpp `-l en` on a 2-minute Hinglish slice with obvious laughs emitted no `[laughter]` tag
+at all (2026-10-05). What worked on podcast Episode 1 (`build/laughs.py`):
+1. Find stretches where the 20 ms RMS is above −34 dB and no transcript word covers them.
+2. Rank them by envelope energy at 3-8 Hz (the "ha-ha" rhythm).
+3. Drop any that sit inside a known Deepgram drop: the two biggest candidates were exactly the
+   two ≥5 s gaps the paper edit already flagged, which were dropped speech, not laughter.
+4. Grab one frame of the wide at each candidate. 9 of the top 22 showed a real laugh (head
+   back, doubled over, both grinning).
+
+Never use a candidate without its frame.
+
+---
+
+## `extract_segment(source, start, DURATION, …)`: its third argument is a length, not an end time
+
+When calling `render.extract_segment` directly (framing tests, one-off stills), passing
+`(src, t, t + 0.5, …)` asks for a segment `t + 0.5` seconds LONG. On a 4K HLG source that is a
+real render: one test at t=1000 s wrote 422 MB in five minutes before it was noticed, and
+killing the Python parent left the ffmpeg child running until it was `kill -9`'d by PID.
+Every EDL path goes through `render.py`'s own loop, which computes the duration itself, so this
+only bites hand-written calls. Pass a duration, and when you kill a test render, check
+`ps aux | grep "[f]fmpeg"` afterwards.
+
+---
+
+## Cutting one continuous take into camera angles: every cut must land in a quiet fade zone
+
+render.py fades every segment edge (Hard Rule 3). That is right for a story cut, but when one
+continuous take is split into "cameras" (a wide carved into singles and a two-shot), each
+camera cut puts a 30 ms fade-out and a 30 ms fade-in on audio that was continuous. On podcast
+Episode 1 v1, **50 of 308 cuts** sat on speech: the splits went at word boundaries, and
+Deepgram spans touch, so a "boundary" was often mid-syllable.
+
+Fix, verified on the source audio before re-rendering (in the episode's `build/make_edl.py`):
+- Put a camera cut only where the **loudest 10 ms in the ±30 ms the fades cover is at most
+  −32 dB**, with speech at about −17 dB. Choose the quietest 10 ms of the nearest pause. If none
+  qualifies, make no cut and accept a longer hold.
+- Where no words exist (an untranscribed stretch), search the audio itself for such a spot.
+- Merge story ranges that are back-to-back in the source (gap under 0.6 s). Otherwise the join is a
+  faded story cut in the middle of a phrase: "…डेढ़ | साल निकल गया" was one.
+
+Result: 194 camera cuts, worst fade-zone level −32.1 dB, median −44.7. Measure the ±30 ms
+fade zone, not just the cut instant: on v1 the 10 ms at the cut was quiet (median −47 dB) while
+34 cuts still had speech inside the fades.
+
+**The same applies to splitting one take into two ranges just to change the ZOOM** (a punch-in
+on a line, or a push that stops dead on the turn). On Episode 3, 2026-10-05, the word-edge
+snapper broke both splits silently:
+- **The pads overlapped.** The OUT point's decay extension ran to 18.650, and the next word's
+  60 ms IN pad started at 18.595, so 55 ms played twice. Give the second range `pad_in` ≈ 0 so
+  both edges sit in the same gap. `cut.py` now refuses consecutive same-take ranges that overlap.
+- **Trimming the pause made a jump cut at identical framing.** Where the push holds its end
+  zoom, the two ranges must share their boundary exactly. Keep the pause, and set the second
+  range's `pad_in` to reach back to the first range's OUT.
+
+Both were caught in the range table (`cut.py` prints source in/out), not in the render. Read it.
+
+---
+
+## Speaker-following framing: label each shot by who speaks MOST of it, then audit
+
+When a cut follows the speaker, short turns ("हां", "Correct") get folded into a neighbour so
+they don't each force a cut. Folding keeps the neighbour's label across the merged span. That
+can leave a shot labelled for one person while the other does nearly all the talking. Podcast
+Episode 1 v2 had **3 singles, 45 s in total, on the wrong person**. One was 7 s of Shoaib's
+close-up over Deepak's refereeing story.
+
+Fix: after the shot boundaries are fixed, re-label each shot by **majority speaking time** of
+its words. Then audit every single against the transcript; v3 has 0 mismatches.
+
+A visual cross-check helps but is only a proxy: measure lower-face motion (frame difference in
+a box on each mouth, 10 fps) for both people over each single. On 172 singles, 110 showed the
+person on screen moving at least 1.5x more than the other. Of the 22 flagged, almost all were
+correct shots of Deepak talking while the listener gestured or nodded (hand gestures cross the
+face box). Treat a motion flag as "look at this", and let the transcript decide.
+
+---
+
+## A second camera: sync by audio, PROVE it with the camera clocks, then split by subject
+
+Podcast Episode 1 added 45 Sony DSLR clips (singles, 4K25 and 1080p100) to an iPhone master.
+The rule: audio comes **only** from the iPhone.
+
+- **Sync**: cross-correlate the DSLR's scratch audio against each iPhone clip. Coarse pass on
+  100 Hz log-RMS envelopes, fine pass on raw 8 kHz audio within ±150 ms. That runs in 19 s for
+  45 clips against 2.5 h. Long clips drift at most 11 ms, under a third of a frame.
+- **Don't trust the correlation peak alone.** Convert every offset into an implied
+  camera-clock difference. The **35 strong matches all agreed at 9.0–10.7 s** (the Sony ran
+  ~10 s ahead). Every short clip that matched elsewhere was off by thousands of seconds,
+  however good its peak looked. Re-search those within ±30 s of the clock estimate: 5 of 6
+  re-locked, and one (13.6 s away from the clock) was left out. Clips outside every
+  conversation clip by the clock are b-roll.
+- **The DSLR operator reframes, and often holds on the LISTENER.** Classify the subject every
+  0.5 s (shirt colour in a centre-lower box worked) and steadiness (frame difference: median
+  2.6, a pan > 15). Of 61 single-shot candidates, 20 failed because the DSLR showed the other
+  person. Use those as reaction shots, only for shots of 10 s or less.
+- **Colour-match on the same MATERIALS, not histograms.** Matching histograms across two
+  framings turned a light-blue shirt pink, because the frames hold different amounts of wall
+  and door. Fit an affine colour matrix (ridge toward identity) on patches of the same
+  material in both cameras: wall, both shirts, skin. Leave out anything lit differently from
+  the two angles; the doors were 2x darker from the side. Fit AFTER the episode grade,
+  because render.py applies a range's `filter` after the grade.
+- Yield is limited by steadiness and subject: 20.6 min of the cut had DSLR footage under it,
+  and 30 shots (4.9 min) qualified as clean singles or reactions.
+
+---
+
+## Conversation cuts: a clean join is not enough. Every edge must make sense to a first-time viewer
+
+Podcast Episode 1 v4 passed a full prose read-back. Shoaib still found statements "starting from
+the middle, so the context is lost". Two failures the read-back did not catch:
+
+1. **Mid-sentence edges.** Phrase-level selection put IN points after a cut "…और" and OUT
+   points before the sentence ended. A mechanical audit flags them: the word before the IN has
+   no sentence-final punctuation and the gap is under 0.8 s, or the OUT word has none. It
+   flagged **31 of 112 starts and 24 of 112 ends**.
+2. **Lines that answer something cut.** They read fine in isolation: "Save but again…" replied
+   to a cut "we'd saved a safety net"; "…तो कर देना" ("then you pay") never said pay what;
+   "Private sector is something one can crack" had lost its setup. Only reading each IN
+   **together with the ~15 words before it in the SOURCE** catches these. About 20 more fixes.
+
+The fixes: start at the true start of the thought, finish the sentence, or rejoin pieces where
+the removed part carried the meaning. **The runtime went 69.7 → 80.5 min.** In a two-person
+conversation, trimming inside thoughts is false economy. Cut whole exchanges (a question with
+its whole answer), and drop entire tangents instead of shaving every answer. The audit script
+is in the episode's build (`paper.py` + the boundary audit in the worklog). Run both checks
+before the first render, not after the viewer finds them.
+
+---
+
+## loudnorm's TP target does not survive the AAC encode that follows it
+
+Every delivery measured "−14 LUFS" and looked fine, but on podcast Episode 1 the output peaked at
+**+1.0 dBTP with 871 samples at full scale** (`volumedetect` histogram_0db). The mix arrived at
++4.5 dBTP and needed +1.8 dB of gain. loudnorm reported `"normalization_type":"dynamic"`: it
+refused linear mode and limited at −1, and the AAC encode then overshot past 0. Fix in render.py:
+`alimiter` at −3 dBFS after loudnorm, in both the one-pass and two-pass paths. Measured −1.8 dBTP,
+no clipped samples, −14.4 LUFS. `tests/test_render_loudness_peak.py` fails on the old chain.
+
+**Check `normalization_type` in the pass-1 JSON.** "dynamic" means the target was not reachable
+linearly. And measure peaks per channel (`pan=mono|c0=c0`), never through `-ac 1`.
+
+Re-normalising an existing render needs no re-render. The composite stream-copies audio, so
+`base*.mp4` holds the pre-loudnorm mix. Mux the rendered video (`-c:v copy`) with
+`base` audio through loudnorm and the limiter. That took minutes, not an hour.
+
+Also: a cut flagged by the click check can be a transient in the SOURCE (a mouth click 26 ms
+before the cut). Check the source at the same timestamp before "fixing" the edit. And when
+indexing a boundary list, boundary k is the END of segment k.
+
+## Locked focus + leaning in = optically soft takes, and a push or crop magnifies it
+
+Episode 3 (iPhone, 4K HLG, focus locked at the chair). Shoaib's review: "wherever I lean
+towards the camera, it is a little blur." It was in the camera, not the render. A 1:1 crop of
+the source showed it (IMG_3785, leaning in, against IMG_3782, leaning back). Measured per take
+as the variance of the Laplacian on the detected face, resized to a fixed 256 px so a closer
+face isn't favoured: **13–20 when leaning in, 40–86 when leaning back**. 19 of 50 ranges were
+under 20, including the zenith and most of Scene 8.
+
+- **Detect:** episode3/edit/build/measure_sharpness.py (OpenCV Haar face plus Laplacian; needs
+  `--with "opencv-python-headless<5"`, because 5.0 dropped `CascadeClassifier` from the wheel).
+- **Mitigate:** ffmpeg `cas` through `ranges[].filter`, which render.py applies AFTER the
+  downscale, i.e. at delivery size. Use 0.6 under 20 and 0.35 under 35. Cap the push on soft
+  takes (1.10 / 1.14 instead of 1.18). Ease the cold-open crop from 1.35 to 1.2: a crop or a
+  push magnifies the blur by its own factor. Judged by eye at 1080p. Defocus is not recovered,
+  only made less visible.
+- **Prevent (shoot side):** if the script says "lean in", lock focus with the face IN the
+  leaning position, or check one leaning-in frame at 100% before rolling.
+
+## A hold after the final line of a take shows the speaker reaching for the mic
+
+Episode 3. Three holds (1.2–2.0 s of `pad_out` after a take's last word) showed Shoaib
+reaching to switch off the mic, at 0.2–1.1 s after the word. **Never extend a take's LAST word
+by more than ~0.4 s without a motion check.** Use the mean absolute frame difference at
+192x108: still is ≤0.4, and a reach is 1.5–2.5. Where the script needs a silent beat and the
+take gives none, borrow it from the NEXT take's pre-roll, which is usually still and silent
+(IMG_3759: 1.8 s at −69 dB, motion 0.1–0.3). `cut.py` has `out_at`/`in_at` overrides, which
+refuse to land inside a word.
+
+## A phone photo's stored size is not its displayed size (EXIF rotation)
+
+Episode 3's `formals.jpg`: ffprobe and `sips` both report 4608x3456, which is landscape. But
+ffmpeg AUTOROTATES a JPEG on input, so the picture that arrives is portrait. A "landscape
+fills the frame" rule driven by the probed size would cover-crop a portrait photo to 16:9,
+straight through the faces. Size photos through `PIL.ImageOps.exif_transpose(...)`, which
+matches what ffmpeg actually draws. Verified by eye on the v5 frame.
+
+## A spot effect 17 LU under speech is simply not there
+
+Episode 3, v5: a school bell and an alarm at (programme − 9 LU − 8/10 dB) changed the 2–6 kHz
+band energy against the no-music control by +0.0 dB, so they were inaudible. Two fixes: put the
+effect in a PAUSE where possible (the bell, now 0.55 s before its line: +1.6 dB in band), and sit
+it about 9 LU under the voice rather than 17. Measure the effect's own band (2–6 kHz for bells
+and beeps) against the control. Broadband RMS hides it, as noted in the index.
+
+## A long render started in the background dies at 30 minutes unless you ask for longer
+
+A background Bash job's default limit is 30 min. Episode 3's 4K render (52 segments at about
+1 min each, then 4K cards and composite: about 80 min in all) was stopped after 24 segments.
+Start any 4K render with the maximum timeout (2 h). If it does die, don't restart from scratch:
+`episode3/edit/build/resume_extract.py` keeps every segment whose video packet count equals
+`max(1, round(d*fps))` and re-extracts only the rest, so the half-written file is redone. And
+parse `ffprobe … -of csv=p=0` with `.strip(",")`. It prints `185,`, and an `isdigit()`
+check on that silently rejected every good segment the first time, which cost 10 minutes of
+re-extraction.
+
+## Glass list cards: the timeline spine poked out below the card until the last row landed — FIXED
+
+Shoaib spotted it on Episode 3's BODY · MIND · VOICE tracker (2026-10-05). In
+`cards_runtime/glass.js`, each row except the last draws a `.spine` segment pointing down at the
+NEXT row. It appeared with its OWN row, while the card had only grown to the rows landed so far,
+so it hung below the card's bottom edge until the last row landed and the card covered it.
+
+**Fixed 2026-10-05.** Spines start collapsed (`transform: scaleY(0)`, origin at the top, in
+glass.css) and grow with the row BELOW them (`#sp${k-1}` tweened at row k's time). The ids are
+`sp…`, not `s…`, because stat cards already use `#s${k}` for their sub-lines. The mask pass draws
+no list content, so the frosted glass is unchanged. Verified on a real HyperFrames render of a
+3-row card at 1, 2 and 3 rows: there is never a line below the newest row. Pinned by
+`tests/test_cards.py` `SpineTests`. Any card cached under `animations/cards/` before the fix
+re-renders by itself, because its content hash includes the runtime.

@@ -703,3 +703,39 @@ either study for a talking-head channel.
 - **No captions on narration.** That works for his audience, but a muted 16–22 audience needs
   them.
 - **Conspiracy styling:** censor bars over "conspirators", a devil-emoji crowd motif.
+
+---
+
+## 12. A long-form interview podcast: all the production is in the intro (Figuring Out FO556)
+
+Raj Shamani × Andrew Huberman, 2:46:56, 16.1M views (2026-09). Measured 2026-10-04: frame-diff cuts
+(see gotchas.md: `scene>` undercounts on a dark set), 1 fps intro contact sheets, per-shot
+sheets for a full chapter, whole-episode overlay scans, a pause-floor audio pass. Full write-up
+with the beat table: podcast Episode 1's `edit/reference_FO556.md`.
+
+- **The intro (2:53, 1.7% of runtime) carries nearly all the polish**: a cut every 2.5 s, a
+  music bed throughout, kinetic captions (small white line, keyword big in red), explainer
+  animations, credential screenshots. **The 2h44m body is plain**: 4.0–4.8 cuts/min, median
+  shot 9.8 s, holds to 41 s, **no music** (pause floor −65 to −80 dB in every 10-min block),
+  **no captions**, and no sound effects measurable at graphic onsets.
+- **Intro shape**:
+  1. a hook claim, then the host's one-word "How?"
+  2. the answer, illustrated, to a payoff line
+  3. a white flash
+  4. credentials in host voice-over over screenshots
+  5. a one-line promise
+  6. about 8 host-question → guest-answer teasers, **ending on an unanswered vulnerable
+     question**
+  7. a title card over the wide, then host to camera (music off)
+  8. a flash, the show ident and another flash, then the welcome with lower thirds
+- **Body camera grammar**: the two-shot is home base (40%), the guest single takes 49%, and the
+  host single 11%, for questions plus 1.4–2.6 s reaction cutaways. The wide is rare (~23 shots)
+  and lands on laughs and topic shifts.
+- **Name-drop photos**: a black-and-white photo of the person or book named, for 2–5 s,
+  composited into the empty part of the frame beside the speaker, inside the shot rather than as
+  a cutaway. About one every 5–6 min.
+- **Chapters every ~5 min**, titled as curiosity or how-to lines.
+- **Transfer rule:** a long conversation's body does not need beds or effects to hold. Spend
+  the production on the intro, and in the body change only *what is in the shot* (a reaction, a
+  wide on a laugh, a name-drop photo). This is §8's "wall-to-wall music has no meaning" at
+  podcast scale.

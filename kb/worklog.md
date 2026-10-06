@@ -1432,3 +1432,177 @@ Python, because the mask pass draws no text and must still match the silhouette.
 Episode 2's IMG_3665 with a 1.00→1.12 push: the HyperFrames check passed and the pills sit clear
 of the face. Tests: `StampTests` (208 pass).
 
+
+## 2026-10-03 — Podcast Episode 1: inventory, transcription, story read (no cut yet)
+
+First reconnection-podcast episode (two-hander, ~2h35m of conversation in three 4K HLG clips
+plus a re-shot 14s welcome). Language checked first (whisper `-l auto` on a mid slice → `hi`
+p=0.94), then Deepgram `--language multi` on all 8 clips (~$0.80). Found and verified a new
+trap: **Deepgram dropped ~20 min of real speech** (63 gaps of 5s or more at speech-level RMS). The
+gaps were filled for content with whisper translate, and the gap-file pattern is recorded in
+`gotchas.md`. Also: the diarization label for the same person flipped between clips (S0 was the
+host in clip 1 and the guest in clips 2-3). Strategy proposed to the user and not yet approved
+(Hard Rule 11). Story notes are in the session's `edit/project.md`, not here, because this repo
+is public.
+
+Same day, later, while Shoaib was away (he asked me to make the cut decisions myself):
+- **The gap-fill worked.** Re-running Deepgram `multi` on the dropped gaps as short slices
+  recovered 3379 words, and a second pass on the remaining holes added 735 more. The text matched
+  the whisper translations. Two holes in the cut remain, about 30 s with no transcript.
+- **render.py: a static `zoom` now crops the SOURCE before the downscale, and `zoom_y` was
+  added.** Before, a 2x single from 4K at 1080p was an upscaled 960x540. New tests in
+  `tests/test_render_zoom_crop.py`: the new order scores 60.3 dB PSNR against a direct crop and
+  the old order 35.1 dB, with the bound at 50. The tests fail on the old code. 212 tests pass.
+- **Cut v1 (309 shots, 69.7 min):** speaker-following singles and a two-shot carved from the 4K
+  wide. QC found 50 camera cuts with speech under the fades. Fixed by placing cuts only in quiet
+  fade zones and merging back-to-back story ranges (gotchas.md). v2 has 307 shots, and all 194
+  camera cuts have a fade-zone level of −32 dB or lower.
+- v1 QC also found an odd output rate, `114057/3802`, carried from the iPhone source. v2 renders
+  with `--fps 30`.
+
+## 2026-10-03 — Two YouTube-growth videos (The Studio, Think Media) → distribution.md §12
+
+Shoaib asked what could be learned from <https://youtu.be/Puny-2wkMZA> (The Studio, MKBHD's
+team) and <https://www.youtube.com/watch?v=AV4r2Qixb1Y> (Think Media). **Verified how:** the
+caption endpoint returned 429 again (json3 and vtt, default and `web_safari` clients), and the
+signed-out transcript panel never loaded. So, with Shoaib's OK, I downloaded the audio and
+transcribed it with local whisper-cli (`ggml-small.en`, 3.0K and 6.2K words).
+
+**Tooling note:** The Studio's video carries auto-dubbed audio tracks (Hebrew, Malayalam), so
+plain `-f 139` fails ("Requested format is not available"). Select the original with
+`-f "ba[ext=m4a][format_note*=original]/ba[ext=m4a][language^=en]/ba[ext=m4a]"`. That picked
+the 128 kbps `140-*` tracks (13.7 MB and 30 MB), more than estimated. Fine for whisper.
+
+The channel-specific reading (the strategy triangle, applying outlier inversion and trend
+theory to our own stories, unfair advantages, brand foundational words) went to channel-kb:
+`07-research/youtube-growth-advice.md`, plus the playbook (§1.12–14, §3.26), the idea bank, the
+short-advice format and `04-learnings.md`.
+- **v2 QC, then v3:** v2 rendered clean (306 cuts, no clicks, only the slate frozen, −14.0
+  LUFS). Then a caption-style sample showed "…designer. Senior". The quiet-spot search for
+  touching tokens could step past the next word's timestamp, so it is now bounded by the
+  neighbouring word. A speaker-motion check found 3 singles (45 s) showing the wrong person
+  (gotchas.md). Both fixed for v3.
+- **render.py: caption word selection.** A word is captioned only if at least half of it is in
+  the cut, after clamping same-speaker timestamp overlaps. `tests/test_render_caption_words.py`.
+  213 tests pass.
+- **Captions:** made a Devanagari vs Roman Hinglish A/B of the cold open for Shoaib. Wrote a
+  hand transliteration of all 804 Devanagari words in the cut (`edit/captions/roman_map.py`),
+  with ASR place-name fixes (कपूर तला → Kapurthala, रोत तक → Rohtak). The builder is
+  `edit/captions/build_captions.py A|B`.
+- **Evening: Shoaib picked caption style A** (Devanagari + Latin) and added 45 DSLR clips. Built
+  `ranges[].video` in render.py (picture from a second camera, audio stays on the iPhone source;
+  `tests/test_render_video_source.py`, 216 tests pass). Synced with audio cross-correlation and
+  validated against the camera clocks; 38 clips usable. Then subject/steadiness per 0.5 s, and a
+  colour-matrix fit on matched materials. The cut uses the DSLR for 30 shots (4.9 min) from 18
+  clips. Captions are now built before the render from frame-snapped durations
+  (`max(1, round(d × fps)) / fps`, which is exactly what extract_segment does), to be checked
+  against the real segments.
+- **2026-10-04: context pass after Shoaib's review of v4.** Statements were starting mid-thought.
+  A mechanical edge audit (31 starts and 24 ends flagged of 112) plus a full source-context read
+  (~20 lines answering cut material) led to merging back-to-back pieces, starting at true thought
+  starts and finishing sentences. 112 → 94 story ranges; 69.7 → 80.5 min. paper.py anchor
+  matching now ignores nukta (Deepgram's precomposed ज़ vs typed ज+़ failed 3 anchors). Lesson in
+  gotchas.md.
+- **render.py: true-peak limiter after loudnorm** (`TP_LIMITER`, −3 dBFS). v4 and v5 both
+  overshot to about +1 dBTP after AAC. `tests/test_render_loudness_peak.py`; 218 tests pass. v5's
+  audio was re-normalised from `base_preview.mp4` without a re-render.
+
+## 2026-10-04 — Figuring Out FO556 study (podcast craft), into storytelling.md §12
+
+Shoaib asked what a big podcast does that podcast Episode 1's preview (no music, sound effects
+or graphics) lacks. Took Raj Shamani × Huberman (2:46:56) apart:
+- 720p `yt-dlp`. The en-orig auto-captions downloaded fine this time, with no 429.
+- Frame-diff cut detection at 12 fps.
+- Contact sheets: 1 fps over the intro, one frame per shot over a full chapter.
+- Overlay scans: bright pixels, and content in the normally black corners.
+- Pause-floor audio pass, and high-band energy at overlay onsets against 40 random moments.
+
+Finding: the intro holds all the production, and the body is plain multicam with no music.
+New gotcha: `scene>0.25` *under*counts on a dark set (62 vs 802 cuts). Our v5 already cuts at
+4.4/min against their 4.0–4.8. The proposed intro rebuild and body additions are in the episode's
+`edit/reference_FO556.md`, awaiting Shoaib's go-ahead (Hard Rule 11).
+
+## 2026-10-05 — Episode 3: inventory and transcription
+
+Inventory of `Editing/episode3`. 51 A-roll clips, 15.6 min, all 4K HLG at 29.97 fps, single
+chair frame, upright (a frame was checked per clip). One byte-identical duplicate (`IMG_3783 2.mov`,
+md5) was excluded. There's no separate tight cold-open take, so the close-up will be a 4K crop.
+Deepgram `en` ran on 50 clips, with whisper small.en as the cross-check in a separate edit dir
+(new note in helpers.md: the shared `transcripts/` path makes `--force` overwrite the paid
+transcript). Word counts agree, and there's no Hindi or Spanish. Both engines misheard the same 5
+words ("thought of the day" came out as "third of the day"), so whisper agreement does not clear
+a caption: Indian-English school vocabulary still needs a human read. Per-episode notes are in
+`episode3/edit/project.md`.
+
+## 2026-10-05 — Podcast Episode 1 v6: FO556 intro + body grammar, the show's graphics
+
+Shoaib approved the FO556-derived plan (storytelling.md §12). Built:
+- **A produced 2:32 intro.** Hook → white flash → credentials (Shoaib to camera, plus his
+  voice-over over Deepak b-roll via `ranges[].video` from the conversation sources) → 8-teaser
+  question/answer montage, ending on a line that lands on silence → Shoaib's name line →
+  flash → the welcome hug under an UNFINISHED title card.
+- **Kinetic captions** in the hook and montage only, two-tier, with the key phrase in the
+  brand accent. One `.ass` file shared with Captions A (see gotchas.md).
+- **Body:** 24 reaction cutaways (Shoaib's backchannel when there is one, else a silent
+  listening beat; never inside the turn) and 7 wides on laughs (see gotchas.md, laughs).
+- **Graphics:** stamps on the credentials; name lower thirds and the title card as PIL
+  ProRes 4444 overlays at 1080; a 16 s end-screen source clip (`build/podcast_gfx.py`).
+- **Music:** one track for the intro bed, title sting and end bed, from Episode 2's mixer
+  method (`build/mix_music.py`). Nothing under the conversation.
+- **21 chapters.**
+
+Found: Deepgram's duplicate-phrase ghost clipped "designer" at the Microsoft reveal in v5
+(gotchas.md). Renders and QC are in the episode's `project.md`.
+- **2026-10-05, later: Episode 3 picture lock v1.** Shoaib approved the strategy. The cut has 52
+  ranges and runs 8:20.7: Scene 4 at 1.10x from prepped sources, slow pushes at ~1%/s capped at
+  1.18x, 3 punch-ins, the 2019 clip for 3.13 s ungraded, and a 6.5 s end card. **render.py now
+  takes a per-range `grade`** (`segment_grade()`; `tests/test_render_segment_grade.py`, 5 pass).
+  Self-eval on the 1080p preview: all 52 segments are 1920x1080, with 0 frame-count mismatches,
+  0/51 pops and one freeze, the end card (expected). Reading the cut back as prose caught a
+  dropped "me". The range table caught two same-take split bugs (new note in gotchas.md, under
+  the camera-angles entry). `coverage.py` shows 2.0 events/min with the longest static stretch at
+  67.5 s, as expected before cutaways and cards.
+- **2026-10-05: Episode 3 v2, from Shoaib's review.** Leaning-in takes were optically soft, which
+  was verified 1:1 in the source. Fixed with `cas` at output size, push caps and a gentler
+  cold-open crop. Three holds showed him reaching for the mic, and the motion profile placed
+  `out_at`. Both lessons are in gotchas.md and index.md. Re-checked on the render: 0/51 pops,
+  and every hold measures motion ≤0.6.
+- **2026-10-05: Episode 3 v4, the full visual and sound pass.** It has 16 word-anchored cutaways,
+  11 cards (a new list `scale` option, used for a BODY · MIND · VOICE corner tracker), 2
+  locators, the badge, and music beds with three seam thuds. Lost in Thought's own melody stem
+  is the Scene 5 "thin pad". Re-composited from the existing segments (`build/recomposite.py`
+  refuses if `ranges` changed), which takes minutes instead of 25. Verified 0/51 pops, and
+  unscored windows checked against the no-music control by pause floor. **coverage.py does not
+  count glass cards, stamps or graphics as events**: it reported an 82.9 s static stretch that
+  held 3 stamps, a stat card and a locator. (Suspicion, not fixed: worth teaching it the `cards`
+  and `graphics` blocks.)
+- **2026-10-05: Episode 3 delivered at 4K** (`final.mp4`, 8:15.7, 2.49 GB, −14.2 LUFS, 0/51
+  pops). Shoaib dropped a filler cutaway; that rule is now in memory: a cutaway must show the
+  line, otherwise ask for a picture or use a stamp. New `build/resume_extract.py` for stopped
+  renders, plus a gotcha on the background-job limit and the ffprobe trailing comma.
+- **2026-10-05: fixed the glass-card spine overflow** (Shoaib's note on Episode 3). Each spine now
+  grows with the next row instead of appearing with its own. Verified on a HyperFrames render of
+  a 3-row card; `SpineTests` added; 230 tests pass. Episode 3's delivered `final.mp4` was rendered
+  before the fix and still shows it (Shoaib: fine for this one).
+
+## 2026-10-05 — Pre-delivery review + cross-video mistakes ledger
+
+Shoaib: three full rewatches of a 90-minute cut cost about 4.5 hours, and he still misses
+things on the second and third watch. He asked for (1) automation, so a delivered preview is
+near-final, and (2) a common memory of every mistake, across all videos, to check against.
+
+Built:
+- **`kb/mistakes.md`**: 26 entries from podcast Episode 1, Episode 2, Detour-2 and Detour-3,
+  each with Saw / Cause / Check (AUTO id or READ item).
+- **`helpers/review.py`**: render checks T1-T7, story-edge checks C1-C10, graphics G1-G2,
+  a watch-list, and a changes reel against the previous version. 13 tests.
+- **Rules** in CLAUDE.md ("Before any preview reaches Shoaib"), SKILL.md step 7, and the
+  kb/index.md map.
+
+First real run, on podcast Episode 1 v7:
+- 60 HIGH flags before calibration, mostly false positives.
+- After calibration, 15 HIGH. Of those, 2 were genuine misses Shoaib had not reported yet:
+  the second half of a question at 6:10, and a clipped "है" at 34:32 (M007).
+- 5 were accepted with a written reason.
+- The rest were reclassified (filler trims, punctuated endings), then 0 HIGH.
+- 23 changed edges went into the reel for Shoaib, instead of an 89-minute rewatch.

@@ -29,10 +29,18 @@ Transcribe ──> Pack ──> reason over text ──> EDL ──> Render ─�
 | [storytelling.md](storytelling.md) | **Retention craft for talking-head cuts** — contrast, rhythm, withholding, the zenith | Planning a cut; before picture lock |
 | [ideation.md](ideation.md) | **Where ideas come from** — recombination, the A+B=C identity formula, constraints | Deciding what to make; choosing a style |
 | [distribution.md](distribution.md) | **After the render** — how the algorithm distributes, reading a flop, community posts | Judging performance; deciding what to fix |
+| [mistakes.md](mistakes.md) | **Every mistake Shoaib caught, on every video, and the check that now catches it** | Before every delivery |
 | [worklog.md](worklog.md) | Dated log of local changes + why | Understanding a local divergence |
 | [check-env.sh](check-env.sh) | Re-verifies everything in environment.md | Cold start, or something broke |
 | [new-machine.md](new-machine.md) | Cloning onto another laptop; what doesn't travel | Setting up a second machine |
 | [bootstrap.sh](bootstrap.sh) | Idempotent installer for a fresh macOS machine | Same |
+
+## Before delivering ANY preview
+
+Run `helpers/review.py`, clear its HIGH flags, walk the READ items in
+**[mistakes.md](mistakes.md)** (the cross-video ledger of every mistake Shoaib caught), and
+deliver the watch-list plus the changes reel. When Shoaib reports something new, add it to
+the ledger the same day, with an automated check where possible. (CLAUDE.md has the full rule.)
 
 ## Hard rules (never violate — these cause silent failures)
 
@@ -73,6 +81,13 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   use multilingual `ggml-small.bin` with **`-l en`** (it renders Hindi into English and can be
   compared for meaning); `-l hi`/`-l auto` garble it, and word-level `-ml 1` output is unusable
   for Devanagari, so whisper checks *wording only* — never timings. See gotchas.md.
+- **On a long Hinglish conversation, Deepgram `multi` DROPS speech**: 6-18% per clip on podcast
+  Episode 1, in gaps up to 46s. List the gaps of 5s or more and measure their RMS. If they sit
+  at speech level, fill them with whisper `-l hi -tr` to read them. See gotchas.md.
+- **Carving camera angles out of one take? Cut only in a quiet fade zone**: the loudest 10 ms
+  within ±30 ms of the cut at −32 dB or lower, otherwise no cut. render.py's fades on continuous
+  speech put 50 of 308 podcast cuts on a word. Merge story ranges that are back-to-back in the
+  source. And pass `--fps 30` for iPhone footage. See gotchas.md.
 - **Grep a `--language multi` transcript for Spanish before burning captions**
   (`grep -nE '[¿¡áéíóúñ]' <edit>/takes_packed.md` — **not** the JSON, which stores `\u00bf` escapes and silently matches nothing) — Deepgram drifts into Spanish on short
   or low-content clips. Hit 3 of 38 on Detour-2, one of them 47% of the clip (re-verified 2026-09-30 with the
@@ -146,6 +161,13 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   a normally-rounded end can land microseconds past the next word's start — and captions are
   selected by *overlap*, so that word is burned in while none of it is spoken. The user hears a
   skip. See gotchas.md.
+- **On a conversation, audit every story edge for CONTEXT, against the WHOLE preceding turn.**
+  Flagging INs after a non-sentence-final word is not enough: a question whose opening
+  sentences were cut starts cleanly after a full stop and passes (podcast Episode 1 v6, 7:20:
+  "what I have seen for you was sports" without "growing up every kid has something special").
+  Print each IN with the turn back to a 2 s pause and each OUT with what follows, and read all
+  of them. The v2 pass found 29 more fixes and took 82 → 89 min. Cut whole exchanges, never
+  the setup of a question. See gotchas.md.
 - **Read the assembled cut back as continuous prose before rendering.** It is the only thing that
   catches an OUT point taken from a word's *start* (drops the sentence's last word) or a join
   that skips the words carrying the meaning. Found 5 broken joins in a *delivered* cut.
@@ -342,6 +364,24 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   saves 3 hard ~1.2× punch-ins for punchlines, and gets to a visual change every 2.6 s with only
   one cut per 5.5 s: stamps, insets and tints inside the shot. The push is `ranges[].zoom_to`
   (animated, built 2026-10-03). See [storytelling.md](storytelling.md) §11.
+
+- **A long podcast spends its production on the INTRO, not the body** (Figuring Out FO556):
+  the 2:53 intro cuts every 2.5 s under a bed, with kinetic red-keyword captions and explainers.
+  The 2h44m body is plain multicam: ~4.5 cuts/min, no music, no captions, no sound effects. Its
+  only extras are name-drop photos in the empty frame, host reaction cutaways and a wide on
+  laughs. And `scene>` UNDERcounts on a dark set. See [storytelling.md](storytelling.md) §12.
+- **Deepgram can return ONE spoken phrase as TWO copies** (the first squeezed, with ~0.08 s
+  words). A text anchor then lands on the ghost and clips the real word. It dropped "designer"
+  at podcast Episode 1's Microsoft reveal. Check RMS on any repeated phrase. See gotchas.md.
+- **Leaning in front of locked focus makes soft takes** (face sharpness 13–20 against 40–86), and
+  a push or crop magnifies it. Measure per take, `cas` at output size, cap the push. **And
+  never hold a take's LAST word past ~0.4 s without a motion check**: the speaker reaches for
+  the mic. Take the silent beat from the next take's pre-roll instead. Both in gotchas.md.
+
+- **Outliers bring views; formats bring people back** (The Studio). Adapt an outlier by
+  inverting it or using it as a hook genre, never 1:1. Design Shorts in the script, never clip
+  them out after. Batch 3–4 before launching a format. On a decline, ask "did I just try
+  something new?" before suspecting the platform. See [distribution.md](distribution.md) §12.
 
 ## Maintaining this KB
 

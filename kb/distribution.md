@@ -372,3 +372,36 @@ Per §5, this does not mean re-cutting Detour-2. It means Detour-3 is built turn
 **Still to check in Studio** (none of it derivable from the numbers given):
 new vs returning; Detour-1's first three days for a velocity comparison (§4); the
 retention graph, which `helpers/coverage.py` can consume directly.
+
+---
+
+## 12. Two growth videos: The Studio (MKBHD's team) and Think Media
+
+Sources: **"How To Start A Million Subscriber YouTube Channel"**, The Studio, 31:23, 2026-07-03
+(<https://youtu.be/Puny-2wkMZA>), and **"How to Grow a YouTube Channel From Scratch in 2026!"**,
+Think Media, 14:07, 2026-07-06 (<https://www.youtube.com/watch?v=AV4r2Qixb1Y>). Read in full from
+local whisper transcripts; the caption endpoint returned 429. **Their claims, not our
+measurements.** The channel-specific reading is in the private channel-kb
+(`07-research/youtube-growth-advice.md`); only the distribution side is here.
+
+- **"Is my channel dead?" Ask first: did I just try something new?** If yes, decide whether to
+  stick it out, or carry over what worked from the last format. If no, the audience is bored:
+  innovate, or borrow topics from other channels. A decline almost never means a shadowban; it's
+  usually the content.
+- **Choose the number by the goal.** Growth → views, and better outliers. Relationship → watch
+  time (longer videos that aren't boring). Reach and connection → subscribers. Selling ads → low
+  volatility between videos. Decide which before reading a dashboard.
+- **Verify identity in YouTube Studio** (a government ID) on a new channel. They say it "builds
+  trust with the algorithm". Unverified, but free and one-time.
+- **Shorts have to be designed, not clipped.** A long-form video cut into Shorts afterwards
+  doesn't work; the format must contain setups that pay off in under a minute. That makes it a
+  script decision, not an edit one.
+- **Batch 3–4 videos before launching a format**, so one upload's numbers can't break the habit.
+- **Outliers bring views; formats bring people back.** "Nobody really cares about you when they're
+  clicking." Return visits come from a consistent format, even one as plain as a person at a
+  desk.
+- **CTR floor (Think Media): 3–5% decent, under 2% poor packaging.** Detour-2's 2.06% sits on the
+  line, consistent with §11's autoplay-vs-click finding. Still read it under §10's warning: CTR
+  falls as reach widens, and on ~19 clicks it's noise.
+- **AI "is a regression towards an average"** (The Studio). That's the reason the scripting
+  rules require every fact to come from the creator's own notes.

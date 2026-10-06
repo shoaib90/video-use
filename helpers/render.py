@@ -87,6 +87,17 @@ def resolve_grade_filter(grade_field: str | None) -> str:
     return grade_field
 
 
+def segment_grade(rng: dict, edl_resolved: str) -> str:
+    """The grade filter for one range: its own `grade` if it has the key, else the EDL's.
+
+    The key's presence is what matters, so `"grade": "none"` (or null, or "")
+    turns grading off for that range while every other range keeps the EDL grade.
+    """
+    if "grade" not in rng:
+        return edl_resolved
+    return resolve_grade_filter(rng["grade"])
+
+
 def probe_duration(path: Path) -> float:
     """Container duration of a rendered file, in seconds."""
     out = subprocess.run(
@@ -426,6 +437,9 @@ def extract_segment(
     zoom: float = 1.0,
     zoom_x: float = 0.45,
     zoom_to: float | None = None,
+    zoom_y: float = 0.5,
+    video_source: Path | None = None,
+    video_start: float | None = None,
 ) -> None:
     """Extract a cut range as its own MP4 with grade + 30ms audio fades baked in.
 
@@ -439,6 +453,12 @@ def extract_segment(
     """
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # A range may take its PICTURE from a second, synced file (another camera)
+    # while its audio stays on `source`: audio, transcript and captions all key
+    # off `source`, so only the frames change. Everything visual below (HDR
+    # detection, crop geometry) is computed against the picture file; the output
+    # size is still measured from `source`, so every segment matches (Rule 2).
+    picture = video_source or source
     portrait = is_portrait_source(source)
     # Explicit height wins; otherwise the mode default (720p draft, else 1080p).
     target_h = height if height is not None else (720 if draft else 1080)
@@ -483,9 +503,14 @@ def extract_segment(
         raise ValueError(f"zoom_to must be >= 1.0 (got {zoom_to}); it crops in, never out")
     animated = zoom_to is not None and abs(float(zoom_to) - zoom) > 1e-6
     bias = min(max(zoom_x, 0.0), 1.0)
+    ybias = min(max(zoom_y, 0.0), 1.0)
 
     vf_parts: list[str] = []
-    if is_hdr_source(source):
+    if video_source is not None:
+        # Resample to the output rate FIRST: zoompan emits one frame per input
+        # frame, so a 25 fps picture under a 30 fps push would otherwise play fast.
+        vf_parts.append(f"fps={out_rate.replace(':', '/')}")
+    if is_hdr_source(picture):
         vf_parts.append(TONEMAP_CHAIN)
     if animated:
         # Animated push-in (or pull-out): the zoom moves linearly from `zoom` on
@@ -501,26 +526,30 @@ def extract_segment(
         vf_parts.append(
             f"scale={2 * out_w}:{2 * out_h}:flags=lanczos,"
             f"zoompan=z='{z0}+({z1}-{z0})*on/{span}'"
-            f":x='(iw-iw/zoom)*{bias}':y='(ih-ih/zoom)/2'"
+            f":x='(iw-iw/zoom)*{bias}':y='(ih-ih/zoom)*{ybias}'"
             f":d=1:s={out_w}x{out_h}:fps={rate_expr}"
         )
         if grade_filter:
             vf_parts.append(grade_filter)
     else:
-        vf_parts.append(scale)
-        if grade_filter:
-            vf_parts.append(grade_filter)
-        # Per-segment reframe (push-in to disguise a jump cut on a static camera).
-        # Expressed as a plain number so one EDL stays correct at any output
-        # resolution: crop to 1/zoom of the frame, then scale back to the exact
-        # frame size. The scale-back is mandatory - every segment must share
+        # Per-segment reframe (push-in to disguise a jump cut, or a single from a
+        # wide two-shot). Expressed as a plain number so one EDL stays correct at
+        # any output resolution. The crop is taken on the SOURCE frame, before the
+        # downscale: cropping after it threw away the resolution a 4K source has
+        # to spare, so a 2x single at 1080p was an upscaled 960x540. The scale to
+        # the exact measured frame size is mandatory - every segment must share
         # dimensions or the `-c copy` concat (Rule 2) fails.
         if abs(zoom - 1.0) > 1e-6:
-            cw = max(2, (int(out_w / zoom) // 2) * 2)
-            ch = max(2, (int(out_h / zoom) // 2) * 2)
-            cx = int((out_w - cw) * bias)
-            cy = (out_h - ch) // 2
+            src_w, src_h = display_dims(picture)
+            cw = max(2, (int(src_w / zoom) // 2) * 2)
+            ch = max(2, (int(src_h / zoom) // 2) * 2)
+            cx = int((src_w - cw) * bias)
+            cy = int((src_h - ch) * ybias)
             vf_parts.append(f"crop={cw}:{ch}:{cx}:{cy},scale={out_w}:{out_h}")
+        else:
+            vf_parts.append(scale)
+        if grade_filter:
+            vf_parts.append(grade_filter)
     if extra_vf:
         vf_parts.append(extra_vf)
     vf = ",".join(vf_parts)
@@ -547,10 +576,15 @@ def extract_segment(
     if audio_prefilter:
         af = f"{audio_prefilter},{af}"
 
+    inputs = ["-ss", f"{seg_start:.3f}", "-i", str(source)]
+    maps: list[str] = []
+    if video_source is not None:
+        inputs += ["-ss", f"{video_start:.3f}", "-i", str(video_source)]
+        maps = ["-map", "1:v:0", "-map", "0:a:0"]
     cmd = [
         "ffmpeg", "-y",
-        "-ss", f"{seg_start:.3f}",
-        "-i", str(source),
+        *inputs,
+        *maps,
         "-t", f"{max(0.0, duration - t_epsilon):.6f}",
         "-vf", vf,
         "-af", af,
@@ -618,10 +652,14 @@ def extract_all_segments(
         duration = end - start
         out_path = clips_dir / f"seg_{i:02d}_{src_name}.mp4"
 
-        if is_auto:
+        # A range's own `grade` wins over the EDL-level one. Archival footage
+        # spliced into a graded shoot (an old SDR clip that should look like the
+        # past) wants "none"; the shoot's grade would push its colours twice.
+        seg_resolved = segment_grade(r, resolved)
+        if seg_resolved == "__AUTO__":
             seg_filter, _stats = auto_grade_for_clip(src_path, start=start, duration=duration, verbose=False)
         else:
-            seg_filter = resolved
+            seg_filter = seg_resolved
 
         note = r.get("beat") or r.get("note") or ""
         print(f"  [{i:02d}] {src_name}  {start:7.2f}-{end:7.2f}  ({duration:5.2f}s)  {note}")
@@ -630,6 +668,7 @@ def extract_all_segments(
         seg_vf = r.get("filter") or ""
         seg_zoom = float(r.get("zoom") or 1.0)
         seg_zoom_x = float(r.get("zoom_x", 0.45))
+        seg_zoom_y = float(r.get("zoom_y", 0.5))
         seg_zoom_to = r.get("zoom_to")
         seg_zoom_to = None if seg_zoom_to is None else float(seg_zoom_to)
         if seg_zoom_to is not None:
@@ -646,11 +685,19 @@ def extract_all_segments(
         seg_audio = audio_prefilter if seg_audio is None else seg_audio
         if seg_audio != audio_prefilter:
             print(f"        audio: {seg_audio or '(none)'}")
+        video_src = video_start = None
+        if r.get("video"):
+            v = r["video"]
+            video_src = resolve_path(sources[v["source"]], edit_dir)
+            video_start = start - float(v["offset"])
+            if video_start < 0:
+                raise ValueError(f"range {i}: picture starts before {v['source']} does")
+            print(f"        video: {v['source']} @ {video_start:.3f}s (audio stays on {r['source']})")
         extract_segment(src_path, start, duration, seg_filter, out_path,
                         preview=preview, draft=draft, rate=out_rate,
                         extra_vf=seg_vf, audio_prefilter=seg_audio,
-                        height=height, crf=crf, zoom=seg_zoom, zoom_x=seg_zoom_x,
-                        zoom_to=seg_zoom_to)
+                        height=height, crf=crf, zoom=seg_zoom, zoom_x=seg_zoom_x, zoom_y=seg_zoom_y,
+                        zoom_to=seg_zoom_to, video_source=video_src, video_start=video_start)
         seg_paths.append(out_path)
 
     return seg_paths
@@ -713,15 +760,29 @@ def _srt_timestamp(seconds: float) -> str:
 
 
 def _words_in_range(transcript: dict, t_start: float, t_end: float) -> list[dict]:
+    """Words to caption for the cut [t_start, t_end].
+
+    A word counts only if at least half of it is inside the cut. Before that test, a
+    word that starts before the previous word of the SAME speaker has ended is
+    clamped to start at that end: one speaker cannot say two words at once, so the
+    overlap is a timestamp error (Deepgram: "लेता." 1183.12-1183.76, then "वह" from
+    1183.40). Selecting on any overlap burned that next word into the captions though
+    the cut ends before it is heard (podcast Episode 1). Different speakers are left
+    alone, because two people really can talk at once.
+    """
     out: list[dict] = []
-    for w in transcript.get("words", []):
-        if w.get("type") != "word":
-            continue
-        ws = w.get("start")
-        we = w.get("end")
-        if ws is None or we is None:
-            continue
+    last_end: dict = {}
+    words = [w for w in transcript.get("words", [])
+             if w.get("type") == "word" and w.get("start") is not None and w.get("end") is not None]
+    for w in sorted(words, key=lambda w: w["start"]):
+        spk = w.get("speaker_id")
+        ws = max(w["start"], last_end.get(spk, float("-inf")))
+        we = w["end"]
+        last_end[spk] = max(we, last_end.get(spk, float("-inf")))
         if we <= t_start or ws >= t_end:
+            continue
+        dur = we - ws
+        if dur > 0 and (min(we, t_end) - max(ws, t_start)) < dur / 2:
             continue
         out.append(w)
     return out
@@ -922,6 +983,13 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path,
 LOUDNORM_I = -14.0
 LOUDNORM_TP = -1.0
 LOUDNORM_LRA = 11.0
+# loudnorm cannot hold its own TP target once the AAC encode follows it. When the
+# mix arrives hot (podcast Episode 1: +4.5 dBTP in, +1.8 dB of gain needed), the
+# linear mode is refused, the dynamic fallback limits at -1, and the AAC encode then
+# overshoots: measured +1.0 dBTP out, 871 samples at full scale. A brick-wall limiter
+# at -3 dBFS after loudnorm leaves room for that overshoot: -1.8 dBTP after AAC, no
+# clipped samples, integrated -14.4 LUFS. Pinned by tests/test_render_loudness_peak.py.
+TP_LIMITER = "alimiter=limit=0.708:attack=5:release=50:level=false"
 
 
 def measure_loudness(video_path: Path) -> dict[str, str] | None:
@@ -973,7 +1041,7 @@ def apply_loudnorm_two_pass(
     """
     if preview:
         # One-pass approximation — faster, slightly less accurate.
-        filter_str = f"loudnorm=I={LOUDNORM_I}:TP={LOUDNORM_TP}:LRA={LOUDNORM_LRA}"
+        filter_str = f"loudnorm=I={LOUDNORM_I}:TP={LOUDNORM_TP}:LRA={LOUDNORM_LRA},{TP_LIMITER}"
         cmd = [
             "ffmpeg", "-y", "-hide_banner", "-nostats",
             "-i", str(input_path),
@@ -1004,7 +1072,8 @@ def apply_loudnorm_two_pass(
         f":measured_LRA={measurement['input_lra']}"
         f":measured_thresh={measurement['input_thresh']}"
         f":offset={measurement['target_offset']}"
-        f":linear=true"
+        f":linear=true,"
+        f"{TP_LIMITER}"
     )
     cmd = [
         "ffmpeg", "-y", "-hide_banner", "-nostats",

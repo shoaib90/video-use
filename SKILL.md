@@ -141,7 +141,7 @@ For animations, create `<edit>/animations/slot_<id>/` with `Bash` and spawn a su
 4. **Propose strategy.** 4–8 sentences: shape, take choices, cut direction, animation plan, grade direction, subtitle style, length estimate. **Wait for confirmation.**
 5. **Execute.** Produce `edl.json` via the editor sub-agent brief. Drill into `timeline_view` at ambiguous moments. Build animations in parallel sub-agents. Apply grade per-segment. Compose via `render.py`.
 6. **Preview.** `render.py --preview`.
-7. **Self-eval (before showing the user).** Run `timeline_view` on the **rendered output** (not the sources) at every cut boundary (±1.5s window). Check each image for:
+7. **Self-eval (before showing the user).** First run `helpers/review.py` (story-edge context, captions, freezes, clicks, loudness, music windows, graphics; ledger: `kb/mistakes.md`) and clear its HIGH flags. Run `timeline_view` on the **rendered output** (not the sources) at every cut boundary (±1.5s window). Check each image for:
    - Visual discontinuity / flash / jump at the cut
    - Waveform spike at the boundary (audio pop that slipped past the 30ms fade)
    - Subtitle hidden behind an overlay (Rule 1 violation)
@@ -509,7 +509,10 @@ mask pass (which draws no text) gets the identical silhouette:
 
 Fields: `position` `top-left | top-right` (stamps also `top-center`) · `icon` `clock | drop | bolt | scale | list | star` ·
 `after: {"word": …}` starts the phrase search later (use it when the first phrase also occurs
-earlier) · `out: {"word": …, "offset": s}` or `hold: s` (default 3 s after the last event).
+earlier) · `out: {"word": …, "offset": s}` or `hold: s` (default 3 s after the last event) ·
+`scale: 0.4–1.0` (list and stat) shrinks the card toward its top corner. That makes a compact
+**corner tracker** that can stay up through a whole scene over the talking head, with the
+newest row accented. Episode 3's BODY · MIND · VOICE tracker is a 3-row list at `scale: 0.75` (0.55 read too small at 1080).
 
 ### Anchoring rules — the part that goes wrong
 

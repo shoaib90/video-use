@@ -35,6 +35,9 @@ millisecond offsets, and glues standalone punctuation onto the preceding word.
 **No diarization** — omits `speaker_id`, so `takes_packed.md` has no S0/S1 tags. Don't use it
 alone on multi-speaker footage. Defaults to `small.en`; see gotchas.md for why not `base.en`.
 Good for free iteration and as a cross-check on dropped filler words.
+**As a cross-check, give it its own `--edit-dir`** (e.g. `<edit>/whisper_check`): every
+transcriber writes `<edit>/transcripts/<stem>.json`, so on the same dir it refuses ("written by
+deepgram") — and the obvious fix, `--force`, overwrites the *paid* transcript. (Episode 3, 2026-10-05.)
 
 ## transcribe_batch.py
 ```
@@ -82,7 +85,12 @@ render.py <edl.json> -o <out> [--preview] [--draft] [--build-subtitles]
 - **`--crf`** x264 CRF for the *extract*, i.e. the quality ceiling. Default 16 final / 22 preview
   / 28 draft. The composite encode is derived as `crf - 2`. See gotchas.md on the two-generation
   encode — this flag is the one that actually controls output quality.
-- `--build-subtitles` generates `master.srt` from transcripts + EDL offsets inline
+- `--build-subtitles` generates `master.srt` from transcripts + EDL offsets inline. A word
+  is captioned only if **at least half of it** falls inside the cut. Before that test, a word that
+  starts before the same speaker's previous word ended is clamped to that end, because Deepgram
+  overlaps make the next word look half-heard. Added 2026-10-03 and pinned by
+  `tests/test_render_caption_words.py`. Before, any overlap at all captioned a word the viewer
+  never hears.
 - `--fps` forces the output rate; default preserves the first source's rate
 
 ### EDL schema
@@ -120,9 +128,24 @@ These three fields are local extensions (not upstream). All optional and backwar
 - **`audio_filter`** — applied per segment *before* the 30ms fades, so the fades stay on the
   true edges (Rule 3). For denoise/EQ.
 - **`ranges[].zoom`** (number ≥ 1.0, plus optional **`zoom_x`** 0–1 horizontal bias, default
-  0.45) — per-segment push-in to disguise jump cuts on a static camera. Resolution-independent:
-  render.py resolves it against the real post-scale dimensions, so the same EDL is correct at
-  720p and 2160p. **Prefer this over a raw `filter`.**
+  0.45, and **`zoom_y`** 0–1 vertical bias, default 0.5) — per-segment push-in to disguise jump
+  cuts, or a single carved out of a wide two-shot. Resolution-independent, and since 2026-10-03
+  the crop is taken on the **source frame before the downscale**, so a 2.6x single from a 4K
+  wide is native detail at 1080p (it used to crop after the scale: an upscaled 960x540 at 2x).
+  `zoom_y` was added for the same podcast job, where faces sit at about 35% of frame height, not
+  the middle. Pinned by `tests/test_render_zoom_crop.py`. **Prefer this over a raw `filter`.**
+- **`ranges[].video`** `{"source": <key>, "offset": <s>}` (added 2026-10-03): take this range's
+  **picture** from a second, synced camera, at `start - offset` in that file. The **audio,
+  transcript and captions stay on `source`**. The picture is resampled to the output rate
+  before any zoom or push, so a 25 or 100 fps camera keeps real-time speed under a 30 fps
+  render. HDR handling and crop geometry use the picture file, and the output size is still
+  measured from `source`, so the concat holds. The key must be in `sources`. Pinned by
+  `tests/test_render_video_source.py`. Sync, subject and colour tooling for a real shoot is in
+  podcast Episode 1's `edit/build/dslr_*.py` (see gotchas.md).
+- **`ranges[].grade`** (added 2026-10-05) — overrides the EDL `grade` for one range. The key's
+  presence is what counts: `"none"`, `null` or `""` turns grading off. Built for archival SDR
+  footage inside a graded HLG shoot (Episode 3's 2019 clip, "it should look like the past"),
+  and also used on the black end card. `tests/test_render_segment_grade.py`.
 - **`ranges[].filter`** — raw per-segment video filter, applied *after* the grade and after any
   zoom. Escape hatch. **Output dimensions must be identical across every segment** or the
   `-c copy` concat (Rule 2) fails — so a `crop` must always be followed by a `scale` back to the
@@ -137,5 +160,45 @@ These three fields are local extensions (not upstream). All optional and backwar
   `brand` is an optional path to a `brand.json` when the episode has none of its own (Episode 2
   points at YT1's). Full guide: `SKILL.md`, "Glass cards". Resolve before rendering:
   `uv run python helpers/cards.py <edl> --clips clips_graded`. Needs Node.
+  `scale` (0.4–1.0, list and stat; added 2026-10-05) is a static CSS scale on a wrapper
+  ("holder") around the card. It leaves the card's own entrance and exit tweens alone, and the
+  mask pass runs the same wrapper, so the glass stays under the card. The bound check uses the
+  SCALED height. Tests are in `tests/test_cards.py` `ScaleTests`.
 - `force_style`'s `MarginV` is relative to `PlayResY=288`. The shipped default of 90 is tuned
   for **vertical** video; for 16:9 landscape ~28 sits the caption about 10% up from the bottom.
+
+## review.py — pre-delivery review *(local addition, 2026-10-05)*
+```
+review.py <edit_dir> --render <final.mp4> --label v8 [--prev <edit>/review/v7]
+          [--raw <no-music render> --music-ok "0-126,146-156"] [--exempt-beats "^0 "]
+          [--accepted <json>] [--skip-render] [--no-reel]
+```
+Runs every check in [mistakes.md](mistakes.md) that can be automated, and writes
+`<edit>/review/<label>/`:
+- `report.md`: PASS/FLAG per check, flags ranked HIGH > MED > LOW
+- `edges.md`: each flagged or changed story edge, with the source speech before and after it
+- `watchlist.md`: the timestamps Shoaib needs
+- `reel.mp4`: ~14 s around every edge changed since `--prev`
+- `ranges.json`: the next run's `--prev`
+- `sheet_overlays_*.jpg`: one frame per overlay
+
+What it needs and does:
+- **Story ranges** are rebuilt from the EDL: abutting shots on one source merge, so camera
+  cuts are not mistaken for edits.
+- **Edge checks** need `<edit>/transcripts/<source>.json`.
+- **`--exempt-beats`** marks teasers and cold opens, which skip the context checks C1-C4.
+- **`accepted.json`** entries are flags that were checked and judged fine. Each needs a `why`.
+  They are listed in the report, not counted.
+
+Calibrated on podcast Episode 1 v7, where 60 HIGH flags fell to 3 genuine:
+- tag questions ("correct?", "है ना?", "ठीक है?") are not questions
+- a join to the next range on the same source within 60 s is MED ("read the join"), and LOW
+  under 3 s (a tightening cut)
+- a trimmed lead-in of 4 words or fewer, all fillers, is LOW
+- C7 fires only when the edge sits on the ghost word
+
+Pinned by `tests/test_review_edges.py` (13 tests). Render checks reuse the episode QC methods:
+- freezedetect at d=1.0
+- step spikes at the cuts
+- ebur128 loudness
+- music presence measured in pauses against the aligned no-music render
