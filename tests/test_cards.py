@@ -317,3 +317,66 @@ class FilterTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScaleTests(unittest.TestCase):
+    """`scale` makes a compact tracker: it must reach the page, bound the card by its SCALED
+    height, and never apply to a stamp."""
+
+    def setUp(self):
+        self.e = _Edit()
+
+    def resolve(self, c):
+        return cards.resolve([c], self.e.edl, self.e.dir, self.e.durs, 1920, 1080)[0]
+
+    def test_default_scale_is_one(self):
+        self.assertEqual(self.resolve(_routine())["box"]["k"], 1.0)
+
+    def test_scale_reaches_the_page_on_a_wrapper_in_both_passes(self):
+        s = self.resolve(_routine(scale=0.55))
+        self.assertEqual(s["box"]["k"], 0.55)
+        for mode in ("overlay", "mask"):
+            html = cards.page(s, mode, 1920, 1080)
+            self.assertIn('"k": 0.55', html)
+            self.assertIn("holder.appendChild(card)", html)
+
+    def test_scaled_card_is_bounded_by_its_scaled_height(self):
+        rows = [{"text": f"Row {i}", "at": w} for i, w in
+                enumerate(["till two pm", "two fifteen", "lunch", "bicycle", "bus for fifteen", "so sleep"])]
+        big = _routine(rows=rows, footer={"text": "On repeat for", "at": "on repeat", "value": "3 years",
+                                          "value_at": "three years"}, label="x" * 3)
+        self.resolve(big)                       # fits at full size
+        self.resolve(dict(big, scale=0.4))      # and smaller
+
+    def test_bad_scales_raise(self):
+        with self.assertRaises(cards.CardError):
+            self.resolve(_routine(scale=1.2))
+        with self.assertRaises(cards.CardError):
+            self.resolve(_routine(scale=0.2))
+        with self.assertRaises(cards.CardError):
+            self.resolve({"id": "s", "kind": "stamp", "text": "ARMY", "at": "lunch", "scale": 0.5})
+
+
+class SpineTests(unittest.TestCase):
+    """The spine under row k points at row k+1. It must not be visible before row k+1 lands, or
+    it hangs below the card, which has only grown to the rows landed so far (Episode 3)."""
+
+    def setUp(self):
+        self.e = _Edit()
+        self.spec = cards.resolve([_routine()], self.e.edl, self.e.dir, self.e.durs, 1920, 1080)[0]
+        self.html = cards.page(self.spec, "overlay", 1920, 1080)
+
+    def test_every_spine_but_the_last_row_has_an_id(self):
+        n = len(self.spec["list"]["rows"])
+        self.assertIn('class="spine" id="sp${k}"', self.html)   # each spine has its own id (not #s: stat subs use that)
+        self.assertIn("k < L.rows.length - 1", self.html)  # ...and the last row has none
+        self.assertGreater(n, 1)
+
+    def test_spine_starts_collapsed(self):
+        self.assertRegex(self.html, r"\.spine \{[^}]*transform: scaleY\(0\)")
+        self.assertRegex(self.html, r"\.spine \{[^}]*transform-origin: 50% 0")
+
+    def test_spine_grows_on_the_NEXT_row_not_its_own(self):
+        # tweened as #sp${k - 1} at r.t: row k's time grows row k-1's spine, never its own
+        self.assertIn("tl.fromTo(`#sp${k - 1}`, { scaleY: 0 }, { scaleY: 1", self.html)
+        self.assertNotIn("`#sp${k}`", self.html)

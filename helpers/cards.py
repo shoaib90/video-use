@@ -50,6 +50,9 @@ EDL block (all lengths in 1080-high units; all `at` values are spoken phrases):
        "position": "top-right", "accent": true}
     ]
 
+`scale` (0.4-1.0, list and stat only) shrinks the whole card toward its top corner: a compact
+tracker, e.g. a three-pillar list that stays up through a scene over the talking head.
+
 A `stamp` is one word or figure in a glass pill: it lands AS its phrase is said (no settle
 lead, unlike a card), holds ~1.8 s (or exits on `out`), and is shown in caps. Use it for the
 word a line turns on, 3-8 per episode, never repeating a card already on screen. Positions:
@@ -226,6 +229,16 @@ def resolve(cards: list[dict], edl: dict, edit_dir: Path, segment_durations: lis
             raise CardError(f"{where}: position must be top-left or top-right"
                             + (" or top-center" if kind == "stamp" else ""))
 
+        # `scale` shrinks a list or stat card as a whole, anchored at its own top corner — a
+        # compact tracker that can stay up over a talking head. Applied to a wrapper in the
+        # runtime, so the entrance/exit tweens on the card itself are untouched, and the mask
+        # pass runs the same wrapper, so the frosted glass stays exactly under the card.
+        card_scale = float(c.get("scale", 1.0))
+        if kind == "stamp" and card_scale != 1.0:
+            raise CardError(f"{where}: a stamp has no scale")
+        if not 0.4 <= card_scale <= 1.0:
+            raise CardError(f"{where}: scale must be between 0.4 and 1.0, got {card_scale}")
+
         after = 0.0
         if c.get("after"):
             after = find_phrase(words, c["after"]["word"], 0.0, f"{where} after")
@@ -327,7 +340,7 @@ def resolve(cards: list[dict], edl: dict, edit_dir: Path, segment_durations: lis
             "start": round(start, 3), "duration": dur,
             "in": loc(card_in), "exit": loc(exit_t),
             "stage": {"w": stage_w, "h": 1080, "scale": round(scale, 6)},
-            "box": {"x": x, "y": y, "w": box_w, "h0": box_h0, "side": side},
+            "box": {"x": x, "y": y, "w": box_w, "h0": box_h0, "side": side, "k": card_scale},
             "colors": {"dot_done": f"rgba({_hex_rgb(brand['fg'])},0.45)"},
             "heights": [],
             "_brand": brand,
@@ -349,8 +362,8 @@ def resolve(cards: list[dict], edl: dict, edit_dir: Path, segment_durations: lis
             if footer:
                 spec["heights"].append([loc(footer["w"] - LEAD - 0.15), final_h + LIST["foot"]])
                 final_h += LIST["foot"]
-            if y + final_h > 1080 - MARGIN:
-                raise CardError(f"{where}: card would reach y={y + final_h} (1080 units)")
+            if y + final_h * card_scale > 1080 - MARGIN:
+                raise CardError(f"{where}: card would reach y={y + final_h * card_scale:.0f} (1080 units)")
             spec["list"] = {
                 "time_col": time_col, "dot_x": 148 if time_col else 4, "text_x": 180 if time_col else 36,
                 "view": {"top": geo["view_top"], "h": LIST["view_h"]},

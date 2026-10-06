@@ -28,12 +28,19 @@
   stage.style.cssText = `width:${C.stage.w}px;height:${C.stage.h}px;transform:scale(${C.stage.scale});`;
   document.getElementById("root").appendChild(stage);
 
+  // The holder carries the card's position and its static `scale` (box.k); the card inside
+  // keeps its own tweened transform. Same structure in both modes, so the mask matches.
+  const holder = document.createElement("div");
+  holder.className = "holder";
+  holder.style.cssText = `left:${C.box.x}px;top:${C.box.y}px;width:${C.box.w}px;` +
+    `transform:scale(${C.box.k || 1});transform-origin:${C.box.side} top;`;
+  stage.appendChild(holder);
   const card = document.createElement("div");
   card.className = `card ${C.kind}`;
   card.id = "card";
-  card.style.cssText = `left:${C.box.x}px;top:${C.box.y}px;width:${C.box.w}px;height:${C.box.h0}px;` +
+  card.style.cssText = `left:0px;top:0px;width:${C.box.w}px;height:${C.box.h0}px;` +
     `transform-origin:${C.kind === "stamp" ? "center center" : `${C.box.side} top`};`;
-  stage.appendChild(card);
+  holder.appendChild(card);
 
   if (MODE === "mask") {
     card.innerHTML = '<div class="shell"></div>';
@@ -48,7 +55,7 @@
     const rows = L.rows.map((r, k) => `
       <div class="row" id="r${k}" style="top:${r.top}px;height:${r.h}px">
         ${L.time_col ? `<span class="time">${esc(r.time || "")}</span>` : ""}
-        <span class="dot" id="d${k}" style="left:${L.dot_x}px"></span>${k < L.rows.length - 1 ? `<span class="spine" style="left:${L.dot_x + 6}px;height:${r.h}px"></span>` : ""}
+        <span class="dot" id="d${k}" style="left:${L.dot_x}px"></span>${k < L.rows.length - 1 ? `<span class="spine" id="sp${k}" style="left:${L.dot_x + 6}px;height:${r.h}px"></span>` : ""}
         <span class="what" style="left:${L.text_x}px">${esc(r.text)}</span>
         ${r.chips.length ? `<span class="chips" style="left:${L.text_x}px">${r.chips.map((c, j) => `<span class="chip" id="c${k}_${j}">${esc(c.text)}</span>`).join("")}</span>` : ""}
       </div>`).join("");
@@ -106,6 +113,9 @@
       tl.fromTo(`#d${k}`, { scale: 0 }, { scale: 1, duration: 0.45, ease: "back.out(2.2)" }, r.t);
       // accent marks NOW: a dot is born accent (CSS) and goes muted when the next step lands
       if (k > 0) tl.to(`#d${k - 1}`, { backgroundColor: C.colors.dot_done, duration: 0.35, ease: "power2.out" }, r.t);
+      // The spine below row k points at row k+1, so it grows down WITH row k+1. Shown with its
+      // own row, it hung below the card, which only grows to the rows landed so far.
+      if (k > 0) tl.fromTo(`#sp${k - 1}`, { scaleY: 0 }, { scaleY: 1, duration: 0.45, ease: "power3.out" }, r.t);
       r.chips.forEach((c, j) => tl.fromTo(`#c${k}_${j}`, { opacity: 0, y: 6, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: "back.out(1.6)" }, c.t));
     });
     if (L.tag) tl.fromTo("#tag", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, L.tag.t);
