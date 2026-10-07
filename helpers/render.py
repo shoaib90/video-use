@@ -1152,6 +1152,134 @@ def build_demotion_filter(demotions: list[dict], bg: str, fps: str,
     return chain, out_label
 
 
+# -------- Rim-lit silhouette ----------------------------------------------------
+
+
+SIL_HOLD = 3.0
+SIL_LEAD = 0.15
+SIL_FADE = 0.45
+
+
+def resolve_silhouettes(sils: list[dict], edl: dict, edit_dir: Path,
+                        durations: list[float]) -> list[dict]:
+    """Turn EDL `silhouettes` into output-time windows, anchored to spoken phrases.
+
+    Same rules as glass cards (cards.py): every `at` is a phrase searched forward, a phrase
+    that was cut RAISES, and times come from the MEASURED segment durations.
+
+        "silhouettes": [{"id": "you", "at": "people exactly like you",
+                         "crowd_at": "thousands of them", "out": {"word": "so the"}}]
+    """
+    words = cards_mod.kept_words(edl, edit_dir, durations)
+    total = sum(durations)
+    out, after = [], 0.0
+    for n, sl in enumerate(sils):
+        where = f"silhouettes[{n}] ({sl.get('id', n)})"
+        if not sl.get("at"):
+            raise cards_mod.CardError(f"{where}: needs an 'at' phrase")
+        t = cards_mod.find_phrase(words, sl["at"], after, f"{where} at")
+        last = t
+        crowd = None
+        if sl.get("crowd_at"):
+            crowd = cards_mod.find_phrase(words, sl["crowd_at"], t + 1e-3, f"{where} crowd_at")
+            last = crowd
+        if sl.get("out"):
+            end = cards_mod.find_phrase(words, sl["out"]["word"], last + 1e-3, f"{where} out")
+            end += float(sl["out"].get("offset", 0.0))
+        else:
+            end = last + float(sl.get("hold", SIL_HOLD))
+        fade = float(sl.get("fade", SIL_FADE))
+        start = max(0.0, t - SIL_LEAD)
+        end = min(end, total - 0.05)
+        if end - start < 2 * fade:
+            raise cards_mod.CardError(f"{where}: window {end - start:.2f}s is shorter than its fades")
+        if out and start < out[-1]["end"]:
+            raise cards_mod.CardError(f"{where}: overlaps the previous silhouette")
+        out.append({"id": str(sl.get("id", n)), "start": round(start, 3), "end": round(end, 3),
+                    "crowd": round(crowd - SIL_LEAD, 3) if crowd is not None else None,
+                    "fade": fade})
+        after = t + 1e-3
+    return out
+
+
+def build_silhouette_filter(sils: list[dict], current: str, matte_label: str, glow: str,
+                            out_w: int, out_h: int, fps: str, total: float) -> tuple[list[str], str]:
+    """The speaker as a near-black figure with a glow-coloured rim, over a darkened picture.
+
+    Kallaway's device for "people exactly like you" (kb/storytelling.md §13). Everything is
+    derived from the matte in ffmpeg; the picture never goes through Python:
+
+    * **rim** — the matte blurred minus the matte itself is a halo OUTSIDE the edge only. It is
+      built at quarter resolution (it is a blur anyway), boosted, scaled back and tinted;
+    * **figure** — a near-black layer whose alpha IS the matte, over the picture darkened
+      and desaturated;
+    * **crowd** — optional smaller copies of the matte, bottom-aligned left and right, fading in
+      on their own phrase;
+    * **fades** — one tiny 16x16 ramp evaluated per frame (`geq` on T) and scaled to full
+      size, merged as alpha. Cheap, and it handles any number of windows in one pass.
+    """
+    if not sils:
+        return [], current
+    W, H = out_w, out_h
+    h = glow.lstrip("#")
+    r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    sq = round(4.5 * H / 1080, 2)               # quarter-res sigma: ~18 px of halo at 1080
+    win = "+".join(f"between(t,{s['start']:.3f},{s['end']:.3f})" for s in sils)
+    t0, t1 = sils[0]["start"], sils[-1]["end"]
+    terms = []
+    for s in sils:
+        a, z, f = s["start"], s["end"], max(0.05, s["fade"])
+        terms.append(f"({_smoothstep(f'clip((T-{a:.3f})/{f:.3f},0,1)')}"
+                     f"-{_smoothstep(f'clip((T-{z - f:.3f})/{f:.3f},0,1)')})")
+    ramp = "+".join(terms)
+    crowds = [s for s in sils if s["crowd"] is not None]
+    p = []
+    p.append(f"{matte_label}scale={W}:{H}:flags=bicubic,format=gray,"
+             f"split={3 if crowds else 2}[sl_mf][sl_mg]" + ("[sl_mc]" if crowds else ""))
+    p.append("[sl_mg]scale=iw/4:ih/4,split=2[sl_q1][sl_q2]")
+    p.append(f"[sl_q1]gblur=sigma={sq}[sl_qb]")
+    p.append(f"[sl_qb][sl_q2]blend=all_mode=subtract,lut=y='min(255,val*4)',"
+             f"scale={W}:{H}:flags=bicubic,format=gbrp,"
+             f"colorchannelmixer=rr={r:.3f}:rg=0:rb=0:gr=0:gg={g:.3f}:gb=0:br=0:bg=0:bb={b:.3f}[sl_ring]")
+    p.append(f"{current}split=2[sl_keep][sl_src]")
+    # darkened, desaturated, and washed faintly with the glow colour, as in the reference
+    p.append(f"color=c={glow}@0.13:s={W}x{H}:r={fps}:d={total:.3f},format=rgba[sl_wash]")
+    p.append("[sl_src]eq=brightness=-0.20:saturation=0.55,format=gbrp[sl_dk0]")
+    p.append("[sl_dk0][sl_wash]overlay=format=gbrp[sl_dark]")
+    p.append(f"color=c=0x050508:s={W}x{H}:r={fps}:d={total:.3f},format=rgba[sl_blk]")
+    p.append("[sl_blk][sl_mf]alphamerge[sl_fig]")
+    base = "[sl_dark]"
+    if crowds:
+        # Crowd figures at the frame edges, where a close-up subject does not cover them,
+        # each with a DIMMER rim of its own: a black shape on a dark picture does not read.
+        cw, ch = 2 * (int(W * 0.5) // 2), 2 * (int(H * 0.5) // 2)
+        y = H - ch
+        p.append("[sl_mc]split=2[sl_c1][sl_c2]")
+        p.append(f"[sl_c1]scale={cw}:{ch},pad={W}:{H}:0:{y}:black[sl_cl]")
+        p.append(f"[sl_c2]scale={cw}:{ch},pad={W}:{H}:{W - cw}:{y}:black[sl_cr]")
+        p.append("[sl_cl][sl_cr]blend=all_mode=lighten,split=2[sl_cm][sl_cg]")
+        p.append(f"color=c=0x0E0E16:s={W}x{H}:r={fps}:d={total:.3f},format=rgba[sl_cb]")
+        p.append("[sl_cb][sl_cm]alphamerge[sl_crowd]")
+        p.append("[sl_cg]scale=iw/4:ih/4,split=2[sl_cq1][sl_cq2]")
+        p.append(f"[sl_cq1]gblur=sigma={round(sq * 0.7, 2)}[sl_cqb]")
+        p.append(f"[sl_cqb][sl_cq2]blend=all_mode=subtract,lut=y='min(255,val*2.2)',"
+                 f"scale={W}:{H}:flags=bicubic,format=gbrp,"
+                 f"colorchannelmixer=rr={r * 0.7:.3f}:rg=0:rb=0:gr=0:gg={g * 0.7:.3f}:gb=0"
+                 f":br=0:bg=0:bb={b * 0.7:.3f}[sl_cring]")
+        cwin = "+".join(f"between(t,{s['crowd']:.3f},{s['end']:.3f})" for s in crowds)
+        p.append(f"[sl_dark][sl_crowd]overlay=format=gbrp:enable='{cwin}'[sl_dc0]")
+        p.append(f"[sl_dc0][sl_cring]blend=all_mode=addition:enable='{cwin}'[sl_dc]")
+        base = "[sl_dc]"
+    p.append(f"{base}[sl_fig]overlay=format=gbrp[sl_s1]")
+    p.append("[sl_s1][sl_ring]blend=all_mode=addition,format=gbrap[sl_s2]")
+    p.append(f"color=c=black:s=16x16:r={fps}:d={total:.3f},format=gray,"
+             f"geq=lum='255*({ramp})',scale={W}:{H}:flags=bilinear[sl_a]")
+    p.append("[sl_s2][sl_a]alphamerge[sl_S]")
+    p.append(f"[sl_keep][sl_S]overlay=format=auto:eof_action=pass:repeatlast=0"
+             f":enable='between(t,{t0:.3f},{t1:.3f})'[sl_out]")
+    return p, "[sl_out]"
+
+
 # -------- Final compositing (Rule 1 + Rule 4) -------------------------------
 
 
@@ -1170,6 +1298,8 @@ def build_final_composite(
     fps: str = "30",
     matte: Path | None = None,
     cards: list[dict] | None = None,
+    silhouettes: list[dict] | None = None,
+    glow: str = "#8B5CF6",
 ) -> None:
     """Final pass: base → overlays → glass cards → text graphics → subtitles LAST → out.
 
@@ -1186,11 +1316,19 @@ def build_final_composite(
     graphics = graphics or []
     demotions = demotions or []
     cards = cards or []
+    silhouettes = silhouettes or []
     has_overlays = bool(overlays)
     has_subs = subtitles_path is not None and subtitles_path.exists()
     has_graphics = bool(graphics)
 
-    if not has_overlays and not has_subs and not has_graphics and not demotions and not cards:
+    if silhouettes and not matte:
+        raise ValueError("silhouettes need a matte; build one with helpers/matte.py "
+                         "and set the EDL's `matte`")
+    if silhouettes and demotions:
+        raise ValueError("silhouettes and demotions do not combine: the matte describes "
+                         "the full-frame subject")
+    if (not has_overlays and not has_subs and not has_graphics and not demotions and not cards
+            and not silhouettes):
         # Nothing to do — just rename/copy base to final name
         run(["ffmpeg", "-y", "-i", str(base_path), "-c", "copy", str(out_path)], quiet=True)
         return
@@ -1242,16 +1380,41 @@ def build_final_composite(
     # the freeze above was `repeat` doing exactly what it is documented to do.
     filter_parts: list[str] = []
     current = "[0:v]"
+    matte_behind = matte_sil = None
     if matte_idx is not None:
+        # the matte stream feeds the behind-subject cut, the silhouette, or both; an
+        # unconnected split output is an ffmpeg error, so split only what is used
+        users = [u for u, on in (("b", bool(behind)), ("s", bool(silhouettes))) if on]
+        if len(users) == 2:
+            filter_parts.append(f"[{matte_idx}:v]split=2[mt_b][mt_s]")
+            matte_behind, matte_sil = "[mt_b]", "[mt_s]"
+        elif users == ["b"]:
+            matte_behind = f"[{matte_idx}:v]"
+        elif users == ["s"]:
+            matte_sil = f"[{matte_idx}:v]"
+        else:
+            filter_parts.append(f"[{matte_idx}:v]nullsink")
+    if behind:
         # keep a clean copy of the base to cut the subject from later
-        filter_parts.append("[0:v]split[b_main][b_subj]")
+        filter_parts.append(f"{current}split[b_main][b_subj]")
         current = "[b_main]"
     # Demotion transforms the BASE, so it happens before anything is drawn on
     # top of it.
     if demotions:
-        dem, current = build_demotion_filter(demotions, brand_bg, fps)
+        dem, current = build_demotion_filter(demotions, brand_bg, fps, in_label=current)
         filter_parts.append(dem)
         print(f"  demotions: {len(demotions)}")
+    # The silhouette transforms the base too (darker picture, black figure, rim), so it is
+    # drawn before anything sits on top of it.
+    if silhouettes:
+        out_w, out_h = cards_mod._dims(base_path)
+        sl_parts, current = build_silhouette_filter(
+            silhouettes, current, matte_sil, glow, out_w, out_h,
+            # the generated layers must run at the BASE's real rate, not the nominal `fps`
+            # argument (often "30" for a 29.97 or 23.976 base), or alphamerge drifts
+            probe_source_fps(base_path) or fps, probe_duration(base_path))
+        filter_parts += sl_parts
+        print(f"  silhouettes: {len(silhouettes)}")
     for idx, ov in enumerate(overlays, start=1):
         t = float(ov["start_in_output"])
         dur = float(ov["duration"])
@@ -1270,7 +1433,7 @@ def build_final_composite(
             # scale2ref scales its FIRST input to match its SECOND, and
             # returns both - so the base copy comes back out as [bsj]
             filter_parts.append(
-                f"[{matte_idx}:v][b_subj]scale2ref=flags=bicubic[mk][bsj];"
+                f"{matte_behind}[b_subj]scale2ref=flags=bicubic[mk][bsj];"
                 f"[mk]format=gray[mkg];"
                 f"[bsj][mkg]alphamerge[subj];"
                 f"{current}[subj]overlay=eof_action=pass:repeatlast=0[vsubj]")
@@ -1303,7 +1466,7 @@ def build_final_composite(
         out_label = "[outv]"
     else:
         # Rename the last stage's output to [outv] for consistency
-        if has_overlays or has_graphics or cards or demotions:
+        if has_overlays or has_graphics or cards or demotions or silhouettes:
             filter_parts.append(f"{current}null[outv]")
             out_label = "[outv]"
         else:
@@ -1456,7 +1619,17 @@ def main() -> None:
 
     graphics = edl.get("graphics") or []
     card_specs = edl.get("cards") or []
-    durations = [probe_duration(p) for p in segment_paths] if (graphics or card_specs) else []
+    sil_specs = edl.get("silhouettes") or []
+    durations = ([probe_duration(p) for p in segment_paths]
+                 if (graphics or card_specs or sil_specs) else [])
+    silhouettes = []
+    if sil_specs:
+        silhouettes = resolve_silhouettes(sil_specs, edl, edit_dir, durations)
+        print(f"silhouettes: {len(silhouettes)}")
+        for sl in silhouettes:
+            print(f"  {sl['id']:<12} {sl['start']:8.3f}s → {sl['end']:.3f}s"
+                  + (f"  crowd {sl['crowd']:.3f}s" if sl["crowd"] is not None else ""))
+    glow = cards_mod.load_brand(edl, edit_dir)["glow"]
     cards = []
     if card_specs:
         # Rendered at the base's own size and frame rate: overlays are resolution-specific.
@@ -1475,7 +1648,8 @@ def main() -> None:
                               force_style=sub_force_style,
                               crf=gen2_crf, preset=gen2_preset, graphics=graphics,
                               demotions=demotions, brand_bg=brand_bg,
-                              fps=str(args.fps or 30), matte=matte_path, cards=cards)
+                              fps=str(args.fps or 30), matte=matte_path, cards=cards,
+                              silhouettes=silhouettes, glow=glow)
     else:
         # Composite to a temp file, then run loudnorm → final output
         tmp_composite = out_path.with_suffix(".prenorm.mp4")
@@ -1483,7 +1657,8 @@ def main() -> None:
                               force_style=sub_force_style,
                               crf=gen2_crf, preset=gen2_preset, graphics=graphics,
                               demotions=demotions, brand_bg=brand_bg,
-                              fps=str(args.fps or 30), matte=matte_path, cards=cards)
+                              fps=str(args.fps or 30), matte=matte_path, cards=cards,
+                              silhouettes=silhouettes, glow=glow)
         print("loudness normalization → social-ready (-14 LUFS / -1 dBTP / LRA 11)")
         apply_loudnorm_two_pass(tmp_composite, out_path, preview=args.draft)
         tmp_composite.unlink(missing_ok=True)

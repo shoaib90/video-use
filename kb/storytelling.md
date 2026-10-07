@@ -739,3 +739,78 @@ with the beat table: podcast Episode 1's `edit/reference_FO556.md`.
   the production on the intro, and in the body change only *what is in the shot* (a reaction, a
   wide on a laugh, a name-drop photo). This is §8's "wall-to-wall music has no meaning" at
   podcast scale.
+
+---
+
+## 13. Two growth explainers, two graphic systems: Aprilynne Alter and Kallaway
+
+Sources: **"Stop Copying Big YouTubers"**, Aprilynne Alter, 21:43, 296K views
+(<https://youtu.be/659t-D3e0Z0>); **"How I Grew from 0 to 100K Subscribers in 5 Months"**,
+Kallaway, 25:56, 748K views (<https://youtu.be/3y-WiiUaqb4>). Both talking-head-led and both
+heavy on motion graphics, studied 2026-10-06 for their editing. Full breakdowns in the private
+channel-kb (`07-research/aprilynne-alter.md`, `07-research/kallaway.md` §7).
+
+**Method:**
+- Both downloaded at 720p. Picture changes by frame differencing (64×36 grey at native 23.976 fps,
+  ≥6 and ≥4× the ±8-frame median, merged under 0.2 s), not `scene>` (see gotchas).
+- One frame per 2 s, tiled to 41 contact sheets, all read.
+- Face share by distance to a reference face frame (32×18 RGB), so approximate.
+- Sound from a decoded WAV: the level in every pause between caption words relative to the
+  voice's p90; transient and spectral-flatness lift at cuts against 2,000 random moments;
+  spectrograms of six passages.
+- **Nobody listened.**
+
+### Measured
+
+| | Aprilynne | Kallaway |
+|---|---|---|
+| Full-frame picture changes | 477 · **22/min** · median 1.5 s | 153 · **5.9/min** · median 5.1 s (undercounts: most graphics play *over* the face) |
+| Face, full frame | ~27% (longest run 18 s) | ~51% (longest run 52 s) |
+| Graphics | ~47% white canvas + ~5% dark | ~28% dark full-screen + many overlays |
+| Music bed | Continuous, ~11 dB under the voice in pauses; **drops out at section cards** (6 of her 10 near-silences sit on a picture change, incl. Part 2 at 5:55 and Part 3 at 12:59) | Continuous, ~8 dB under; **thins under long pure-talk stretches** (pauses 30+ dB down at 7:20–8:00, 19:25, 22:00, 24:30) and returns with graphics; only 1 of 16 near-silences is at a cut |
+| Effects at cuts | None above chance (12% vs 10%) | None above chance (8% vs 10%) |
+
+**Neither marks its cuts with whooshes.** Sound design here means a continuous bed whose
+*absences* are placed (at section seams, or under a talking stretch). It isn't an effect on every
+transition.
+
+### The shared grammar (both, in different clothes)
+1. **One recurring visual metaphor per idea, which returns and accumulates**: her puzzle pieces,
+   test tube, triangle and colour-coded viewer icons; his algorithm orb in a star field, highway
+   lanes for platform speed, and neon paths to a credibility line. It's learned once and then
+   costs nothing.
+2. **A chapter device that returns at every seam**, showing where you are: her "PART n" puzzle
+   card and a 1-2-3 step card with the current step lit; his 3D glass "Lesson" card deck with
+   finished cards dimmed.
+3. **Emphasis, not captions**: one huge word over the face (her), or one glowing key phrase over
+   or behind the head plus a one-sentence key-idea lower third (him). Neither burns running
+   sentence captions.
+4. **Annotate real images**: highlighter on the one number that matters, leader-line callouts on
+   a thumbnail, highlight boxes on title words.
+5. **Build, then dim**: a list builds item by item, then everything but the point fades to ~20%.
+6. **The face owns the feeling.** Her closing encouragement is almost all face; his longest face
+   run (52 s) is the expectations and mindset section. Graphics carry the analysis, never the
+   emotional beat. It's the zenith rule again (§1).
+
+### What our tooling already does, and what it doesn't
+
+| Technique | Status |
+|---|---|
+| Glass cards: lists, figures, steps (the house look; Kallaway's lesson deck is the same family) | **Have**: the `cards` block |
+| A card deck that slides, neighbours visible | **Have**: `SlidingCarousel` (`components.py`) |
+| Build-then-dim lists | **Have**: `StaggeredList` dims; glass `list` lights only the newest row |
+| A key phrase **behind** the subject | **Have**: `matte.py` + `behind_subject` |
+| Shrinking the speaker so a graphic owns the frame | **Have**: `demotions` |
+| Slow push / punch-in | **Have**: `ranges[].zoom`, `zoom_to` |
+| Music dropped at a section card | **Have**: anchored beds (pin the exit to the last word before the card) |
+| **A chapter deck that RETURNS at every seam with progress state** (done dimmed, next lit) | **Built 2026-10-06**: glass card kind `deck` |
+| **A key-sentence lower third** (one line + subline + accent bar, typed on) | **Built 2026-10-06**: glass card kind `keyline` (above captions by default) |
+| **Annotated real image** (highlighter, outline box, leader-line callouts) | **Built 2026-10-06**: glass card kind `annotate` |
+| **A rim-lit silhouette of the speaker** (and multiplying it) | **Built 2026-10-06**: EDL `silhouettes` in render.py (the crowd is only as good as the matte) |
+| **An abstract metaphor scene per idea** | **Per video**: HyperFrames / Manim, built bespoke |
+
+### What doesn't transfer
+- **Aprilynne's white flat-vector canvas** is an explainer register; the channel's set is dark
+  blue/purple with a warm lamp, which Kallaway's dark, glowing language already matches.
+- **22 changes a minute** is explainer pace; the pace floor for story episodes stands (index:
+  "Pacing is a ceiling, not a target").

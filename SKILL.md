@@ -427,6 +427,31 @@ exactly like a broken render.
 Masking and demotion do not combine: the matte describes the full-frame subject, so it will not
 line up with a shrunken card. render.py warns rather than producing a silent misalignment.
 
+**Rim-lit silhouette** (`silhouettes`, added 2026-10-06) turns the speaker into a near-black
+figure with a glow-coloured rim, over the picture darkened and washed faintly with the glow.
+It's Kallaway's device for "people exactly like you" (`kb/storytelling.md` §13). It needs the
+same matte, and anchors to spoken phrases exactly like glass cards:
+
+```json
+"matte": "mattes/base.mp4",
+"silhouettes": [{"id": "you", "at": "people exactly like you",
+                 "crowd_at": "thousands of them", "out": {"word": "so the point"}}]
+```
+
+- Fields: `at` (required), `out: {"word", "offset"}` or `hold` (default 3 s), `fade` (default
+  0.45 s), and `crowd_at`, which fades in two smaller figures at the frame edges, each with a
+  dimmer rim of its own.
+- Windows never overlap, and one shorter than its two fades raises.
+- **Use it once or twice an episode, on a line about the VIEWER** ("you", "people like you"),
+  never on a feeling of your own. Your face carries those (§13: the face owns the feeling).
+- **The crowd is only as good as the matte.** A clean head-and-shoulders reads as people; a
+  matte that swallows the mic and chair makes blobs. Look at the frame before keeping
+  `crowd_at`.
+- It is built entirely in ffmpeg from the matte: a halo (blurred matte minus matte, at quarter
+  resolution), a black figure whose alpha is the matte, and one 16×16 alpha ramp for every
+  window. It runs at the base's real frame rate (measured: 6.5 s for 24 s of 1080p).
+- It refuses demotions (the matte would not line up) and needs `matte`.
+
 **`list_carousel`** is the sliding treatment: columns narrow enough that neighbours stay in
 frame (that is what makes it read as a list being traversed), a giant ghosted numeral per
 column, dashed dividers, and `ease_in_out` for the slide — a carousel that overshoots reads as
@@ -463,7 +488,12 @@ lands on. A re-cut moves it for free.
 - **One focus at a time**: accent marks only CHANGE (`stat`) or the newest step (`list`). At
   most two accents in frame. Two cards on screen together is the ceiling.
 
-### The three kinds
+### The kinds
+
+Three are corner cards (`list`, `stat`, `stamp`). Three more (`keyline`, `deck`, `annotate`) are
+the house graphics language adopted on 2026-10-06, after Kallaway (`kb/storytelling.md` §13).
+They use the brand's **`glow`** colour (default violet `#8B5CF6`, the purple of the set), not
+`accent`, so adopting them doesn't recolour the existing cards.
 
 **`list`** — a vertical timeline. Each row lands on its phrase; the card grows with its rows,
 then scrolls by whole rows once full (never a half-clipped row). Optional `time` column, `chips`
@@ -514,6 +544,59 @@ earlier) · `out: {"word": …, "offset": s}` or `hold: s` (default 3 s after th
 **corner tracker** that can stay up through a whole scene over the talking head, with the
 newest row accented. Episode 3's BODY · MIND · VOICE tracker is a 3-row list at `scale: 0.75` (0.55 read too small at 1080).
 
+**`keyline`** — the ONE sentence an idea comes down to, typed on in the lower left with a
+glowing bar and an optional sub-line. It has no glass panel (text over footage, as in the
+reference), so its mask is empty. It lands as its phrase is said and holds 3.5 s.
+- **Distil, don't transcribe:** fewer words than were spoken. The caption already shows the
+  words, so a keyline that repeats them adds nothing.
+- At most one per idea, and never on the zenith.
+- It sits **above** a two-line house caption by default (bottom at y = 800). Use
+  `"placement": "low"` (y = 968, the reference's spot) only on a cut with no burned captions.
+  One sentence, ≤ 90 characters.
+
+```json
+{"id": "k1", "kind": "keyline", "text": "Confidence is the memory of proof",
+ "sub": "Not a feeling you wait for", "at": "memory of proof"}
+```
+
+**`deck`** — the chapter device that **returns at every section seam**. Full frame, over the
+frosted, darkened picture: glass cards in a row, the finished chapters dimmed, the current one
+centred and lit in `glow`. Before its phrase the previous chapter is still lit; on the phrase it
+dims and the current one lights. That hand-over is the progress the viewer reads.
+- Define the chapters once at EDL level and point at them; `prefix` labels each card ("Part",
+  "Pillar", "Lesson").
+- Up to 9 chapters; 5 are shown, centred on the current one.
+- Pair it with the music dropping out just before the seam (`kb/storytelling.md` §13).
+
+```json
+"decks": {"pillars": [{"title": "Body", "icon": "bolt"}, {"title": "Mind", "icon": "star"},
+                      {"title": "Voice"}]},
+"cards": [{"id": "seam2", "kind": "deck", "deck": "pillars", "current": 1, "prefix": "Pillar",
+           "at": "second my mind"}]
+```
+
+**`annotate`** — a real image (a photo, a screenshot, an old thumbnail) on the frosted, darkened
+picture, marked up as it's talked about. Each mark lands on its own phrase. `rect` is
+`[x, y, w, h]` in **fractions of the image**, so a re-crop of the frame never moves it.
+- `box`: a glowing outline.
+- `highlight`: a glow marker that sweeps left to right.
+- `callout`: a thin outline, a line drawn out to a `label` on the `left`, `right`, `top` or
+  `bottom`.
+- Lateral callouts narrow the image, so the label always fits the frame.
+- An optional `title` sits above the image and a `caption` below it.
+- The image is inlined into the card at the pixels it occupies, so replacing the file
+  re-renders the card.
+
+```json
+{"id": "thumb", "kind": "annotate", "image": "assets/thumb.jpg", "at": "my thumbnail",
+ "title": "3 thumbnail elements",
+ "marks": [{"type": "box", "rect": [0.3, 0.1, 0.4, 0.8], "at": "my face"},
+           {"type": "callout", "rect": [0.38, 0.2, 0.26, 0.3], "label": "Facial expression",
+            "side": "right", "at": "expression matters"},
+           {"type": "highlight", "rect": [0.02, 0.86, 0.5, 0.1], "at": "the views"}],
+ "out": {"word": "that is the lesson"}}
+```
+
 ### Anchoring rules — the part that goes wrong
 
 1. **Every `at` is a spoken PHRASE, searched forward from the previous event.** A single common
@@ -544,8 +627,10 @@ BT.601→709, which HyperFrames does not tag), then text graphics, then subtitle
 
 Needs Node (`npx`). Brand colours come from `brand.json` (or `"brand": "<path>"` on the EDL);
 the font from its `card_font` (default Helvetica Neue, loaded by system name — no font file is
-ever copied). Two kinds is deliberate: add a third to `cards_runtime/glass.js` only when a beat
-needs one, and give it the same treatment (Python resolves, the runtime only draws).
+ever copied). Add a kind to `cards_runtime/glass.js` only when a beat needs one, and give it
+the same treatment: Python resolves every time and every length, and the runtime only draws.
+A full-frame kind fades its container with **opacity only**: a scaled full-frame mask would show
+the frosted backdrop's edge. Its motion lives on inner elements, in the overlay pass.
 
 ## Text graphics (titles, lower thirds, chapter cards)
 

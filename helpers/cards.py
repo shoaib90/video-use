@@ -57,6 +57,34 @@ A `stamp` is one word or figure in a glass pill: it lands AS its phrase is said 
 lead, unlike a card), holds ~1.8 s (or exits on `out`), and is shown in caps. Use it for the
 word a line turns on, 3-8 per episode, never repeating a card already on screen. Positions:
 top-left, top-right or top-center; `stack` moves it down a row.
+
+Three full-language kinds (Kallaway's look, adopted 2026-10-06; kb/storytelling.md §13):
+
+* `keyline` — the ONE sentence an idea comes down to, typed on in the lower left with a glow
+  accent bar and an optional sub-line. No glass panel: text over footage, like the reference.
+  Lands as its phrase is said, holds ~3.5 s. Never running captions — one per idea.
+      {"id": "k1", "kind": "keyline", "text": "Confidence is the memory of proof",
+       "sub": "Not a feeling you wait for", "at": "memory of proof"}
+* `deck` — the chapter device that RETURNS at every section seam: glass cards in a row, the
+  finished ones dimmed, the current one centred and lit in the glow colour. Full frame, over the
+  frosted, darkened picture. Define the chapters once at EDL level (`"decks": {"pillars":
+  [...]}`) and point at them, or list them inline.
+      {"id": "seam2", "kind": "deck", "deck": "pillars", "current": 1, "at": "second my mind"}
+      "decks": {"pillars": [{"title": "Body", "icon": "bolt"}, {"title": "Mind"},
+                            {"title": "Voice"}]}
+  `prefix` ("Pillar", "Part"…) labels each card; default "Part".
+* `annotate` — a real image (photo, screenshot, thumbnail) on the frosted, darkened picture,
+  marked up as it is talked about. Each mark lands on its own phrase; `rect` is in fractions of
+  the IMAGE (x, y, w, h):
+      {"id": "thumb", "kind": "annotate", "image": "assets/thumb.jpg", "at": "my thumbnail",
+       "title": "3 thumbnail elements",
+       "marks": [{"type": "box", "rect": [0.05, 0.1, 0.4, 0.8], "at": "my face"},
+                 {"type": "highlight", "rect": [0.5, 0.6, 0.45, 0.15], "at": "the views"},
+                 {"type": "callout", "rect": [0.6, 0.1, 0.3, 0.3], "label": "Facial expression",
+                  "side": "right", "at": "expression"}]}
+
+Colour: these three use the brand's `glow` (default violet #8B5CF6, the purple of the set),
+not `accent`, so adopting the look does not recolour the existing list/stat/stamp cards.
 """
 from __future__ import annotations
 
@@ -89,9 +117,19 @@ _ADV = {**{c: 0.72 for c in "ABCDEFGHKNOPQRSUVXYZ"}, "I": 0.30, "J": 0.56, "L": 
         "T": 0.63, "W": 0.98, **{d: 0.58 for d in "0123456789"}, " ": 0.28, "%": 0.93, "×": 0.60,
         ".": 0.28, ",": 0.28, ":": 0.28, "-": 0.39, "–": 0.56, "'": 0.28, "&": 0.72, "+": 0.60,
         "/": 0.33, "?": 0.61, "!": 0.30, "₹": 0.60, "$": 0.58}
+# bottom: above a two-line caption at the house style (MarginV=30, FontSize=15 on PlayResY 288
+# = captions ~856-968 at 1080); "low" is the reference's own spot, for cuts with no burned captions
+KEYLINE = {"x": 112, "bottom": 800, "bottom_low": 968, "max_w": 1250, "font": 48, "sub": 30, "hold": 3.5,
+           "type_cps": 55.0, "max_chars": 90}
+DECK = {"w": 340, "h": 460, "gap": 44, "visible": 5, "hold": 2.2, "max": 9}
+ANNOT = {"max_w": 1500, "max_h": 720, "top": 196, "title_y": 108, "label_gap": 56, "hold": 2.5}
+MARK_TYPES = ("box", "highlight", "callout")
+FULL_FRAME = ("deck", "annotate")
+KINDS = ("list", "stat", "stamp", "keyline", "deck", "annotate")
 ICONS = {"clock", "drop", "bolt", "scale", "list", "star", None}
 
-DEFAULT_BRAND = {"bg": "#0A0A0A", "fg": "#DED3BD", "muted": "#8A8375", "accent": "#F25435"}
+DEFAULT_BRAND = {"bg": "#0A0A0A", "fg": "#DED3BD", "muted": "#8A8375", "accent": "#F25435",
+                 "glow": "#8B5CF6"}
 DEFAULT_FONT = "Helvetica Neue"
 # local() names per weight. Chrome resolves these from the installed system fonts.
 FONT_FACES = {"Helvetica Neue": {400: "HelveticaNeue", 500: "HelveticaNeue-Medium",
@@ -202,6 +240,89 @@ def stamp_width(text: str) -> int:
     return int(round(em * f + 2 * STAMP["pad"]))
 
 
+def deck_layout(chapters: list[dict], cur: int, prefix: str, stage_w: float, t_light: float) -> dict:
+    """Card positions and states for one appearance of the chapter deck.
+
+    The row is centred on the CURRENT chapter and shows at most `DECK["visible"]` cards, all
+    fully inside the frame (a card cut by the frame edge clips its text, which the HyperFrames
+    layout audit refuses). Before `t_light` the previous chapter is still lit; at `t_light` it
+    goes to done and the current one lights. That hand-over is the progress the viewer reads.
+    """
+    w, gap = DECK["w"], DECK["gap"]
+    half = DECK["visible"] // 2
+    lo, hi = max(0, cur - half), min(len(chapters) - 1, cur + half)
+    cx = stage_w / 2
+    y = round((1080 - DECK["h"]) / 2, 3)
+    cards = []
+    for k in range(lo, hi + 1):
+        before = "done" if k < cur - 1 else "lit" if k == cur - 1 else "next"
+        after = "done" if k < cur else "lit" if k == cur else "next"
+        ch = chapters[k]
+        cards.append({"k": k, "x": round(cx + (k - cur) * (w + gap) - w / 2, 3), "y": y,
+                      "label": f"{prefix} {k + 1}", "title": str(ch["title"]),
+                      "icon": ch.get("icon"), "before": before, "after": after})
+    if cards[0]["x"] < 0 or cards[-1]["x"] + w > stage_w:
+        raise CardError("deck: cards do not fit the frame; lower DECK['visible']")
+    return {"w": w, "h": DECK["h"], "cards": cards, "t_light": round(t_light, 3)}
+
+
+def _image_data_uri(img: Path, w_px: int, h_px: int) -> str:
+    """The image, scaled to the pixels it will occupy, as an inline data URI.
+
+    Inline because HyperFrames' static guard ignores external sources in a render, and because
+    the cache key then covers the image's pixels too (a replaced file re-renders the card).
+    """
+    import base64
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        out = Path(td) / "img.png"
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(img), "-frames:v", "1",
+                        "-vf", f"scale={w_px}:{h_px}:flags=lanczos,format=rgba", str(out)],
+                       check=True)
+        return "data:image/png;base64," + base64.b64encode(out.read_bytes()).decode()
+
+
+def annotate_layout(an: dict, stage_w: float, scale: float, loc) -> dict:
+    """Fit the image, then turn each mark's image-fraction rect into stage units.
+
+    Callouts on the left or right need room for their label, so the image narrows to leave
+    it; a label is never allowed to run off the frame.
+    """
+    iw, ih = _dims(an["image"])
+    lateral = any(m["type"] == "callout" and m.get("side", "right") in ("left", "right")
+                  for m in an["marks"])
+    max_w = min(ANNOT["max_w"], stage_w - 2 * (400 if lateral else 120))
+    has_title = bool(an["title"])
+    max_h = ANNOT["max_h"] - (0 if has_title else 0)
+    k = min(max_w / iw, max_h / ih)
+    dw, dh = round(iw * k, 3), round(ih * k, 3)
+    x = round((stage_w - dw) / 2, 3)
+    y = ANNOT["top"] if has_title else round((1080 - dh) / 2, 3)
+    marks = []
+    for m in an["marks"]:
+        r = m["rect"]
+        rx, ry, rw, rh = x + r[0] * dw, y + r[1] * dh, r[2] * dw, r[3] * dh
+        mk = {"type": m["type"], "t": loc(m["w"] - LEAD),
+              "x": round(rx, 3), "y": round(ry, 3), "w": round(rw, 3), "h": round(rh, 3)}
+        if m["type"] == "callout":
+            side, g = m.get("side", "right"), ANNOT["label_gap"]
+            cxm, cym = rx + rw / 2, ry + rh / 2
+            if side == "right":
+                p0, p1 = (rx + rw, cym), (x + dw + g, cym)
+            elif side == "left":
+                p0, p1 = (rx, cym), (x - g, cym)
+            elif side == "top":
+                p0, p1 = (cxm, ry), (cxm, y - g)
+            else:
+                p0, p1 = (cxm, ry + rh), (cxm, y + dh + g)
+            mk.update({"label": str(m["label"]), "side": side,
+                       "line": [round(v, 3) for v in (*p0, *p1)]})
+        marks.append(mk)
+    src = _image_data_uri(an["image"], max(2, round(dw * scale)), max(2, round(dh * scale)))
+    return {"image": {"src": src, "x": x, "y": y, "w": dw, "h": dh},
+            "title": an["title"], "caption": an["caption"], "marks": marks}
+
+
 def resolve(cards: list[dict], edl: dict, edit_dir: Path, segment_durations: list[float],
             out_w: int, out_h: int) -> list[dict]:
     """Turn EDL `cards` into fully resolved runtime specs, one per card."""
@@ -220,11 +341,13 @@ def resolve(cards: list[dict], edl: dict, edit_dir: Path, segment_durations: lis
             raise CardError(f"{where}: duplicate id")
         seen_ids.add(cid)
         kind = c.get("kind")
-        if kind not in ("list", "stat", "stamp"):
-            raise CardError(f"{where}: kind must be 'list', 'stat' or 'stamp', got {kind!r}")
+        if kind not in KINDS:
+            raise CardError(f"{where}: kind must be one of {', '.join(KINDS)}, got {kind!r}")
         if c.get("icon") not in ICONS:
             raise CardError(f"{where}: unknown icon {c.get('icon')!r}; one of {sorted(i for i in ICONS if i)}")
         pos = c.get("position", "top-left")
+        if kind in ("keyline",) + FULL_FRAME:
+            pos = "top-left"            # placement is fixed by the kind, not chosen
         if pos not in ("top-left", "top-right") and not (kind == "stamp" and pos == "top-center"):
             raise CardError(f"{where}: position must be top-left or top-right"
                             + (" or top-center" if kind == "stamp" else ""))
@@ -234,8 +357,8 @@ def resolve(cards: list[dict], edl: dict, edit_dir: Path, segment_durations: lis
         # runtime, so the entrance/exit tweens on the card itself are untouched, and the mask
         # pass runs the same wrapper, so the frosted glass stays exactly under the card.
         card_scale = float(c.get("scale", 1.0))
-        if kind == "stamp" and card_scale != 1.0:
-            raise CardError(f"{where}: a stamp has no scale")
+        if kind not in ("list", "stat") and card_scale != 1.0:
+            raise CardError(f"{where}: a {kind} has no scale")
         if not 0.4 <= card_scale <= 1.0:
             raise CardError(f"{where}: scale must be between 0.4 and 1.0, got {card_scale}")
 
@@ -299,6 +422,72 @@ def resolve(cards: list[dict], edl: dict, edit_dir: Path, segment_durations: lis
             box_h0 = STAMP["h"]
             y = MARGIN + int(c.get("stack", 0)) * (STAMP["h"] + STAMP["gap"])
             spec["_stamp"] = {"text": shown, "accent": bool(c.get("accent", False))}
+        elif kind == "keyline":
+            text = " ".join(str(c.get("text", "")).split())
+            if not text:
+                raise CardError(f"{where}: a keyline needs text")
+            if len(text) > KEYLINE["max_chars"]:
+                raise CardError(f"{where}: a keyline is ONE sentence (≤{KEYLINE['max_chars']} "
+                                f"characters); {len(text)} given")
+            if not c.get("at"):
+                raise CardError(f"{where}: a keyline needs an 'at' phrase")
+            at(c["at"], "at")
+            placement = c.get("placement", "above-captions")
+            if placement not in ("above-captions", "low"):
+                raise CardError(f"{where}: placement must be 'above-captions' or 'low'")
+            spec["_keyline"] = {"text": text, "sub": " ".join(str(c.get("sub", "")).split()),
+                                "bottom": KEYLINE["bottom_low" if placement == "low" else "bottom"]}
+            box_w, box_h0, y = KEYLINE["max_w"], 1080, 0
+        elif kind == "deck":
+            chapters = c.get("chapters")
+            if chapters is None and c.get("deck"):
+                chapters = (edl.get("decks") or {}).get(c["deck"])
+                if chapters is None:
+                    raise CardError(f"{where}: no deck {c['deck']!r} in the EDL's `decks`")
+            if not chapters or not 2 <= len(chapters) <= DECK["max"]:
+                raise CardError(f"{where}: a deck needs 2-{DECK['max']} chapters")
+            for k, ch in enumerate(chapters):
+                if not str(ch.get("title", "")).strip():
+                    raise CardError(f"{where}: chapter {k} needs a title")
+                if ch.get("icon") not in ICONS:
+                    raise CardError(f"{where}: chapter {k}: unknown icon {ch.get('icon')!r}")
+            cur = c.get("current")
+            if not isinstance(cur, int) or not 0 <= cur < len(chapters):
+                raise CardError(f"{where}: current must be a chapter index 0-{len(chapters) - 1}")
+            if not c.get("at"):
+                raise CardError(f"{where}: a deck needs an 'at' phrase (the seam's first words)")
+            at(c["at"], "at")
+            spec["_deck"] = {"chapters": chapters, "current": cur,
+                             "prefix": str(c.get("prefix", "Part"))}
+            box_w, box_h0, y = None, 1080, 0
+        elif kind == "annotate":
+            if not c.get("image") or not c.get("at"):
+                raise CardError(f"{where}: an annotate needs an 'image' and an 'at' phrase")
+            img = Path(c["image"])
+            img = img if img.is_absolute() else Path(edit_dir) / img
+            if not img.exists():
+                raise CardError(f"{where}: image not found: {img}")
+            at(c["at"], "at")
+            marks = []
+            for k, m in enumerate(c.get("marks") or []):
+                if m.get("type") not in MARK_TYPES:
+                    raise CardError(f"{where} marks[{k}]: type must be one of {MARK_TYPES}")
+                r = m.get("rect")
+                if (not isinstance(r, (list, tuple)) or len(r) != 4
+                        or not all(isinstance(v, (int, float)) for v in r)
+                        or r[2] <= 0 or r[3] <= 0 or r[0] < 0 or r[1] < 0
+                        or r[0] + r[2] > 1.0001 or r[1] + r[3] > 1.0001):
+                    raise CardError(f"{where} marks[{k}]: rect must be [x, y, w, h] fractions "
+                                    f"of the image, inside it")
+                if m["type"] == "callout":
+                    if not str(m.get("label", "")).strip():
+                        raise CardError(f"{where} marks[{k}]: a callout needs a label")
+                    if m.get("side", "right") not in ("left", "right", "top", "bottom"):
+                        raise CardError(f"{where} marks[{k}]: side must be left/right/top/bottom")
+                marks.append({**m, "w": at(m["at"], f"marks[{k}]")})
+            spec["_annot"] = {"image": img, "marks": marks, "title": str(c.get("title", "")),
+                              "caption": str(c.get("caption", ""))}
+            box_w, box_h0, y = None, 1080, 0
         else:
             steps_in = c.get("steps") or []
             if not steps_in:
@@ -325,23 +514,32 @@ def resolve(cards: list[dict], edl: dict, edit_dir: Path, segment_durations: lis
             exit_t = find_phrase(words, c["out"]["word"], max(events) + 1e-3, f"{where} out")
             exit_t += float(c["out"].get("offset", 0.0))
         else:
-            exit_t = max(events) + float(c.get("hold", STAMP["hold"] if kind == "stamp" else HOLD))
+            default_hold = {"stamp": STAMP["hold"], "keyline": KEYLINE["hold"],
+                            "deck": DECK["hold"], "annotate": ANNOT["hold"]}.get(kind, HOLD)
+            exit_t = max(events) + float(c.get("hold", default_hold))
         exit_t = min(exit_t, total - EXIT_DUR - 0.05)
         # A card settles before its first word; a stamp IS the word, so it lands as it's said.
-        card_in = max(0.0, first_word - (LEAD if kind == "stamp" else CARD_LEAD))
+        card_in = max(0.0, first_word - (LEAD if kind in ("stamp", "keyline") else CARD_LEAD))
         start = max(0.0, card_in - 0.1)
         dur = round(exit_t + EXIT_DUR + 0.1 - start, 3)
         loc = lambda t: round(t - start, 3)   # noqa: E731  window-local seconds
 
+        if kind in FULL_FRAME:
+            box_w = stage_w
         x = (MARGIN if pos == "top-left" else round((stage_w - box_w) / 2, 3) if pos == "top-center"
              else round(stage_w - MARGIN - box_w, 3))
+        if kind == "keyline":
+            x = KEYLINE["x"]
+        elif kind in FULL_FRAME:
+            x = 0
         side = {"top-left": "left", "top-right": "right", "top-center": "center"}[pos]
         spec.update({
             "start": round(start, 3), "duration": dur,
             "in": loc(card_in), "exit": loc(exit_t),
             "stage": {"w": stage_w, "h": 1080, "scale": round(scale, 6)},
             "box": {"x": x, "y": y, "w": box_w, "h0": box_h0, "side": side, "k": card_scale},
-            "colors": {"dot_done": f"rgba({_hex_rgb(brand['fg'])},0.45)"},
+            "colors": {"dot_done": f"rgba({_hex_rgb(brand['fg'])},0.45)",
+                       "glow": brand["glow"]},
             "heights": [],
             "_brand": brand,
         })
@@ -381,6 +579,26 @@ def resolve(cards: list[dict], edl: dict, edit_dir: Path, segment_durations: lis
             spec["stamp"] = {"text": st["text"], "accent": st["accent"],
                              "font": STAMP["font"], "track": STAMP["track"]}
             spec["_words"] = [(st["text"], first_word)]
+        elif kind == "keyline":
+            kl = spec.pop("_keyline")
+            n_chars = len(kl["text"])
+            type_dur = round(min(1.4, max(0.45, n_chars / KEYLINE["type_cps"])), 3)
+            spec["keyline"] = {"text": kl["text"], "sub": kl["sub"], "type_dur": type_dur,
+                               "sub_t": round(spec["in"] + type_dur + 0.15, 3),
+                               "font": KEYLINE["font"], "sub_font": KEYLINE["sub"],
+                               "bottom": kl["bottom"], "max_w": KEYLINE["max_w"]}
+            spec["_words"] = [(kl["text"], first_word)]
+        elif kind == "deck":
+            dk = spec.pop("_deck")
+            spec["deck"] = deck_layout(dk["chapters"], dk["current"], dk["prefix"], stage_w,
+                                       loc(first_word - LEAD))
+            spec["_words"] = [(f"{dk['prefix']} {dk['current'] + 1}: "
+                               f"{dk['chapters'][dk['current']]['title']}", first_word)]
+        elif kind == "annotate":
+            an = spec.pop("_annot")
+            spec["annotate"] = annotate_layout(an, stage_w, scale, loc)
+            spec["_words"] = [("[image]", first_word)] + [
+                (m.get("label") or m["type"], m["w"]) for m in an["marks"]]
         else:
             steps = spec.pop("_steps")
             spec["stat"] = {"steps": [{
@@ -411,7 +629,8 @@ def page(spec: dict, mode: str, out_w: int, out_h: int) -> str:
     css = (RUNTIME / "glass.css").read_text()
     js = (RUNTIME / "glass.js").read_text()
     root_vars = (f":root {{ --fg: {b['fg']}; --muted: {b['muted']}; --accent: {b['accent']}; "
-                 f"--bg-rgb: {_hex_rgb(b['bg'])}; --fg-rgb: {_hex_rgb(b['fg'])}; }}\n")
+                 f"--bg-rgb: {_hex_rgb(b['bg'])}; --fg-rgb: {_hex_rgb(b['fg'])}; "
+                 f"--glow: {b['glow']}; --glow-rgb: {_hex_rgb(b['glow'])}; }}\n")
     fonts = _font_css(b) if mode == "overlay" else ""
     if mode == "mask":     # no text in the mask, so no named family (lint requires a face for one)
         css = css.replace('font-family: "CardFont", sans-serif;', "")

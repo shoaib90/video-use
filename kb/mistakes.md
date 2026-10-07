@@ -59,6 +59,14 @@ transcript inside the cut.* Cause: Deepgram `multi` drops 6-18% of long Hinglish
 Check: `AUTO C8` (a transcript gap of 5 s or more inside the cut, so it plays with no captions
 and was never read).
 
+**M029** · 2026-10-07 · podcast Episode 1 (final) · *A false start was left in: at 1:29:05 Shoaib
+starts "यार तो as he said, बक्चोदी करो and हम भी.", stops, and 6 s later says "So yeah, as he said
+बक्चोदी करो और…" properly.* Cause: the range kept the whole outro, and nothing looked for
+restarts. Check: `AUTO C11`: the same speaker says a 4-word run, pauses at least 1.5 s, then says
+it again within 15 s. Echoes by the other person and emphatic repeats without a pause are not
+flagged. On the full 89-minute cut the check found exactly this one (an earlier, looser version
+flagged 80 natural repeats).
+
 ## Captions
 
 **M010** · 2026-10-03 · podcast Episode 1 · *A caption showed a misheard word ("Sex है" for "Sexy
@@ -102,6 +110,18 @@ Check: graphics/cards raise on a missing anchor. Read the resolution printout (`
 backchannel kept its neighbour's speaker label. Check: majority-speaker relabel in the episode's
 make_edl.py; `READ R5` (contact sheet of singles against who is speaking).
 
+**M027** · 2026-10-06 · podcast Episode 1 (final) · *The goodbye ("…from me, from him, take care…
+Alright, man. Thanks for coming. Let's go.") played entirely on Shoaib's single, so Deepak was not
+in frame for the ending or the handshake.* Cause: speaker-following framing ran right to the last
+word. A farewell is a shared moment, not a turn. Check: `AUTO G3` (the last talking shot of a
+multi-person piece must be a two-shot or wide), plus `READ R8`.
+
+**M028** · 2026-10-06 · podcast Episode 1 (final) · *"Why have we shown that pool clip at the end?"*
+The end screen used post-session DSLR footage of a pool, which has nothing to do with the
+episode's people. Cause: the background was chosen as "calm footage under the end-screen
+elements". Check: `READ R8`. The end screen shows the episode's own people (Episode 1 now holds
+their handshake as a still).
+
 ## Sound
 
 **M030** · podcast Episode 1 v1 · *50 camera cuts landed on speech: audible dips and clicks.*
@@ -142,4 +162,7 @@ said by ~0:10?).
 - **R4** Scan frames at delivery resolution for readable labels, screens and plates.
 - **R5** Look at a contact sheet of singles and check the shot shows whoever is speaking.
 - **R6** Spot-listen at each music cue entry, exit and duck.
+- **R8** Watch the last 30 s and the end screen. Everyone in the conversation is in frame for the
+  goodbye, and the end screen shows the episode's own people or moment, never unrelated
+  b-roll.
 - **R7** Watch the first 15 s: picture from frame 1, the promise by ~0:10, no "last time".

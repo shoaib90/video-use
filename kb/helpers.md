@@ -164,6 +164,19 @@ These three fields are local extensions (not upstream). All optional and backwar
   ("holder") around the card. It leaves the card's own entrance and exit tweens alone, and the
   mask pass runs the same wrapper, so the glass stays under the card. The bound check uses the
   SCALED height. Tests are in `tests/test_cards.py` `ScaleTests`.
+  **`keyline`, `deck`, `annotate`** (added 2026-10-06; the Kallaway look, `storytelling.md` §13)
+  use the brand's new `glow` key (default `#8B5CF6`), not `accent`. A keyline's mask is empty (no
+  glass); deck and annotate are full frame over the frosted picture, and fade their container
+  by opacity only. An `annotate` image is inlined as a data URI at the pixels it occupies.
+  `decks` (EDL level) names chapter lists that `deck` cards point at. Tests:
+  `tests/test_cards_kallaway.py`.
+- **`silhouettes`** — rim-lit speaker silhouettes (added 2026-10-06). Needs `matte`; anchored
+  like cards (`at`, `crowd_at`, `out`/`hold`, `fade`); refuses demotions. Built in ffmpeg from
+  the matte by `build_silhouette_filter`; its generated layers use the BASE's probed fps, not
+  the nominal `fps` argument. The matte input is now split only when both the behind-subject cut
+  and a silhouette use it, and the base is split for the behind cut only when a behind overlay
+  exists (an unconnected split output is an ffmpeg error). Tests:
+  `tests/test_render_silhouette.py`.
 - `force_style`'s `MarginV` is relative to `PlayResY=288`. The shipped default of 90 is tuned
   for **vertical** video; for 16:9 landscape ~28 sits the caption about 10% up from the bottom.
 

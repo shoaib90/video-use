@@ -383,6 +383,15 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   them out after. Batch 3–4 before launching a format. On a decline, ask "did I just try
   something new?" before suspecting the platform. See [distribution.md](distribution.md) §12.
 
+- **Graphics-heavy talking heads (Aprilynne 22 changes/min, Kallaway 5.9/min) never mark cuts with
+  effects** (no lift over random moments). The music is continuous, and its ABSENCES are placed: at
+  section cards (her) or under long pure-talk stretches (him). Their shared grammar: one recurring
+  metaphor per idea, a chapter deck that returns at every seam, emphasis words instead of
+  sentence captions, annotated real images, and the face owning the emotional close. **Kallaway's
+  look is the house graphics language (2026-10-06)**: glass `keyline` / `deck` / `annotate` cards
+  and EDL `silhouettes`, all in the brand's `glow`. A keyline sits ABOVE house captions (they
+  occupy y~856-968). See [storytelling.md](storytelling.md) §13 and `SKILL.md`.
+
 ## Maintaining this KB
 
 At the end of a task, append to [worklog.md](worklog.md) and fold any durable, reusable

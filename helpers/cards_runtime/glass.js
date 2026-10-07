@@ -42,8 +42,60 @@
     `transform-origin:${C.kind === "stamp" ? "center center" : `${C.box.side} top`};`;
   holder.appendChild(card);
 
+  const FULL = C.kind === "deck" || C.kind === "annotate";
+  if (FULL) card.classList.add("full");
+  // keyline has no glass (text over footage, like the reference), so its mask is EMPTY
   if (MODE === "mask") {
-    card.innerHTML = '<div class="shell"></div>';
+    card.innerHTML = C.kind === "keyline" ? "" : '<div class="shell"></div>';
+  } else if (C.kind === "keyline") {
+    const K = C.keyline;
+    // characters wrapped per WORD so a line never breaks inside a word while typing
+    const typed = K.text.split(" ").map((w) =>
+      `<span class="w">${[...w].map((ch) => `<span class="c">${esc(ch)}</span>`).join("")}</span>`).join(" ");
+    card.innerHTML = `
+      <div class="kl-scrim"></div>
+      <div class="kl" style="bottom:${1080 - K.bottom}px;max-width:${K.max_w}px">
+        <div class="kl-bar" id="klbar"></div>
+        <div class="kl-text" style="font-size:${K.font}px">${typed}</div>
+        ${K.sub ? `<div class="kl-sub" id="klsub" style="font-size:${K.sub_font}px">${esc(K.sub)}</div>` : ""}
+      </div>`;
+  } else if (C.kind === "deck") {
+    const D = C.deck;
+    const cards = D.cards.map((c) => `
+      <div class="dc" id="dc${c.k}" style="left:${c.x}px;top:${c.y}px;width:${D.w}px;height:${D.h}px">
+        <div class="dc-shell"></div><div class="dc-glow" id="dg${c.k}"></div>
+        <div class="dc-label">${esc(c.label)}</div>
+        <div class="dc-mark">${c.icon && ICONS[c.icon] ? `<svg viewBox="0 0 24 24">${ICONS[c.icon]}</svg>` : `<span>${c.k + 1}</span>`}</div>
+        <div class="dc-title">${esc(c.title)}</div>
+      </div>`).join("");
+    card.innerHTML = `<div class="ff-bg"></div><div class="deck-row" id="drow">${cards}</div>`;
+  } else if (C.kind === "annotate") {
+    const A = C.annotate, I = A.image;
+    const lines = A.marks.map((m, k) => (m.type === "callout"
+      ? `<line id="ln${k}" x1="${m.line[0]}" y1="${m.line[1]}" x2="${m.line[2]}" y2="${m.line[3]}" />` : "")).join("");
+    const marks = A.marks.map((m, k) => {
+      const box = `left:${m.x}px;top:${m.y}px;width:${m.w}px;height:${m.h}px`;
+      if (m.type === "highlight") return `<div class="mk-hl" id="mk${k}" style="${box}"></div>`;
+      let html = `<div class="mk-box${m.type === "callout" ? " thin" : ""}" id="mk${k}" style="${box}"></div>`;
+      if (m.type === "callout") {
+        const [, , x2, y2] = m.line;
+        const pos = m.side === "right" ? `left:${x2 + 14}px;top:${y2 - 22}px`
+          : m.side === "left" ? `right:${C.stage.w - x2 + 14}px;top:${y2 - 22}px;text-align:right`
+          : m.side === "top" ? `left:${x2 - 300}px;width:600px;top:${y2 - 52}px;text-align:center`
+          : `left:${x2 - 300}px;width:600px;top:${y2 + 8}px;text-align:center`;
+        html += `<div class="mk-label" id="lb${k}" style="${pos}">${esc(m.label)}</div>`;
+      }
+      return html;
+    }).join("");
+    card.innerHTML = `
+      <div class="ff-bg"></div>
+      <div class="an" id="an">
+        ${A.title ? `<div class="an-title">${esc(A.title)}</div>` : ""}
+        <img class="an-img" src="${I.src}" style="left:${I.x}px;top:${I.y}px;width:${I.w}px;height:${I.h}px" />
+        <svg class="an-lines" data-layout-allow-overlap viewBox="0 0 ${C.stage.w} 1080" style="width:${C.stage.w}px;height:1080px">${lines}</svg>
+        <div class="an-marks" data-layout-allow-overlap>${marks}</div>
+        ${A.caption ? `<div class="an-cap" style="top:${I.y + I.h + 28}px">${esc(A.caption)}</div>` : ""}
+      </div>`;
   } else if (C.kind === "stamp") {
     const P = C.stamp;
     card.innerHTML = `
@@ -85,7 +137,12 @@
   const tl = gsap.timeline({ paused: true });
   const side = C.box.side === "left" ? -1 : C.box.side === "right" ? 1 : 0;
   // Curve for opacity, spring for transforms (motion.py: alpha must never overshoot).
-  if (C.kind === "stamp") {
+  if (C.kind === "keyline" || FULL) {
+    // Opacity only on the container: a full-frame mask that scaled would show the frosted
+    // backdrop's edge. Motion lives on the inner elements (overlay pass only).
+    tl.fromTo("#card", { opacity: 0 }, { opacity: 1, duration: FULL ? 0.45 : 0.25, ease: "power2.out" }, C.in);
+    tl.fromTo("#card", { opacity: 1 }, { opacity: 0, duration: C.exit_dur, ease: "power2.in", immediateRender: false }, C.exit);
+  } else if (C.kind === "stamp") {
     // A stamp lands ON its word: quick, a small press-in, no slide. Shared by both passes.
     tl.fromTo("#card", { opacity: 0 }, { opacity: 1, duration: 0.22, ease: "power2.out" }, C.in);
     tl.fromTo("#card", { scale: 1.14, y: -6 }, { scale: 1, y: 0, duration: 0.45, ease: "back.out(2.0)" }, C.in);
@@ -137,6 +194,49 @@
       tl.fromTo(`#v${k}`, { opacity: 0, y: 34 }, { opacity: 1, y: 0, duration: 0.6, ease: "expo.out" }, s.t);
       if (s.tag) tl.fromTo(`#t${k}`, { opacity: 0 }, { opacity: 1, duration: 0.35, ease: "power2.out" }, s.t + 0.15);
       if (s.sub) tl.fromTo(`#s${k}`, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, s.sub_t);
+    });
+  }
+  if (MODE !== "mask" && C.kind === "keyline") {
+    const K = C.keyline;
+    tl.fromTo("#klbar", { scaleY: 0 }, { scaleY: 1, duration: 0.45, ease: "power3.out" }, C.in);
+    const chars = document.querySelectorAll(".kl-text .c");
+    tl.fromTo(chars, { opacity: 0 }, { opacity: 1, duration: 0.06, ease: "none",
+      stagger: K.type_dur / Math.max(1, chars.length) }, C.in + 0.05);
+    if (K.sub) tl.fromTo("#klsub", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, K.sub_t);
+    tl.to(".kl", { x: -24, duration: C.exit_dur, ease: "power2.in" }, C.exit);
+  }
+  if (MODE !== "mask" && C.kind === "deck") {
+    const D = C.deck;
+    // state -> look. Opacity on a curve, scale on a spring (motion.py: alpha never overshoots).
+    const LOOK = { done: { opacity: 0.34, scale: 0.88 }, next: { opacity: 0.6, scale: 0.88 }, lit: { opacity: 1, scale: 1 } };
+    tl.fromTo("#drow", { scale: 0.94, y: 18 }, { scale: 1, y: 0, duration: 0.8, ease: "back.out(1.3)" }, C.in);
+    for (const c of D.cards) {
+      tl.set(`#dc${c.k}`, LOOK[c.before], 0);
+      tl.set(`#dg${c.k}`, { opacity: c.before === "lit" ? 1 : 0 }, 0);
+      if (c.before !== c.after) {
+        tl.to(`#dc${c.k}`, { opacity: LOOK[c.after].opacity, duration: 0.45, ease: "power2.inOut" }, D.t_light);
+        tl.to(`#dc${c.k}`, { scale: LOOK[c.after].scale, duration: 0.7, ease: c.after === "lit" ? "back.out(1.8)" : "power3.out" }, D.t_light);
+        tl.to(`#dg${c.k}`, { opacity: c.after === "lit" ? 1 : 0, duration: 0.5, ease: "power2.inOut" }, D.t_light);
+      }
+    }
+  }
+  if (MODE !== "mask" && C.kind === "annotate") {
+    const A = C.annotate;
+    tl.fromTo("#an", { scale: 0.96, y: 14 }, { scale: 1, y: 0, duration: 0.8, ease: "back.out(1.2)" }, C.in);
+    A.marks.forEach((m, k) => {
+      if (m.type === "highlight") {
+        tl.fromTo(`#mk${k}`, { scaleX: 0 }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, m.t);
+      } else {
+        tl.fromTo(`#mk${k}`, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, m.t);
+        tl.fromTo(`#mk${k}`, { scale: 1.12 }, { scale: 1, duration: 0.55, ease: "back.out(2)" }, m.t);
+      }
+      if (m.type === "callout") {
+        const ln = document.getElementById(`ln${k}`);
+        const len = Math.hypot(m.line[2] - m.line[0], m.line[3] - m.line[1]);
+        ln.style.strokeDasharray = `${len}`;
+        tl.fromTo(ln, { strokeDashoffset: len }, { strokeDashoffset: 0, duration: 0.4, ease: "power2.out" }, m.t + 0.15);
+        tl.fromTo(`#lb${k}`, { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.4, ease: "power3.out" }, m.t + 0.4);
+      }
     });
   }
   window.__timelines["main"] = tl;

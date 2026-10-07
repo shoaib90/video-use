@@ -114,3 +114,46 @@ class Calibration2(unittest.TestCase):
     def test_punctuated_last_word_is_not_dangling(self):
         ws = words(seq("कुछ insight दे सकता है तो? हां.", 0.0))
         self.assertFalse([x for x in self.flags(ws, [("S", 0.0, 1.75)]) if x[1] == "C6"])
+
+
+class GoodbyeFraming(unittest.TestCase):  # M027
+    def test_goodbye_on_a_single_is_flagged(self):
+        edl = {"ranges": [{"source": "A", "start": 0, "end": 5, "frame": "TWO"},
+                          {"source": "A", "start": 5, "end": 9, "frame": "SHOAIB"},
+                          {"source": "E", "start": 0, "end": 16, "frame": "END"}]}
+        self.assertEqual([g[1] for g in review.graphics_checks(edl)], ["G3"])
+
+    def test_goodbye_on_the_wide_passes(self):
+        edl = {"ranges": [{"source": "A", "start": 0, "end": 5, "frame": "SHOAIB"},
+                          {"source": "A", "start": 5, "end": 9, "frame": "WIDE"},
+                          {"source": "E", "start": 0, "end": 16, "frame": "END"}]}
+        self.assertEqual(review.graphics_checks(edl), [])
+
+
+class FalseStart(unittest.TestCase):  # M029
+    def test_restart_is_flagged(self):
+        ws = words(seq("यार तो as he said बक्चोदी करो and हम भी.", 0.0)
+                   + seq("So yeah, as he said बक्चोदी करो और हमारा भी time.", 7.0))
+        st = [("S", 0.0, 12.0, 0.0, 0.0, 0)]
+        f = review.edge_checks(Path("."), st, lambda src: ws)[0]
+        self.assertIn("C11", [x[1] for x in f])
+
+    def test_no_repeat_no_flag(self):
+        ws = words(seq("he went to school and then he played volleyball every evening.", 0.0))
+        f = review.edge_checks(Path("."), [("S", 0.0, 4.0, 0.0, 0.0, 0)], lambda src: ws)[0]
+        self.assertNotIn("C11", [x[1] for x in f])
+
+
+class FalseStartNoise(unittest.TestCase):
+    def test_emphatic_repeat_without_pause_is_not_flagged(self):
+        ws = words(seq("Tier three, Tier four. Tier three, Tier four.", 0.0))
+        f = review.edge_checks(Path("."), [("S", 0.0, 3.0, 0.0, 0.0, 0)], lambda src: ws)[0]
+        self.assertNotIn("C11", [x[1] for x in f])
+
+    def test_echo_by_the_other_speaker_is_not_flagged(self):
+        a = words(seq("मेरे को पता है कि", 0.0))
+        b = words(seq("मेरे को पता है ना", 4.0))
+        for w in b:
+            w["speaker_id"] = "speaker_1"
+        f = review.edge_checks(Path("."), [("S", 0.0, 6.0, 0.0, 0.0, 0)], lambda src: a + b)[0]
+        self.assertNotIn("C11", [x[1] for x in f])

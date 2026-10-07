@@ -1606,3 +1606,78 @@ First real run, on podcast Episode 1 v7:
 - 5 were accepted with a written reason.
 - The rest were reclassified (filler trims, punctuated endings), then 0 HIGH.
 - 23 changed edges went into the reel for Shoaib, instead of an 89-minute rewatch.
+
+## 2026-10-06 — Editing study: Aprilynne Alter and Kallaway → storytelling.md §13
+
+Shoaib asked for the concept *and* the editing (motion graphics, music, sound effects) of
+<https://youtu.be/659t-D3e0Z0> and of Kallaway's <https://youtu.be/3y-WiiUaqb4> (concept
+studied 2026-10-05). Both were downloaded at 720p with his OK (137 MB and 82 MB, scratchpad only).
+
+**Verified how:** the method is in §13. Two traps hit and fixed along the way:
+- `librosa.load()` on the `.mp4` fell back to audioread and **silently returned 86 s of a 21-min
+  file**. Every level from that run was wrong. Decode to WAV with ffmpeg first, then load the WAV.
+- A transient detector fires ~88/min on speech consonants alone, so "40% of cuts have a
+  transient" is chance (~35%). Measure the **lift against random moments** instead; the real
+  answer was no lift at all.
+
+Channel-specific reading in channel-kb: `07-research/aprilynne-alter.md` (new) and
+`07-research/kallaway.md` §7. Script-stage rules in its playbook.
+
+## 2026-10-06 — Built the Kallaway graphics language: keyline, deck, annotate, silhouettes
+
+Shoaib adopted Kallaway's style as the house look and asked for all four missing pieces before
+Episode 4.
+
+**Built:**
+- `cards.py` and `cards_runtime/glass.{js,css}` gained three kinds: `keyline` (a typed key
+  sentence + sub-line + glow bar, with no glass and so an empty mask), `deck` (a returning chapter
+  deck: done dimmed, current lit on its phrase) and `annotate` (an image with box / highlight /
+  callout marks in image fractions). There is a new brand key, `glow` (default `#8B5CF6`), so
+  `accent` and Episode 3's existing cards are untouched.
+- `render.py` gained `silhouettes` (`resolve_silhouettes`, `build_silhouette_filter`): a black
+  figure plus a rim built from the matte, an optional crowd, and one 16×16 `geq` alpha ramp.
+
+**Verified how:**
+- 270 tests pass (new: `test_cards_kallaway.py`, 19; `test_render_silhouette.py`, 7).
+- Real HyperFrames renders of all three kinds on 24 s of 1080p footage: the layout audit passed,
+  every element landed on its phrase per `report()`, and frames were read.
+- A real silhouette on a real `matte.py` matte (6.5 s for 24 s; 8.8 s with the crowd).
+- A burned two-line caption in Episode 3's exact `force_style` under a keyline: no collision.
+
+**Found along the way:**
+- **House captions are NOT where the render.py default says.** Our episodes use `MarginV=30`
+  (not the default 90, which is tuned for vertical) with 8 words per chunk, so a two-line cue
+  occupies y ≈ 856–968 at 1080. Kallaway's lower-left spot (≈ 840–970) collides with it, hence
+  the keyline's default bottom of 800. Check caption geometry before placing anything low.
+- render.py's composite always maps `0:a`, so a test base without audio fails with ffmpeg
+  exit 234 and no visible message (stderr is captured). Give test bases a silent track.
+- The crowd silhouettes read as blobs on a matte that includes the mic and chair (Kallaway's
+  footage). Expect better on a clean head-and-shoulders, but look before keeping `crowd_at`.
+- zsh: `rm -f f_*.png` with no matches aborts the whole `&&` chain (`no matches found`).
+
+## 2026-10-06 — Podcast Episode 1 final: the goodbye and the end screen (M027, M028)
+
+Shoaib, on the final:
+- **The pool clip on the end screen, and why it was there.** Replaced by the episode's own
+  handshake (IMG_3464 @ 3795.6), held as a still with a slow push.
+- **1:29:20 to the end was all on his single.** The goodbye now moves to the wide from "So from
+  me, from him" (`wide_from`). It holds past "Let's go" to 3799.5, through the handshake and
+  standing up (`hold_to`, asserted to stop before the next word).
+
+New check G3 in review.py: a multi-person piece must not end on a single. It flags the old
+final and passes the fix, and is pinned by 2 tests (15 in the file). READ item R8: the last
+30 s and the end screen.
+
+The final was re-rendered with the resume wrapper. A segment is reused when its range is
+identical to the approved final's range at the same index and its source has not changed.
+
+## 2026-10-07 — False-start check C11 (M029)
+
+Shoaib caught a restart at 1:29:05 of the podcast Episode 1 final. A first version of C11 (any
+4-word repeat within 12 s) flagged 80 places on the full cut, nearly all natural Hinglish
+emphasis or one speaker echoing the other. That was useless. It was narrowed to the same
+speaker, a pause of 1.5 s or more between the attempts, and a repeat within 15 s. That flags
+exactly Shoaib's one case. Pinned by 4 tests (19 in `test_review_edges.py`).
+
+The cut: 3770.18 → 3778.18, keeping Deepak's "बक्चोदी करो यार." and resuming on "So yeah, as he
+said…". The final was re-rendered via resume_final (PREV = review/final2), under `caffeinate`.

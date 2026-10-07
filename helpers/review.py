@@ -28,6 +28,7 @@ Checks:
   C4 long setup cut             C5 OUT mid-sentence             C6 dangling edge word
   C7 ghost duplicate words      C8 transcript gap inside cut    C9 lowest-confidence words
   C10 Spanish drift             G1 overlay/card contact sheets  G2 caps-unsafe card text
+  C11 false start / restart     G3 goodbye on a single
 """
 from __future__ import annotations
 
@@ -206,6 +207,31 @@ def edge_checks(edit: Path, stories, words_of, exempt=lambda k: False):
                                                       for m in range(n + 1, min(len(ws), n + 5))):
                     flags.append(("HIGH", "C7", k, edge, f"ghost duplicate “{w['text']}” ({(w['end'] - w['start']) * 1000:.0f} ms) at {w['start']:.2f}: check RMS"))
                     break
+        # C11 false start / restart (M029): the SAME speaker says a 4-word run, stops (a pause of
+        # 1.5 s or more), and says it again within 15 s: the first try was abandoned ("यार तो as
+        # he said बक्चोदी करो and हम भी. [pause] So yeah, as he said बक्चोदी करो और…"). Echoes by the
+        # other person and emphatic repeats with no pause ("Tier three, Tier four. Tier three,
+        # Tier four.") are natural speech and are not flagged.
+        toks = [norm(w["text"]) for w in ws[i:j + 1]]
+        p_ = 0
+        while p_ < len(toks) - 3:
+            gram, hit = tuple(toks[p_:p_ + 4]), None
+            if all(len(g) >= 2 for g in gram):
+                for q_ in range(p_ + 4, len(toks) - 3):
+                    a0, b0 = ws[i + p_], ws[i + q_]
+                    if b0["start"] - a0["start"] > 15:
+                        break
+                    if tuple(toks[q_:q_ + 4]) != gram or a0.get("speaker_id") != b0.get("speaker_id"):
+                        continue
+                    pause = max(ws[i + m + 1]["start"] - ws[i + m]["end"] for m in range(p_ + 3, q_))
+                    if pause >= 1.5:
+                        hit = q_
+                        break
+            if hit is not None:
+                flags.append(("MED", "C11", k, "IN", f"false start? “{' '.join(w['text'] for w in ws[i + p_:i + p_ + 4])}” "
+                                                     f"restarted after a pause, src {ws[i + p_]['start']:.1f} → {ws[i + hit]['start']:.1f}"))
+                p_ = hit
+            p_ += 1
         # C8 transcript gap inside the cut
         for n in range(i, j):
             g = ws[n + 1]["start"] - ws[n]["end"]
@@ -317,6 +343,17 @@ def music_check(render: Path, raw: Path, ok_windows):
 
 def graphics_checks(edl: dict):
     out = []
+    # G3 (M027): a multi-person conversation's goodbye must show everyone. Only EDLs that carry
+    # framing labels (`frame`) can be checked; singles are named after a person, the shared
+    # framings are TWO / WIDE.
+    R = edl.get("ranges", [])
+    framed = [r for r in R if r.get("frame") and r.get("frame") not in ("END", "SLATE")
+              and not r["frame"].startswith(("TOCAM", "BROLL"))]
+    if framed and any(r["frame"].startswith(("TWO", "WIDE")) for r in framed):
+        last = framed[-1]
+        if not last["frame"].startswith(("TWO", "WIDE")):
+            out.append(("HIGH", "G3", f"the last talking shot ({last['source']} {last['start']:.1f}-{last['end']:.1f}) "
+                                      f"is a single ({last['frame']}): the goodbye should show everyone"))
     for c in (edl.get("cards") or []):
         for txt in [c.get("text", "")] + [s.get("value", "") for s in c.get("steps", [])] + [r.get("text", "") for r in c.get("rows", [])]:
             if c.get("kind") == "stamp" and re.search(r"[A-Z]{2,}s\b|\d+[a-z]+s\b", txt):
@@ -469,7 +506,7 @@ def main():
         rep.append(f"\n## Accepted after checking ({len(acc_flags)}, {acc_path.name})\n")
         rep += [f"- {f[0]} {f[1]} #{f[2]} {f[3]}: {f[4]} — **{x['why']}**" for f, x in acc_flags]
     rep.append("\n## Graphics\n")
-    rep += [f"- {g[0]} {g[1]}: {g[2]}" for g in gflags] or ["- PASS G2: no caps-unsafe card text"]
+    rep += [f"- {g[0]} {g[1]}: {g[2]}" for g in gflags] or ["- PASS G2/G3: card text caps-safe; the goodbye shows everyone"]
     rep += [f"- G1 contact sheet: {s.name}" for s in sheets]
     rep.append("\n## Words to read (C9 lowest confidence in the cut; C10 Spanish drift)\n")
     rep += [f"- {fmt(t)}  “{w}”  conf {c:.2f}  ({s})" for c, t, w, s in lowc]

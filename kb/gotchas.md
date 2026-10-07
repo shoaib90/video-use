@@ -3060,3 +3060,25 @@ no list content, so the frosted glass is unchanged. Verified on a real HyperFram
 3-row card at 1, 2 and 3 rows: there is never a line below the newest row. Pinned by
 `tests/test_cards.py` `SpineTests`. Any card cached under `animations/cards/` before the fix
 re-renders by itself, because its content hash includes the runtime.
+
+
+**And even the longest timeout is 2 hours.** The 1080 CRF16 final of podcast Episode 1 (484
+segments, 89.8 min, 4K HLG sources with DSLR pictures) was stopped at 280/484 segments after
+2 h on 2026-10-06. render.py always re-extracts, so a plain restart would hit the same wall.
+Resume instead: wrap `render.extract_segment` so that a segment is reused when its file exists,
+post-dates edl.json and probes to the frame-snapped duration. A truncated file fails the probe
+and is redone. Then call `render.main()`. The wrapper is idempotent, so re-run it until it
+finishes. Pattern: `episode-1/edit/build/resume_final.py`. Run the music mix and review as
+separate jobs, not chained after a render that might be stopped.
+
+
+**And the Mac sleeps under a background job.** Podcast Episode 1's final mix (5 minutes of work)
+was stopped twice at the 2 h limit overnight on 2026-10-07. `pmset -g log` showed the machine
+asleep on battery, waking for about 2 s every 15 minutes. The app's keep-awake hold
+(`until: session_idle`) lets go once the session is quiet, which a turn waiting on a background
+job is. The stdout log was empty because Python block-buffers into a file, so the job looked
+hung rather than asleep. Fix:
+- Wrap long jobs in `caffeinate -ims` (they hold sleep off for exactly the job's life; a
+  closed lid still sleeps).
+- Run them with `PYTHONUNBUFFERED=1`.
+- Check `pmset -g log | grep -E "Sleep|DarkWake"` before blaming the job.
