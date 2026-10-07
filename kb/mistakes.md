@@ -139,6 +139,16 @@ global bed level. Check: per-window levelling in mix_music.py; `READ R6` (listen
 under the conversation, only in the intro.* Check: `AUTO T7` (music presence in speech pauses
 outside the allowed windows, measured against the no-music render) when `--raw` is given.
 
+**M034** · 2026-10-07 · podcast Episode 1 · *Shoaib made his own small Resolve edit on
+`final_raw.mp4`, believing it was the finished video. It had no music and sat at −20.5 LUFS.
+He nearly uploaded it.* Cause: the pre-mix render had a name that read as final, and it sat
+next to the real final. Check:
+- The pre-mix render is named `*_NO_MUSIC_do_not_upload.mp4`.
+- Delivery messages name the ONE file to upload.
+- The edit folder never holds two files that both look final.
+
+`READ R9`: when Shoaib edits a file himself, confirm which file it was built from.
+
 ## Openings & packaging
 
 **M040** · Episode 1 (talking-head series) · *95% → 52% retention in 8 s of silent black at the
@@ -165,4 +175,7 @@ said by ~0:10?).
 - **R8** Watch the last 30 s and the end screen. Everyone in the conversation is in frame for the
   goodbye, and the end screen shows the episode's own people or moment, never unrelated
   b-roll.
+- **R9** Leave exactly one file in the edit folder that looks uploadable. Rename pre-mix and
+  no-loudness renders `*_NO_MUSIC_do_not_upload*`, and name the upload file in the delivery
+  message.
 - **R7** Watch the first 15 s: picture from frame 1, the promise by ~0:10, no "last time".
