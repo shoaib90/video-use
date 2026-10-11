@@ -1681,3 +1681,23 @@ exactly Shoaib's one case. Pinned by 4 tests (19 in `test_review_edges.py`).
 
 The cut: 3770.18 → 3778.18, keeping Deepak's "बक्चोदी करो यार." and resuming on "So yeah, as he
 said…". The final was re-rendered via resume_final (PREV = review/final2), under `caffeinate`.
+
+## 2026-10-11 — HDR audit: how iPhone HLG footage is handled (no code changes)
+
+Shoaib asked how the repo handles iPhone 17 Pro HDR (HLG). Read-only audit of every encode
+site, plus ffprobe and matched frames on two deliveries: podcast Episode 1
+(`IMG_3464` @ 251.397 vs `Unfinished_Ep1_Deepak_FINAL.mp4` @ 3154.233) and Episode 2
+(`IMG_3664` @ 8.86 vs `final.mp4` @ 201.196). Each frame pair was matched against the rendered
+segment.
+
+- Every iPhone source is HLG (`arib-std-b67`, `bt2020`, 10-bit). render.py tone-maps it to Rec.709
+  per segment via `TONEMAP_CHAIN` (zscale `npl=100` + hable). This is a real conversion, not a
+  relabel: saturation 0.32 → 0.47 on the podcast frame.
+- Podcast export: tags `bt709` ×3, consistent with the pixels.
+- Episode 2 export: `transfer` and `primaries` are **unknown**. Cause: ffmpeg 9 ignores
+  `-color_trc/-color_primaries` (new gotchas.md entry, with verified fixes), and the concat
+  copies segment 0's header from an untagged prepped card.
+- Look: `npl=100` puts midtones ~10-15 luma below a reference conversion (`npl=203`, mobius):
+  133.7 vs 144.7 on the podcast frame, 129.3 vs 143.8 on Episode 2. Not changed; it is a look
+  decision for Shoaib.
+- Comparison PNGs were written to the session scratchpad only.

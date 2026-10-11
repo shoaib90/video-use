@@ -3082,3 +3082,43 @@ hung rather than asleep. Fix:
   closed lid still sleeps).
 - Run them with `PYTHONUNBUFFERED=1`.
 - Check `pmset -g log | grep -E "Sleep|DarkWake"` before blaming the job.
+
+---
+
+## ffmpeg 9 ignores `-color_trc` and `-color_primaries` — colour flags silently don't stick
+
+On ffmpeg **9.0.1** (this machine), the output options `-color_trc` and `-color_primaries` are
+ignored. The encoder takes the transfer and primaries the decoded frames already carry, or
+writes `unknown` when they carry none. `-colorspace` (the matrix) does stick. Nothing warns.
+Verified 2026-10-11 with one-second libx264 encodes, read back with ffprobe
+(`color_space,color_transfer,color_primaries`):
+
+| Input | How bt709 was asked for | Result |
+|---|---|---|
+| lavfi `color=black` | output flags | `bt709, unknown, unknown` |
+| untagged mp4 | output flags | `bt709, unknown, unknown` |
+| raw iPhone HLG clip | output flags | `bt709, arib-std-b67, bt2020` |
+| lavfi `color=black` | `-vf setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709` | `bt709, bt709, bt709` |
+| lavfi `color=black` | `-bsf:v h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1` | `bt709, bt709, bt709` |
+
+The HLG row is the dangerous one: a "relabel to bt709" leaves the HLG tags on and only changes
+the matrix, so the file claims a mix of both.
+
+**How it reached a delivery.** Episode 2's `build/prep.py` passes all three flags when it makes
+the black cold-open and tagline cards, and both came out `bt709, unknown, unknown`. Those are
+the first 3 segments of the cut. The concat stream-copies video, so the stream header comes from
+the **first** segment: `base.mp4`, `final_nomusic.mp4` and the delivered `final.mp4` are all
+`transfer=unknown, primaries=unknown`. That held even though 60 of the 64 segments (every one
+through `TONEMAP_CHAIN`) are fully bt709. The pixels are correct Rec.709, and most players
+assume that for untagged HD, but no player is told it. *Unverified: how QuickTime and YouTube
+treat this exact file.* Podcast Episode 1 escaped it only because its first segment was a
+tone-mapped iPhone clip; `TONEMAP_CHAIN`'s last `zscale` tags its frames itself.
+
+Second, smaller instance: an animated push-in (`zoompan`) drops the frame tags, so those
+segments come out `bt709, unknown, unknown` too (podcast `seg_04_IMG_3796.mp4`). Harmless when
+it is not the first segment.
+
+Rules:
+- Tag inside the filter chain (`setparams`) or with `h264_metadata`, never with output flags.
+- Check the tags of segment 0 and of the finished file, not just the source.
+- Read all three fields. `color_space=bt709` alone proves nothing.

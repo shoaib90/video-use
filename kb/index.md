@@ -218,6 +218,11 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   (0.6s drift by the end of a 30-segment cut) and an overlay's `start_in_output`. A cheap
   `--draft` pass measures boundaries valid at any output resolution.
 
+- **ffmpeg 9 ignores `-color_trc` / `-color_primaries`** — output colour flags silently don't stick
+  (only `-colorspace` does). Tag with `setparams` in the filter chain or `h264_metadata`. The concat
+  takes segment 0's tags, so one untagged card left Episode 2's whole final `transfer=unknown`.
+  Check all three fields on segment 0 and the final. See gotchas.md.
+
 - **Piping frames through Python? Read and write `yuv420p` and tag the rawvideo
   INPUT with `-color_range tv -colorspace bt709`.** A bgr24 round trip costs ~20 dB,
   and an untagged input costs another ~19 dB, both silently. Measure any Python video
