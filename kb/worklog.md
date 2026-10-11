@@ -1701,3 +1701,35 @@ segment.
   133.7 vs 144.7 on the podcast frame, 129.3 vs 143.8 on Episode 2. Not changed; it is a look
   decision for Shoaib.
 - Comparison PNGs were written to the session scratchpad only.
+
+## 2026-10-11 — Colour decisions: new tone-map, no default grade, exposure check, bt709 stamp
+
+Shoaib's decisions after the HLG audit and the IMG_3833 / IMG_3836 comparison:
+
+1. **`TONEMAP_CHAIN` changed to `npl=203` + `tonemap=mobius`**. The rest of the chain is
+   unchanged. Midtones are ~10-15 luma brighter on every shoot measured, and red clipping went
+   from 0.9-2.0% to 0.1-0.3%.
+2. **The Episode 2 grade is retired as a default.** Indoor talking heads get no grade, or a
+   light one inside guardrails: p5 >= 20, white balance never from clothing, saturation <= 1.0,
+   red clipping < 0.5%. Written into SKILL.md "Color grade" and gotchas.md. The code default
+   was already no grade; the Episode 2 string had spread by copying it into Episode 3's EDL.
+   Episode 3's EDL was not touched (delivered).
+3. **New `helpers/exposure.py`**, called by render.py after the first segment (of up to 6) that
+   shows a face. It reports frame mean/p5/p95, face luma (mediapipe face detector in
+   `retouch-env`) and red clipping. It warns on p5 < 20, a face > 15 luma under the frame mean,
+   red clipping > 0.5% and grade saturation > 1.0. It never fails a render. `--no-exposure-check`
+   turns it off. On the old-chain test segments it flagged exactly what the comparison showed:
+   p5 3.7 / 8.1 under the Episode 2 grade, and 0.5% / 1.0% red clipping with no grade.
+4. **bt709 stamped on every output.** The concat and the copy path add `h264_metadata`, and the
+   composite ends in `setparams` after the subtitles (Rule 1 holds: it is tags only). This
+   replaces output flags, which ffmpeg 9 ignores.
+
+Verified:
+- Full suite 297 passed (21 new in `tests/test_render_color.py`, including real-ffmpeg tagging
+  tests).
+- An end-to-end render in the scratchpad (untagged lavfi card as segment 0, then both test
+  clips): `base.mp4` and `final.mp4` bt709 ×3, base and final framemd5-identical. The exposure
+  report ran after segment 1 (p5 23.3, face 113.9 vs frame 102.5, red 0.32%, ok).
+
+Not yet done: no real episode has been re-rendered with the new chain. Re-renders of old
+projects will look brighter, and must re-extract every segment rather than resume.

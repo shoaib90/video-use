@@ -221,7 +221,8 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
 - **ffmpeg 9 ignores `-color_trc` / `-color_primaries`** — output colour flags silently don't stick
   (only `-colorspace` does). Tag with `setparams` in the filter chain or `h264_metadata`. The concat
   takes segment 0's tags, so one untagged card left Episode 2's whole final `transfer=unknown`.
-  Check all three fields on segment 0 and the final. See gotchas.md.
+  Check all three fields on segment 0 and the final. render.py now stamps bt709 itself
+  (2026-10-11). See gotchas.md.
 
 - **Piping frames through Python? Read and write `yuv420p` and tag the rawvideo
   INPUT with `-color_range tv -colorspace bt709`.** A bgr24 round trip costs ~20 dB,
@@ -235,10 +236,12 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
 - **`zoompan`'s `d` is output-frames-per-INPUT-frame**, so under `-loop 1` every looped frame
   gets expanded — a 3.6s Ken Burns still came out **389s / 382MB**. Cap with `-frames:v`, and
   probe the duration of anything built with it. See gotchas.md.
-- **A grade does not travel between episodes if the colour space changed.** Ep2 is HLG where
-  Ep1 was SDR; the tone-map already supplies the punch, so Ep1's grade string measured sat
-  0.407 vs its own delivered 0.29. White-balance off a **known white in frame** (the t-shirt),
-  not a global R/B ratio, and set desaturation *after* the contrast curve.
+- **A grade belongs to a lighting setup, not a channel — indoor talking heads default to NO
+  grade** (2026-10-11). The Episode 2 grade took p5 to 5 on a new setup, and its t-shirt white
+  balance cooled skin. Guardrails: p5 >= 20, white balance from skin or wall (never clothing),
+  saturation <= 1.0, red clothing clips < 0.5%. `helpers/exposure.py` checks them on the first
+  face segment of every render. HLG tone-map is now `npl=203` + mobius (`npl=100` + hable ran
+  ~10-15 luma dark), so **never resume a render across that change**. See gotchas.md.
 - **`coverage.py` counts 75 jump cuts on one locked-off frame as 5 visual events — correctly.**
   Push-ins below ~1.1x stop a splice reading as a glitch but are invisible as *events*; only
   something that replaces the frame moves the number. Run it on the picture lock, before

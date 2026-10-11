@@ -228,6 +228,14 @@ For anything else — portraiture, nature, product, music video, documentary —
 
 Hard rules: apply **per-segment during extraction** (not post-concat, which re-encodes twice). Never go aggressive without testing skin tones.
 
+**Indoor talking heads: no grade by default.** HLG sources are already tone-mapped to Rec.709 (`npl=203`, mobius), and the tone-map adds saturation. If the user wants a grade, keep it light and inside these guardrails:
+- the darkest 5% of the frame (p5) stays **>= 20**. Never crush eyes or beard.
+- white balance from **skin or a neutral wall**, never from clothing
+- `saturation` **<= 1.0**
+- strongly red/orange clothing clips **< 0.5%**
+
+A grade belongs to one lighting setup. Never carry a previous episode's grade string over. `render.py` prints an exposure report after the first segment that shows a face (`helpers/exposure.py`). Read it, and fix any WARNING before the full render finishes.
+
 ## Subtitles (when requested)
 
 Subtitles have three dimensions worth reasoning about: **chunking** (1/2/3/sentence per line), **case** (UPPER/Title/Natural), and **placement** (margin from bottom). The right combo depends on content.

@@ -849,8 +849,10 @@ Confirmed the prep approach from the entry above works, with detail worth keepin
   boundaries stayed valid and no re-measure was needed after a re-prep.
 - Prep **to the final output geometry** (3840x2160), not to 1080p — `extract_segment` then
   scales 1:1 instead of upscaling a downscale.
-- Apply `TONEMAP_CHAIN` during prep and stamp `-color_primaries/-color_trc/-colorspace bt709`,
-  so `is_hdr_source()` returns False on the prepped file and render does not tonemap twice.
+- Apply `TONEMAP_CHAIN` during prep so `is_hdr_source()` returns False on the prepped file and
+  render does not tonemap twice. It is the chain's own final `zscale` that tags the frames bt709;
+  the `-color_primaries/-color_trc` output flags do nothing on ffmpeg 9 (see "ffmpeg 9 ignores
+  …" below). Probe the prepped file's `color_transfer` to confirm.
 - **Watch the map order.** `-map 0:v:0` placed before a `-filter_complex` output silently wins,
   and the filtergraph is discarded — the prep "succeeds" and produces an unprepped file. Check
   the output's dimensions, not the exit code.
@@ -2096,6 +2098,12 @@ reason; the lesson had just not been written down.
 
 ## A grade tuned on SDR footage over-saturates when the source is HLG
 
+> **Superseded 2026-10-11 as a default.** The tone-map this entry measured was the old
+> `npl=100` + hable, and the Episode 2 grade it derives (t-shirt white balance + S-curve) is
+> **retired as a default**. It crushed shadows and cooled skin on a new setup. See
+> "Grades do not transfer between lighting setups" below. The measurements stand as a record
+> of Episode 2.
+
 Episode 1 was `bt709` 8-bit. Episode 2 was shot on the same phone in the same room
 and is **HLG HDR** — `yuv420p10le`, `bt2020nc`, `arib-std-b67`. `render.py` detects
 the transfer and tone-maps to Rec.709, which is correct and necessary (untone-mapped,
@@ -3122,3 +3130,52 @@ Rules:
 - Tag inside the filter chain (`setparams`) or with `h264_metadata`, never with output flags.
 - Check the tags of segment 0 and of the finished file, not just the source.
 - Read all three fields. `color_space=bt709` alone proves nothing.
+
+**Fixed in render.py 2026-10-11.** The concat and the copy path add `h264_metadata`, and the
+composite ends in `setparams` after the subtitles. Verified end to end: an untagged lavfi card as
+segment 0, then the two test clips, gave `base.mp4` and `final.mp4` bt709 ×3. Base and final
+are frame-for-frame identical (framemd5 over 255 frames), so the stamp costs no pixels. Each
+`h264_metadata` pass logs "4 bytes left at end of AVCC header" on libx264 output. It is harmless:
+framemd5 is identical after one and after two passes. Pinned by `tests/test_render_color.py`,
+including a real-ffmpeg test that fails if ffmpeg starts honouring the flags again.
+
+---
+
+## The tone-map moved to npl=203 + mobius, and grades do not transfer between lighting setups
+
+Decided by Shoaib on 2026-10-11 from a four-way comparison on two new iPhone 17 Pro clips
+(`IMG_3833`, `IMG_3836`, HLG + Dolby Vision profile 8) plus the podcast Episode 1 and Episode 2
+deliveries. Luma is BT.709 on decoded 8-bit RGB. Each frame pair was matched against its
+rendered segment.
+
+**The old tone-map darkened midtones ~10-15 luma.** `zscale npl=100` treats HLG's 203-nit
+reference white as a 2x highlight, and hable then compresses it. Mean luma, old chain vs
+`npl=203` + mobius on the same frame: podcast 133.7 vs 144.7, Episode 2 129.3 vs 143.8,
+IMG_3833 93.3 vs 102.4, IMG_3836 115.3 vs 126.8. Saturation was the same in each pair. The old
+chain also clipped a saturated red jersey: 0.9% and 2.0% of red pixels at R=255, against 0.1%
+and 0.3%. `TONEMAP_CHAIN` is now `npl=203` + `tonemap=mobius`; the rest of the chain is
+unchanged. The end-to-end check of the new chain on IMG_3833 measured p5 23.3 and red clipped
+0.32%.
+
+**The Episode 2 grade crushed shadows and cooled skin on a new setup.** On top of the tone-map,
+`colorchannelmixer=rr=0.948:bb=1.121` plus the S-curve `0.14/0.06` took p5 from 22.2 to **5.1**
+(IMG_3833) and from 32.4 to 9.5 (IMG_3836). The face's shadow side went to black, and on
+IMG_3833 mean luma fell to 80.6. Its white balance came from a white t-shirt under Episode 2's
+light. Clothing is not neutral, so it cooled skin on Episode 2 too (visible next to the
+reference conversion), and it does not carry over to other light at all.
+
+**Rules (Shoaib's guardrails):**
+- Indoor talking head: **no grade by default**, or at most a light one.
+- p5 must stay **>= 20**. Never crush eyes or beard.
+- No white balance taken from clothing. Balance on skin or the beige wall, if at all.
+- Grade saturation **<= 1.0**. The tone-map already adds saturation (0.31 -> 0.44 here).
+- Strongly red/orange clothing must clip **< 0.5%**.
+- **A grade belongs to a lighting setup, not a channel.** Re-derive it per shoot.
+
+`helpers/exposure.py` checks every rule except the white-balance one; render.py runs it on the
+first face segment.
+
+**Re-renders of old episodes will look different.** Episode 3's EDL still carries the Episode 2
+grade, and it was tuned against the old tone-map. And a resume wrapper that reuses existing
+segments (`resume_final.py`, `resume_render.py`) would mix old-chain and new-chain segments in
+one cut. After this change, re-extract every segment of a project; never resume across it.

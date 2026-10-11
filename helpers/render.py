@@ -131,6 +131,17 @@ def resolve_path(maybe_path: str, base: Path) -> Path:
 
 HDR_TRANSFERS = {"smpte2084", "arib-std-b67"}  # PQ (HDR10) and HLG
 
+# Every render is 8-bit Rec.709, so the output is tagged bt709 explicitly.
+# ffmpeg 9 IGNORES the -color_trc / -color_primaries output flags: an encode
+# takes the tags its frames carry, and writes `unknown` when they carry none.
+# The concat stream-copies video, so the whole base inherits segment 0's tags -
+# one untagged title card left Episode 2's entire final `transfer=unknown`.
+# `setparams` tags frames inside a filtergraph; `h264_metadata` rewrites the
+# SPS of a stream-copy without touching a pixel (frame hashes identical).
+BT709_SETPARAMS = "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709:range=tv"
+BT709_BSF = ["-bsf:v", "h264_metadata=colour_primaries=1:transfer_characteristics=1"
+             ":matrix_coefficients=1"]
+
 # Audio encode settings, shared by the per-segment extract and by the concat's
 # single continuous re-encode. They must agree: the concat re-encodes what the
 # extract produced, so a bitrate or rate that drifts between the two would
@@ -163,6 +174,19 @@ except ImportError:                      # run directly as a script
     cards_mod = _ilu.module_from_spec(_spec)
     _spec.loader.exec_module(cards_mod)
 
+try:                                    # normal package import
+    from . import exposure as exposure_mod
+except ImportError:                      # run directly as a script
+    import importlib.util as _ilu
+    _spec = _ilu.spec_from_file_location(
+        "video_use_exposure", Path(__file__).with_name("exposure.py"))
+    exposure_mod = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(exposure_mod)
+
+# How many segments to try for a face before giving up on the exposure check: a
+# cold open of b-roll or a title card has none, and each attempt runs a detector.
+EXPOSURE_MAX_TRIES = 6
+
 
 def probe_video_height(video: Path) -> int:
     """Actual output height, for sizing graphics that are declared as fractions."""
@@ -174,11 +198,17 @@ def probe_video_height(video: Path) -> int:
     return int(out.stdout.strip().splitlines()[0])
 
 
+# npl=203 is HLG's reference white (BT.2408): diffuse white lands at SDR white
+# instead of being treated as a 2x highlight. mobius leaves everything below its
+# knee linear and only compresses the top. The previous npl=100 + hable put
+# midtones ~10-15 luma below this on every iPhone shoot measured (podcast
+# Episode 1, Episode 2, the 2026-10-11 test clips) and clipped saturated red
+# clothing 0.9-2.0% against 0.1-0.3% here. See kb/gotchas.md.
 TONEMAP_CHAIN = (
-    "zscale=t=linear:npl=100,"
+    "zscale=t=linear:npl=203,"
     "format=gbrpf32le,"
     "zscale=p=bt709,"
-    "tonemap=tonemap=hable:desat=0,"
+    "tonemap=tonemap=mobius:desat=0,"
     "zscale=t=bt709:m=bt709:r=tv,"
     "format=yuv420p"
 )
@@ -605,9 +635,13 @@ def extract_all_segments(
     fps: str | None = None,
     height: int | None = None,
     crf: str | None = None,
+    exposure_check: bool = True,
 ) -> list[Path]:
     """Extract every EDL range into edit_dir/clips_graded/seg_NN.mp4.
     Returns the ordered list of segment paths.
+
+    After the first segment that shows a face, prints an exposure report (see
+    exposure.py) so a crushed or under-lit grade surfaces minutes into a render.
 
     If the EDL `grade` is "auto", analyze each segment range with
     `auto_grade_for_clip` and apply a per-segment subtle correction.
@@ -640,6 +674,7 @@ def extract_all_segments(
         out_rate = "24"
 
     seg_paths: list[Path] = []
+    exposure_tries = 0
     print(f"extracting {len(ranges)} segment(s) → {clips_dir.name}/  @ {out_rate} fps"
           f"{' (forced)' if fps is not None else ' (from source)'}")
     if is_auto:
@@ -700,7 +735,32 @@ def extract_all_segments(
                         zoom_to=seg_zoom_to, video_source=video_src, video_start=video_start)
         seg_paths.append(out_path)
 
+        if exposure_check and exposure_tries < EXPOSURE_MAX_TRIES:
+            exposure_tries += 1
+            exposure_tries = run_exposure_check(out_path, seg_filter, exposure_tries)
+
     return seg_paths
+
+
+def run_exposure_check(segment: Path, grade: str, tries: int) -> int:
+    """Measure one rendered segment; return the updated try count.
+
+    Returns EXPOSURE_MAX_TRIES (stop checking) once a face was measured, or when
+    the detector itself is unavailable, since later segments cannot do better.
+    Never raises: a failed check must not cost a render.
+    """
+    try:
+        res = exposure_mod.check(segment, grade)
+    except Exception as e:  # noqa: BLE001 - diagnostics only
+        print(f"  exposure check skipped: {type(e).__name__}: {e}")
+        return EXPOSURE_MAX_TRIES
+    if res["face_mean"] is None and res["face_note"] == "no face in frame":
+        if tries >= EXPOSURE_MAX_TRIES:
+            print(f"  exposure check: no face in the first {tries} segment(s); face not measured")
+            print("  " + exposure_mod.report(res).replace("\n", "\n  "))
+        return tries
+    print("  " + exposure_mod.report(res).replace("\n", "\n  "))
+    return EXPOSURE_MAX_TRIES
 
 
 # -------- Lossless concat ----------------------------------------------------
@@ -732,6 +792,7 @@ def concat_segments(segment_paths: list[Path], out_path: Path, edit_dir: Path) -
         "-f", "concat", "-safe", "0",
         "-i", str(concat_list),
         "-c:v", "copy",
+        *BT709_BSF,
         *AAC_ARGS,
         "-movflags", "+faststart",
         str(out_path),
@@ -1330,7 +1391,8 @@ def build_final_composite(
     if (not has_overlays and not has_subs and not has_graphics and not demotions and not cards
             and not silhouettes):
         # Nothing to do — just rename/copy base to final name
-        run(["ffmpeg", "-y", "-i", str(base_path), "-c", "copy", str(out_path)], quiet=True)
+        run(["ffmpeg", "-y", "-i", str(base_path), "-c", "copy", *BT709_BSF, str(out_path)],
+            quiet=True)
         return
 
     # Position each overlay with `-itsoffset` on its INPUT, not with `setpts`
@@ -1457,20 +1519,17 @@ def build_final_composite(
         filter_parts.append(f"{current}{chain}[g]")
         current = "[g]"
 
-    # Subtitles LAST — Rule 1
+    # Subtitles LAST — Rule 1. The bt709 stamp after them only rewrites frame
+    # tags, never pixels, so it does not break the rule; it is what keeps an
+    # untagged first segment from stripping the final's tags (BT709_SETPARAMS).
     if has_subs:
         subs_abs = str(subtitles_path.resolve()).replace(":", r"\:").replace("'", r"\'")
         filter_parts.append(
-            f"{current}subtitles='{subs_abs}':force_style='{force_style}'[outv]"
+            f"{current}subtitles='{subs_abs}':force_style='{force_style}',{BT709_SETPARAMS}[outv]"
         )
-        out_label = "[outv]"
     else:
-        # Rename the last stage's output to [outv] for consistency
-        if has_overlays or has_graphics or cards or demotions or silhouettes:
-            filter_parts.append(f"{current}null[outv]")
-            out_label = "[outv]"
-        else:
-            out_label = "[0:v]"
+        filter_parts.append(f"{current}{BT709_SETPARAMS}[outv]")
+    out_label = "[outv]"
 
     filter_complex = ";".join(filter_parts)
 
@@ -1524,6 +1583,12 @@ def main() -> None:
         help="Skip audio loudness normalization. Default is on (-14 LUFS, -1 dBTP, LRA 11).",
     )
     ap.add_argument(
+        "--no-exposure-check",
+        action="store_true",
+        help="Skip the exposure report (shadow floor, face vs frame, red clipping) "
+             "printed after the first segment that shows a face.",
+    )
+    ap.add_argument(
         "--height",
         type=even_positive_height,
         default=None,
@@ -1561,7 +1626,7 @@ def main() -> None:
     # 1. Extract per-segment (auto-grade per range if EDL grade is "auto")
     segment_paths = extract_all_segments(
         edl, edit_dir, preview=args.preview, draft=args.draft, fps=args.fps,
-        height=args.height, crf=args.crf,
+        height=args.height, crf=args.crf, exposure_check=not args.no_exposure_check,
     )
     # The composite is a SECOND video generation on top of the extract. Keep its
     # CRF below the extract's so it adds as little further loss as possible.

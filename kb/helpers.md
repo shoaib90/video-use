@@ -92,6 +92,14 @@ render.py <edl.json> -o <out> [--preview] [--draft] [--build-subtitles]
   `tests/test_render_caption_words.py`. Before, any overlap at all captioned a word the viewer
   never hears.
 - `--fps` forces the output rate; default preserves the first source's rate
+- **`--no-exposure-check`** skips the exposure report. By default render.py measures the first
+  segment (of the first 6) that shows a face and prints frame mean/p5/p95, face luma and red
+  clipping, with a WARNING per broken guardrail. It never fails the render. See `exposure.py`.
+- **Colour (2026-10-11):** HLG/PQ sources get `TONEMAP_CHAIN` (`npl=203`, `mobius`). Every output
+  is tagged bt709 on all three fields: the concat and the copy path add `BT709_BSF`
+  (`h264_metadata`), and the composite ends in `BT709_SETPARAMS` after the subtitles. ffmpeg 9
+  ignores `-color_trc/-color_primaries`, so output flags cannot do this. Pinned by
+  `tests/test_render_color.py`.
 
 ### EDL schema
 ```json
@@ -179,6 +187,21 @@ These three fields are local extensions (not upstream). All optional and backwar
   `tests/test_render_silhouette.py`.
 - `force_style`'s `MarginV` is relative to `PlayResY=288`. The shipped default of 90 is tuned
   for **vertical** video; for 16:9 landscape ~28 sits the caption about 10% up from the bottom.
+
+## exposure.py — talking-head exposure check *(local addition, 2026-10-11)*
+```
+exposure.py <video> [--at SECONDS] [--grade '<filter>'] [--json]      # exit 1 on any warning
+```
+Reads one frame (the middle, by default) and warns when:
+- **p5 < 20**: shadows crushed
+- **the face is > 15 luma under the frame mean**: the subject is under-lit
+- **> 0.5% of strongly red/orange pixels sit at R=255**: clothing has clipped
+- **the grade's `saturation=` is > 1.0**
+
+Luma is BT.709 on decoded 8-bit RGB, the measure the gotchas.md numbers use. The face box is
+mediapipe's bundled face detector (full-range model), run in `~/.cache/video-use/retouch-env`
+(built by `retouch_teeth.py`). The check never builds that env; without it, the face rule is
+skipped and reported. render.py calls it automatically. Tests: `tests/test_render_color.py`.
 
 ## review.py — pre-delivery review *(local addition, 2026-10-05)*
 ```
