@@ -814,3 +814,49 @@ transition.
   blue/purple with a warm lamp, which Kallaway's dark, glowing language already matches.
 - **22 changes a minute** is explainer pace; the pace floor for story episodes stands (index:
   "Pacing is a ceiling, not a target").
+
+### §8b How loud the bed sits under the voice: measured on Kallaway vs Episode 4 (2026-10-13)
+
+Shoaib felt Episode 4's beds were "a little on the higher side". Measured, not guessed.
+
+**Method.** yt-dlp audio of two Kallaway videos (`3y-WiiUaqb4` 0→100K, 25:56; `t5Z-Q1bg1tU`
+storytelling, 11:14) and Episode 4's final were split with demucs `htdemucs --two-stems=vocals`.
+Each stem was measured in 3 s pyloudnorm windows (1 s hop). The gap is voice minus music over
+windows where he is speaking and music is above −48 LUFS.
+- The separation residue measured −57.7 LUFS median on Episode 4's known-unscored windows,
+  hence the −48 floor.
+- **Validated** against Episode 4's real bed stem: true gap 16.1–16.6 dB after the +9.7 dB
+  final gain, separation 16.1. Accurate to ~0.5 dB.
+
+**Results.** All three mixes sit at −14.2/−14.3 LUFS integrated. Kallaway's loudness range is
+1.6–2.2 LU against ours at 4.3: a heavily compressed voice.
+
+| | music under speech | gap, median | p25–p75 |
+|---|---|---|---|
+| Kallaway 0→100K, body | 77% of speech | **28 dB** | 25–32 |
+| Kallaway storytelling, body cues | ~60% | **25–30 dB** | |
+| Kallaway hooks / music moments (0:00–0:32, 2:30–3:29, 7:12–7:31) | | **8–12 dB** | |
+| Episode 4, every cue | 85% | **16 dB** | 14–18 |
+
+**Reading.** His bed under talking is felt, not heard: ~27–30 dB down, about 12 dB quieter
+than ours. Music comes UP only where the talking thins: the hook and transitions, at 8–12 dB.
+Ours sat at one level, 16 dB, everywhere, so the bed never got out of the way of the voice and
+never got a moment of its own. Published guidance: 15–25 dB, with 20 dB as the WCAG
+accessibility floor (1.4.7). Kallaway sits deeper than all of it.
+
+**Rule (Shoaib, 2026-10-13):** beds under talking at **~26–28 dB under the voice**. Lift a cue to
+**~10–12 dB under** only at the hook, deck/transition moments and music-only gaps. Measure the
+gap on the render (demucs, as above) rather than trusting a mixer constant.
+
+**Applied to Episode 4's final (2026-10-13), measured on the render with the same split:**
+- `mix.py` changes: `BED_UNDER` 15 → 26 (relative to the voice window). Faith lifted +18 dB under
+  the hook (0:11.8 → "So what got me hired", easing over 2.5 s). Every other bed enters +11 dB
+  for 4 s (the hold must outlast the bed's fade-in, or the lift vanishes). Power of Freedom
+  trimmed +3 dB.
+- Result: body 26.8–28.6 dB under the voice (median 27.8, was 16.0); hook 11.6 (was 16.2);
+  section entries 16–24. Loudness −14.2 LUFS, −1.3 dBTP unchanged. The 34 SFX are still
+  audible (they sit on the quieter bed).
+- **Not unproven but worth knowing:** a fixed `BED_UNDER` lands differently per track. One pass
+  read Power of Freedom 3 dB deeper than the rest, so measure per cue and trim.
+- **Re-mixing a delivered final is audio-only:** mix the no-music render, run mgx `sfx`, then
+  `-map 0:v -map 1:a -c copy` onto the final. Verified: frames, A/V offset and duration identical.

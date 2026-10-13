@@ -1983,3 +1983,7 @@ the Mac yet.**
   - the 4K no-music and pre-mgx files, `base*.mp4`, `clips_*`, the v1–v5 renders, the mgx work dirs (cues.py kept)
     and the card `renders/*.mov`, which render.py regenerates.
   - Kept: `episode4_final.mp4`, the EDL, build/, transcripts, master.srt, prepped/, the card projects, review/, the blueprint.
+- **Music remix (Shoaib, 2026-10-13: "background music little on the higher side"):** measured two Kallaway references against
+  Episode 4 with a demucs split (storytelling.md §8b). Beds went from 16 to ~28 dB under the voice, with a hook lift to ~12 dB.
+  The final's audio was swapped with the picture untouched. The previous final is in the Trash as
+  `episode4_final_v5levels_music16dB.mp4`.

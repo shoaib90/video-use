@@ -305,6 +305,9 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   ≥3 differentiated thumbnails, and the expected result written down before publishing.
   Outliers are ≥3× a channel's *average views*, not measured against its subscribers.
   See [distribution.md](distribution.md) §10.
+- **Bed under talking: ~27 dB below the voice, measured (Kallaway, 2026-10-13).** Episode 4 sat at 16 dB and Shoaib heard it
+  as too loud. Lift music to ~10 dB under only at hooks and transitions. Method and numbers in
+  [storytelling.md](storytelling.md) §8b.
 - **Wall-to-wall music has no meaning.** Contrast is what creates focus: a naked talking head
   next to a scored one. If the bed never leaves, its arrival and departure stop being signals.
   A sudden stop spotlights a moment; a mid-video **fade reads as "this is ending"**, so land the
