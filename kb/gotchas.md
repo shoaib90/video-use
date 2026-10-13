@@ -60,6 +60,24 @@ missed the spine of the video and came out 3:05 instead of 4:26.
 - `language` is part of the transcript's cache identity (`_language`), so a re-run with a
   different language is refused rather than silently returning the old file.
 
+**A mostly-English speaker fails differently: `en` DROPS the Hindi asides, with no gibberish.**
+Episode 4 (2026-10-12) is English with short Hindi phrases. Deepgram `en` returned clean English
+and simply left holes, for example "ab bahut ho gaya", "arey ye solve kaise hogi" and "kaise kaam
+karti hai, kyun kaam karti hai". Nothing reads wrong, so the "confident gibberish" signal above
+never fires. And **a whisper `-l en` pass cannot clear the language**: it translates Hindi into
+English, so a Hinglish take reads as fluent English. That is how `en` got picked here.
+- Detect it: list every pause of 1.5 s or more *inside* each transcript and measure its
+  `volumedetect` mean. Real pauses here sat at −49 to −72 dB, and dropped speech at −23 to −37 dB
+  (a speaking reference measured −26). On Episode 4 that flagged 20 gaps in 8 of 36 clips.
+- Confirm a flagged gap with whisper `-l hi` on just that span (Devanagari out = Hindi). Expect
+  `-l en` to hallucinate on 2 s snippets ("in the next video").
+- A word-count ratio against whisper catches only the worst clip (3854, 0.71). The other 7 had
+  ratios of 0.98-1.13, because whisper's translation pads its own count.
+- Fix, verified on the same 8 clips: `--language multi --force`, only on the flagged clips.
+  That recovered +184 words (+10%) and cleared 16 of the 20 holes. The other 4 were
+  hesitations, confirmed by whisper `-l hi` returning noise. Back up the `en` JSONs first:
+  `--force` overwrites them in place.
+
 **Captions for mixed script work fine.** Devanagari + Latin in one cue renders correctly through
 libass; `FontName=Kohinoor Devanagari` balances the two scripts best, and Helvetica falls back
 correctly but renders Devanagari slightly small against the Latin. macOS has plenty of
@@ -3179,3 +3197,111 @@ first face segment.
 grade, and it was tuned against the old tone-map. And a resume wrapper that reuses existing
 segments (`resume_final.py`, `resume_render.py`) would mix old-chain and new-chain segments in
 one cut. After this change, re-extract every segment of a project; never resume across it.
+
+## iPhone Cinematic clips arrive as PAIRS: `IMG_nnnn` + `IMG_Ennnn`. Keep only one in the batch folder
+
+Verified on Episode 4 (2026-10-12, iPhone 17 Pro, AirDrop/export from Photos). Every Cinematic
+clip came twice, with identical duration, audio and `com.apple.quicktime.creationdate`:
+- `IMG_Ennnn.MOV` has the depth-of-field render **baked in**: background soft, on-screen
+  monitor text unreadable. Streams: video, audio, one metadata track.
+- `IMG_nnnn.MOV` is the untouched capture, everything sharp, plus a
+  `Core Media Auxiliary Picture` data stream (the depth map). It comes with `IMG_nnnn.AAE`
+  and `IMG_Onnnn.AAE` sidecars (the Cinematic focus decisions; ffmpeg cannot apply them).
+Verified by a frame grab of each at t=20 s on IMG_3845, side by side, and the stream listing.
+
+Why it matters: a folder glob hands both to `transcribe_batch.py`, which **pays twice** and
+then offers the same take twice to the cut. Put one variant in `a-roll/` and park the other
+(Episode 4's first delivery: `IMG_E` in `a-roll/`, plain twins and all `.AAE` in
+`originals/`). Export settings decide it: the folder was later re-delivered with ONE variant
+per clip and no depth stream, so count `IMG_E` files before assuming pairs. A clip with no
+`IMG_E` twin (IMG_3901, a non-Cinematic overhead shot) is a normal capture. The blur also
+hides whatever is on the monitor, which the plain twin shows legibly.
+
+Also from the same sort: a clip shot **at the speaking position** can be B-roll. IMG_3898 is
+the desk framing but holds no speech (whisper: paper rustle only); he unfolds and shows the
+note. Classify by frames AND a free whisper pass, never by framing alone.
+
+## Matching Hindi text against a Deepgram transcript: normalise both sides to NFC first
+
+Verified on Episode 4 (2026-10-12), in the caption pass (`episode4/edit/build/captions.py`),
+which swaps Hindi word runs for English captions. Every pattern matched except one, and the
+miss left Devanagari burned in silently. Deepgram writes **ज़ as one precomposed character
+(U+095B)**, while the same word typed into a script is ज + ़ (U+091C U+093C). They look identical
+and never compare equal. U+095B is a composition exclusion, so `unicodedata.normalize("NFC", …)`
+*decomposes* it, and normalising both sides makes them match. Applies to every nukta letter
+(क़ ख़ ग़ ज़ ड़ ढ़ फ़ य़). Always end such a pass by grepping the output for `[ऀ-ॿ]`: the
+count must be 0.
+
+## Fine cuts (fillers, stutters, restarts) cannot be placed from Deepgram word times
+
+Verified on Episode 4 v2 (2026-10-12), against the audio and by whisper on the assembled joins.
+Deepgram's word boundaries drift by 0.1-0.7 s around hesitations: 3853's retake "It" was
+timed 2.6 s early (it was the tail of the abandoned attempt); 3878's "feeling. It… That" was off
+by a whole word, so a cut removed "feeling" instead of "It…"; a pause inside the 2nd "everything"
+of "everything everything" read as the gap between the two. What works:
+- **Place every edge from the audio:** a run of 30 ms or more below −45 dB, or a valley (a
+  10 ms frame of −38 dB or less that is the minimum within ±30 ms). Many "uh, at" joins have no
+  pause, only a 20-40 ms dip, and the dip is the cut. With no dip, the filler stays.
+- **Leave ~0.15 s of air where something was removed** (40% before, 60% after), and shrink dead
+  pauses rather than deleting them: inside a sentence to 0.30 s, between sentences to 0.50 s.
+- **Verify by listening, not by transcript times:** whisper the assembled audio around every join
+  and check the words beside it, plus any real word Deepgram puts in the removed gap. On
+  Episode 4, 12 of 22 "removed" words were still audible (drift). The other 10 were removed on
+  purpose. And whisper's own text normalising ("four"→"3-4", "I'm"→"I am") needs a human read.
+- **A jump on a locked-off frame is ~9× normal motion** (median frame difference 4.0 vs 0.44).
+  Alternate framings 10% apart at visible jumps (≥ 3.0) and keep the push continuous elsewhere.
+
+## A tightened cut needs a gentler music ducker, measured on the bed stem
+
+Verified on Episode 4 v4 (2026-10-12). Episode 3's sidechain ducker (threshold 0.030, ratio 8,
+release 380 ms) never released on a cut whose pauses were trimmed to 0.25-0.35 s: every bed sat
+~8-10 dB further down than set, so the scored windows rose only 2-4 dB over the unscored ones
+against the no-music control (Episode 3: 17-25 dB). With threshold 0.060, ratio 2.5, release
+250 ms, the ducked bed measured −15.8 to −16.5 LU against the voice in every window. **Measure the
+ducked bed STEM against the voice per window** (episode4/edit/build/mix.py `--stems`). On a
+tight cut the pause floor stops being a usable proxy, because there are almost no pauses left.
+
+## A chapter deck held 2.2 s reads as a frozen picture
+
+Verified on Episode 4 v4: freezedetect (d=1.0) flagged 1.1 s at 5:20, where the deck sat fully
+still over a heavily blurred, darkened picture while the music had just stopped dead. Given
+Shoaib's rule against still frames (mistakes.md M046), the deck hold is now 1.3 s. Run T3 on
+every render that has decks.
+
+## Glass list rows: about 20 characters at scale 0.75
+
+HyperFrames' layout check refused Episode 4's tracker (3 rows of 27-38 characters overflowed by
+35-148 px), and the check fails the render, as designed. Keep a row to ~20 characters and put the
+rest in a `chips` sub-line.
+
+## Captions drop audible words at trimmed pauses (Deepgram time drift)
+
+Verified on Episode 4 v3 (R2, a full caption-vs-render whisper alignment): "note", "LPA", "books",
+"coding" and "enough" were audible but not captioned. Deepgram placed each one mostly inside a
+removed pause, and the builder's half-a-word rule dropped it. The fix (episode4/edit/build/
+captions.py `keep_drifted`): every removal records the words it targeted. Any OTHER word that
+overlaps a removal is moved wholly onto the side that holds its sound (frames above −40 dB).
+Words a cut deliberately removed stay out. render.py's builder has the same exposure on any
+tightened cut, so carry this into the next episode or upstream.
+
+## Killing a render's Python wrapper leaves its ffmpeg running, writing the same file
+
+Verified on Episode 4 v5 (2026-10-13). `pkill -f "recomposite.py …"` stopped the Python process,
+but its ffmpeg child kept compositing into `episode4_v5_NO_MUSIC_do_not_upload.mp4`. A second
+render then wrote to the same path at the same time. The file finished with "EXIT 0" and a
+normal size. It failed only later, in `mix.py`, with `Invalid NAL unit size` and an AAC decode
+error rate of 0.998.
+
+To stop a render, kill the process group, or `pkill -f ffmpeg.*<output name>` as well. Then
+confirm that `ps aux | grep '[f]fmpeg'` is empty before starting again, and delete the partial
+output first.
+
+## motion-graphics-pass: two compose bugs, fixed in `mgx.py` (Episode 4, 2026-10-13)
+
+- **A vignette that crosses a 20 s chunk boundary failed the compose.** Its fade-out start
+  came out negative in the second chunk, and ffmpeg rejects that (exit 222). The vignette is
+  now built with its whole fade curve on its own clock, then trimmed into each chunk.
+  Measured on Episode 4's 452.8–461.2 vignette across the 460 s seam: the corner luma ran
+  78 → 86 → 92 → 110 → 130, so the fade is continuous with no jump.
+- **`count_frames` crashed on `"26829,"`.** ffprobe 9's csv output can end with a trailing
+  separator. It now parses the first field only.

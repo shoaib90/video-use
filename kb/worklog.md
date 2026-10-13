@@ -1733,3 +1733,253 @@ Verified:
 
 Not yet done: no real episode has been re-rendered with the new chain. Re-renders of old
 projects will look brighter, and must re-extract every segment rather than resume.
+
+## 2026-10-11 — Episode 4 test frame (IMG_3837), checked before the shoot
+
+Shoaib's proposed Episode 4 setup. Rendered three 2 s segments through render.py
+(new tone-map, no grade).
+- Exposure check `ok` on all three: frame mean 117-121, p5 29-33, face 128-133 (brighter than
+  the frame), red clipping 0%.
+- Audio clean: noise floor -66 dB, peaks -10 dB, no spatial track.
+- **Captured at 1920x1080, where IMG_3833 and IMG_3836 (same phone, same day) were 3840x2160.**
+  No room for push-ins or punch-ins without upscaling, and no 4K delivery.
+- Face sharpness (Laplacian variance on the face, resized to 256 px, measured at 1080 output;
+  method in gotchas.md "Locked focus"): IMG_3837 median 30.6, IMG_3833 31.7, IMG_3836 80.6.
+  The two softer clips have the larger face (~265 px vs ~240), i.e. a closer camera.
+  *Unproven: focus or distance vs. resolution as the cause.* IMG_3833 is 4K and just as soft.
+- Both clips carry `com.apple.quicktime.cinematic-video-intent=1`, so that tag does not tell
+  Cinematic mode apart.
+
+IMG_3838, the 4K retake (3840x2160 HLG + DV8, 16 s):
+- Exposure `ok` three times (p5 26-32, face 121-127 against a frame mean ~118, red 0%).
+- Audio: noise floor -66 dB.
+- **Face sharpness is still about half of IMG_3836's.** Same measure at 1080, 16 samples per
+  clip: IMG_3838 median 33 (26-44), IMG_3836 median 65 (30-109). Compared at the same face
+  width (~238 px), IMG_3838 scores 36 and IMG_3836 66, so distance alone does not explain it.
+  Within each clip, the smaller the face (further from the lens), the sharper it is: IMG_3836
+  scores 98-109 at 214-222 px and 30-37 at 250-254 px. That is the Episode 3 locked-focus
+  pattern. Suspected cause: focus set behind the speaking position. *Unproven* until a
+  focus-locked retake measures better.
+- **Correction:** the first pass reported "75 when leaning back". That list dropped frames
+  with no detected face, so the 75 was matched to the wrong timestamp. Always print the
+  timestamp next to each sample.
+
+## 2026-10-12 — Episode 4 footage sorted into a-roll / b-roll / outtakes
+
+The folder was delivered twice. The first delivery was 106 files (53 MOV + 53 AAE, Cinematic
+`IMG_`/`IMG_E` pairs). It was sorted, then **replaced**: by 11:24 the folder held a flat 45
+files with no subfolders, no `IMG_E` twins, no AAE, and no Core Media Auxiliary (depth) stream.
+That is the set sorted here. The earlier `edit/inventory.md` was gone too.
+
+Classified by 3 frames per clip (contact sheet) plus a free whisper pass
+(`ggml-small.bin -l en`, 4 in parallel, ~37 min of audio). No paid transcription.
+- `a-roll/` 36 desk takes, 26.4 min. `b-roll/` 4: IMG_3898 note at the desk, IMG_3899 bed +
+  laptop (29.97 fps), IMG_3901 overhead of the notes (extra `apac` track), Flow_VID 6 s portrait
+  SDR wall from another camera. `outtakes/` 5: setup tests 3837 (1080p)/3838/3840, false starts
+  3842/3883. Count checked: 36+4+5 = 45.
+- Per-clip table, retake groups in story order, and edit notes in `episode4/edit/inventory.md`.
+  Flagged there: 3893 teases the back injury for the *next* episode, but 3872/3874 tell it in
+  this one; the monitor shows a Golden Gate wallpaper in 3850-3854 and code everywhere else.
+- Setup tests and false starts were put in `outtakes/` without asking, to keep them out of a
+  batch transcription. Swappable by moving files.
+
+## 2026-10-12 — Episode 4 a-roll transcribed (Deepgram `en`), Hindi asides dropped
+
+Shoaib OK'd transcribing `a-roll/`. `transcribe_batch.py` is wired to ElevenLabs (unconfigured),
+so `transcribe_deepgram.py --language en --edit-dir episode4/edit` ran per clip, 4 in parallel.
+36/36 succeeded; `takes_packed.md` packed 186 phrases, 22m49s. No Spanish, no Devanagari, one
+speaker per clip.
+- **`en` was the wrong choice.** It was picked because the whisper `-l en` pass read as fluent
+  English, but that mode translates Hindi. A loudness scan of every pause of 1.5 s or more
+  found 20 at speech level (−23 to −37 dB) in 8 clips: 3848, 3853, 3854, 3861, 3877, 3878,
+  3887 and 3890. Six were checked with whisper `-l hi`; four are Hindi ("arey ye solve kaise
+  hogi", "ab bahut ho gaya"…). Lesson folded into gotchas.md and index.md.
+- **Fixed, with Shoaib's OK:** re-ran those 8 with `--language multi --force`. The `en`
+  versions are kept in `edit/transcripts_en_backup/`. Words: 1765 → 1949 (+184; 3854 34 → 53,
+  3853 438 → 499). 7 of 8 rose; 3848 lost two "uh"s and nothing else. 22 packed lines now
+  carry Devanagari, and there is still no Spanish. The gap re-scan left 4 at speech level, and
+  all 4 are hesitations or breaths: whisper `-l hi` gave noise or a held "aaa", and Deepgram's
+  words either side are identical in both versions.
+- Caption fixes noted in `episode4/edit/inventory.md`: "internचाला" → Internshala,
+  "उत्तराय" → Uttarayan, garbled "फिर मैं विशाह" at 3877 ~2:09.
+- Residual risk, *unverified*: the other 28 clips stayed `en`. The gap scan found no holes in
+  them, but a Hindi word transcribed *in place* as English would not leave a hole.
+
+## 2026-10-12 — Episode 4 v1 picture lock: plan, cut, captions, review
+
+Shoaib asked for the plan and then the edit, without a pause between them. The plan is in
+`episode4/edit/plan.md`; each content default in it is marked and reversible.
+- **Cut:** `episode4/edit/build/cut.py`, from Episode 3's, with every edge derived from word
+  timings. 93 ranges, 14:54 plus the end card. The zenith (Suma's note) lands at 11:15. The script
+  targeted ~8 min: 1,370 written words became ~15 min of kept speech once fumbles were out. That
+  ratio is now a data point for the script playbook.
+- **New in the cut builder:** each edge snaps to the quietest 10 ms within 0.25 s, without
+  passing the neighbouring word's midpoint. Ranges that abut in the source are merged. Loud edges
+  (> −32 dB) went 40 → 13, and the render then showed **0 pops (T4)**, so those 13 were
+  touching-word joins, not clicks.
+- **Every cut changes scale** (1.00 ↔ 1.12, push ~1%/s capped at 1.18). The zenith is static
+  at 1.12. The cold open is a 1.25 crop from 4K. Holds were set from frame-difference motion
+  scans: 3884 holds still until 9.1 s, so the locked line got its ~2 s silence.
+- **Face sharpness:** 34–56 on every take (Episode 3's soft takes were 13–20). The setup test's
+  softness did not carry into the shoot. No grade, and exposure `ok` (p5 36, face 132).
+- **Captions:** `build/captions.py` copies the transcripts to `build/caption_src/`, swaps Hindi
+  for English, fixes names and writes numerals, then calls `render.build_master_srt` on the
+  real segments. The paid transcripts are untouched. Found the nukta NFC trap (gotchas.md).
+- **B-roll:** two `ranges[].video` inserts. IMG_3899 (bed) under "lying down on bed,
+  slouching" is reframed 1.3x right, because R4 found a readable whiteboard ("…— Kapil…") at
+  1080. IMG_3901 shows Suma's note under "she wrote it on 19th January 2020". IMG_3901's first
+  ~25 s shows the 2020 journal, which is held back for its own video, so that stretch is unused.
+- **review.py v1:** T1/T2/T4/T6 pass; T3 is the end card; T5 is −14.9 LUFS (one-pass preview
+  loudnorm). 4 HIGH edges were read and accepted (`review/accepted.json`).
+- Re-rendered after the R4 reframe: review v1 has **HIGH 0** (4 accepted with reasons), T4 0 pops,
+  and master.srt is byte-identical when rebuilt on the new segments. Delivered
+  `episode4_v1_NO_MUSIC_do_not_upload.mp4` and `review/v1/watchlist.md` (editorial calls only).
+  Not in v1: cards and stamps, music, the chapter deck.
+
+## 2026-10-12 — Episode 4 v2: re-cut after Shoaib's review of v1
+
+Shoaib on v1: cuts at bad places and mid-sentence, not natural; the best of the repeated lines
+not picked; the note scene opens on waiting. Then, mid-rework: "not cutting sentences does not
+mean you should not cut the fillers, it should look like a final product."
+- **Ledger:** M042-M045 and READ R10 (retakes). review.py gained monologue mode, C12 sliver,
+  C13 dead lead-in, C14 said twice, C15 edge-on-speech and `downgrade_tightening`, with tests
+  (304 pass). On the v1 cut the new checks fire on exactly the problems he heard.
+- **Rebuilt `episode4/edit/build/cut.py`.** Ranges are (take, first sentence, last sentence) from
+  `build/sentences.py`. Edges sit in measured pauses with 0.20 s of air before and 0.28 s after.
+  Long ranges get camera splits only at sentence pauses. A take table records every retake
+  choice and why. v1's builder is kept as `cut_v1.py`.
+- **`build/tighten.py`** removes fillers, stutters, listed restarts and dead pauses, only at
+  quiet points. 125 removals. 18 fillers glued to a word were kept (no dip). Nine cuts were
+  placed by hand from `build/valley.py`, because Deepgram's times were off. Two of my
+  hand cuts were wrong and were caught by `build/verify_joins.py` (whisper at every join):
+  "It…" (it removed "feeling") and "everything everything" (it cut inside the word). Fixed,
+  and the stutter is kept.
+- **Picture:** `build/jumps.py` measured jumps at a median of 4.0 against 0.44 for continuous
+  motion. Visible jumps (≥ 3.0) alternate framings 10% apart. The note scene now opens on his
+  first word (14.82 s, not 12.0).
+- **Result:** 164 segments, 15:48 plus the end card (v1 was 14:54). review HIGH 0: 13 flags were
+  checked by listening and recorded with reasons. The listening pass found no real word lost.
+
+## 2026-10-12 — Episode 4 v3: Shoaib's notes on v2
+
+Notes: 7:20 "started" missing; 9:19 a jump after "third interview"; 9:31 "What" missing; 11:21
+the caption said "2020 one"; still frames at 11:43 and 12:22, and anywhere else; 14:12 "क्यों काम
+करती है" cut early; the intro not crisp; why English-only captions instead of Hinglish.
+- **Root causes.** 7:20, 9:31 and 14:12 were hand cuts at dips INSIDE words. v2's verifier
+  transcribed both sides together, so whisper filled the gaps back in (M048). 9:19: removing the
+  company name tore a run-on sentence, so the name is now kept as said. The still frames were
+  scripted holds plus "beat" pauses (M046). The captions followed the script's "English
+  captions" over the house Hinglish convention (M047; channel-kb playbook corrected). The 2021
+  bug: Deepgram writes "twenty twenty one," with a comma, so the "2021" pattern missed it.
+- **Changes in `episode4/edit/build`.** No holds, no beat pauses. Joins keep 0.15/0.20 s of
+  air. Pauses shrink to 0.25 s (in a sentence) or 0.35 s (between sentences). A breath at −38 dB
+  or quieter counts as dead air. The pause halves at picture splits are trimmed. Camera blocks
+  (~22 s, alternating 1.00/1.12) are formed AFTER tightening. Cold open: a framing per line
+  (1.25, 1.0, 1.40) with tight air. `stills.py` measures every quiet stretch: 24 over 0.7 s
+  became 5 (section breaks, ~0.8 s). New `verify_sides.py`: 251 joins, each side transcribed
+  alone. Every flag was a whisper mishearing of a short clip, confirmed from the levels. Result:
+  253 segments, 14:54 + the end card.
+- **review.py:** C16 still frame (audio-confirmed via `confirm_stills`), with tests (306 pass).
+  On v2 it fires at both of Shoaib's timestamps plus four more holds. On v3: HIGH 0, with 17
+  flags accepted after listening.
+
+## 2026-10-12 — Episode 4 v4: grade, graphics, music, b-roll; the full ledger walk
+
+Shoaib: keep the company name; add graphics and music; take b-roll from the global folder and
+elsewhere (the MRI); a pasted note that the skin read oversaturated orange-red. He also asked
+whether previews were checked against the mistakes list. **They were only partly checked:**
+review.py ran every time, but the READ items were not walked, and Episode 3's own feedback
+(holds, "random stuff", a readable book title, the card spine) had never reached the ledger.
+Added M046 (first raised on Episode 3) and M049-M052, plus READ R11.
+- **Grade** (`build/skin.py`, a vectorscope measure): skin was ON the skin line (123-125°) but
+  chroma 37-41 under a warm balance. colortemperature 7200 + colorbalance gm 0.02 + saturation
+  0.9 + a soft highlight curve gives skin 123-126° at chroma 29-33. Cooling alone swung skin to
+  118° (magenta).
+- **Cards:** 15 (4 decks, 6 stamps, a day list, an offers stat, a keyline, a three-things
+  tracker), each read on a contact sheet. **B-roll** (`build/visuals.py`, overlays): 2017 college
+  photo, Awaken reading clip, the MRI with its patient header cropped. The journal pages were
+  not used (the journal has its own video).
+- **Music** (`build/mix.py`): 7 beds and 4 hits, all phrase-anchored; the zenith, cold open and
+  dark stretch are unscored. R6 found the beds ~8-10 dB too low; fixed (gotchas.md).
+- **Captions** R2: five audible words dropped; fixed with `keep_drifted` (gotchas.md).
+- Final: `episode4_v4_preview.mp4`, −14.2 LUFS / −1.3 dBTP, HIGH 0, 0 pops, one freeze (the end
+  card). The ledger walk is recorded in `review/v4/ledger_walk.md`.
+
+## 2026-10-13 — skills/motion-graphics-pass (from Episode 2's final_mgx.mp4)
+
+Episode 2's motion-graphics pass was built in a claude.ai session on 2026-10-12 (39 cue sprites in pycairo,
+the routine glass card, 14 caption cues replaced by patches from `base.mp4`, 75 SFX from
+`effects/structural/`, composited in 20 s chunks onto `final.mp4` → `final_mgx.mp4`). Shoaib asked for the
+same process in this repo, so it is now a vendored skill: `SKILL.md` (process + the design judgment),
+`scripts/mgx.py` (pipeline CLI), `scripts/mglib.py` (primitives + components), `examples/episode2/cues.py`
+(the full pass), `references/` (as-built record, blueprint, format, toolkit).
+
+Verified by re-running the generalized scripts against Episode 2 (Linux VM, ffmpeg 4.4, python 3.10):
+sprites byte-identical to the delivered ones (fork and spawn), a composed chunk PSNR ∞ against the delivered
+chunk, the SFX bus sample-identical, `verify` on final_mgx.mp4: 16194/16194 frames, 540.340 s, A/V offset
+0.0334/0.0330, −14.2/−14.2 LUFS. **Not yet run on this Mac** (ffmpeg 9, uv, macOS spawn): first use should
+run `still` and one `compose --chunks` before a full pass. New finding while building it: the audibility
+check (M052) shows 42 of Episode 2's 75 effects buried under the voice.
+
+## 2026-10-13 — Epidemic Sound sourcing added to the motion-graphics skill
+
+Shoaib connected the Epidemic Sound connector and asked that SFX and music always be the apt one: local library
+first, connector when nothing local fits. Added `mgx.py library` (name/tag search over effects/ + music/, sidecars
+included) and `mgx.py fetch` (downloads a signed asset URL, measures duration / hit / peak / centroid, writes an id
+sidecar, prints the SFX_LIB line), plus `references/sourcing-audio.md`. Verified: connector search for SFX and music
+works and DownloadSoundEffect returns a signed WAV URL on audiocdn.epidemicsound.com; `fetch` + `library` tested
+with a file:// URL in the Linux VM (its proxy blocks the CDN, 403). **The real CDN download has not been run on
+the Mac yet.**
+
+
+## 2026-10-13 — Episode 4 v5: new b-roll + first motion-graphics pass on a new episode
+
+- **B-roll (Shoaib's notes):**
+  - book cutaway → `global-b-rolls/book_reading2.mov`;
+  - the LinkedIn and GitHub screen recordings (`episode4/b-roll/`) are a new `screen` kind in
+    `build/visuals.py`: cropped windows of one recording, joined, each pushing in slowly about a
+    fixed point;
+  - the 2017 hostel photo returns on "in that hostel room" (Shoaib confirmed it is the hostel).
+- **Privacy (R4):** the GitHub sidebar email is cropped out of both shots. LinkedIn's
+  "Open to work" and analytics boxes are cropped out.
+- **Screen recordings read as freezes.** v5's first review flagged T3 at 0:27.8, 0:30.3, 0:31.9 and
+  3:02.5: the recordings sit perfectly still for seconds at a time. A 1.03–1.08 push per part
+  fixed it; the re-run flags only the end card.
+- **motion-graphics-pass, run on Episode 4** (`edit/mgx/cues.py`, `edit/motion_graphics_blueprint.md`):
+  - 22 cues + 1 vignette + 34 SFX;
+  - no caption replacements; every cue carries unspoken information;
+  - three motifs: the semester chart, the confidence meter, the note glyph;
+  - anchors use a `T(phrase, near)` helper over `cards.kept_words` that refuses an anchor that
+    moved more than 1.5 s.
+  - **The stills loop caught three problems:** "Solved" clipped, an empty chart card, and the
+    figure's head over its label. It also caught a zero-scale cairo matrix on the first frame of
+    a pop, now fixed by a `scl()` guard.
+- **mgx.py fixes:** `count_frames` (ffprobe 9 trailing comma) and vignette fades across chunk
+  seams. Both are in gotchas.md.
+- **SFX ceiling 0.93 → 0.84 for this episode:** 0.93 measured −0.4 dBTP after AAC (T5); 0.84
+  gives −1.3. The skill default may want the same change. Unproven on other episodes.
+- **Lost a render to a stray ffmpeg** after `pkill` on the Python wrapper (gotchas.md).
+- **Caption fix:** "Nisway" → "Niswey" (his LinkedIn spelling) in `build/captions.py`.
+- **Delivered:**
+  - `episode4_v5_preview.mp4`;
+  - `review/v5/reel.mp4` (3:24 of changes, 720p, under the 30 MB phone limit);
+  - `review/v5/watchlist_shoaib.md` and `ledger_walk.md`.
+  - review.py: HIGH 0, T1–T6 pass except the end-card freeze. mgx verify: frames, duration and
+    sync identical to the master, −14.2 LUFS.
+- **4K final (Shoaib approved v5, 2026-10-13):**
+  - Steps: `visuals.py 2160`, then `render.py --height 2160 --fps 30 --no-loudnorm`, then `mix.py`,
+    then the mgx pass in a separate work dir (`edit/mgx_final/`, cues copied with MASTER/BASE/OUTPUT
+    switched to the 4K files). The v5 preview's `mgx/` stays intact.
+  - Timings on this Mac: 4K segment extraction ~2 h for 253 segments (sequential, ~50% CPU);
+    4K cards + composite ~50 min; mgx at S=2: 12 s sprites, ~10 min compose.
+  - Delivered `episode4_final.mp4`: 3840x2160 30 fps, 37.6 Mbps, bt709 x3. mgx verify: 26829/26829
+    frames, identical sync, −14.2 LUFS. review.py: HIGH 0, T5 −1.3 dBTP, T3 only the end card.
+  - R4 rescanned at 4K: LinkedIn and GitHub crops show only public profile fields, no email.
+- **Speed badge (Shoaib, 2026-10-13):** "SWITCH TO 1.25X", Episode 3's `gfx_badge.py` at 5.0 s, from 0:11.8 (the first line after the cold
+  open). Added to the 4K final through a new mgx `MOVIE_LAYERS` option, then `compose --dirty speed_badge`.
+  That recomposed one 20 s chunk (10 s), then mux. Verify passed again. Frames checked at 11.9 / 12.6 / 15.0 / 16.7: readable over
+  both the hostel photo and the face, gone before the first graphic at 17.2.
+- **Cleanup:** the intermediates went to `~/.Trash/episode4_intermediates_2026-10-13` (30 GB), not a hard delete:
+  - the 4K no-music and pre-mgx files, `base*.mp4`, `clips_*`, the v1–v5 renders, the mgx work dirs (cues.py kept)
+    and the card `renders/*.mov`, which render.py regenerates.
+  - Kept: `episode4_final.mp4`, the EDL, build/, transcripts, master.srt, prepped/, the card projects, review/, the blueprint.

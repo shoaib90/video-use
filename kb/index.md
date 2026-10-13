@@ -55,6 +55,14 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
 
 ## Fast facts
 
+- **No holds, no still frames (M046, Shoaib 2026-10-12).** A face held past the last word reads
+  as a frozen picture, even when the script says "hold". End lines on a clean cut, and keep no
+  wordless stretch over ~0.7 s in a shot. review.py C16 checks it.
+- **Captions are Hinglish as spoken**, Devanagari for Hindi, in Kohinoor Devanagari (M047),
+  whatever a script says.
+- **Verify a cut by transcribing each side ALONE** (M048): a joined transcription fills clipped
+  words back in.
+
 - Run helpers as `uv run python helpers/<name>.py` — there are no console scripts.
 - `pytest` is not a declared dep: `uv run --with pytest python -m pytest tests/`.
 - **`main` is the working branch** and this fork's copy of the tool — and now the only one.
@@ -63,6 +71,12 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   diarization), ElevenLabs (unconfigured). Each has a different flaw — see [gotchas.md](gotchas.md).
 - Paid transcription is cached per source. Never re-transcribe unnecessarily; iterate with whisper.
 - All three animation engines installed: Manim, HyperFrames, Remotion.
+- **Motion-graphics pass on a locked cut: `skills/motion-graphics-pass/`** (added 2026-10-13 from Episode 2's
+  `final_mgx.mp4`). `mgx.py <edit> words|frames|still|render|layers|sfx|compose|mux|verify`; outputs in
+  `<edit>/mgx/`. Caption swaps are patches from `base.mp4`. Its `sfx` step prints per-effect audibility (M052).
+- **Sound sourcing (Shoaib, 2026-10-13): the apt sound, always.** Local library first (`mgx.py <edit> library <terms>`), then the
+  Epidemic Sound connector (`…Epidemic_Sound__SearchSoundEffects` / `SearchRecordings` → `Download*` → `mgx.py fetch`, which files
+  it in `effects/epidemic/` or `music/epidemic/` with an id sidecar). Procedure: `skills/motion-graphics-pass/references/sourcing-audio.md`.
 - **Glass cards are the house look for structured beats** (lists, schedules, figures): a `cards`
   block in the EDL, word-anchored, rendered by HyperFrames and composited by render.py. Guide in
   `SKILL.md` "Glass cards"; read `cards.py <edl> --clips …` output before rendering. **Anchor on
@@ -76,6 +90,9 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   code-switched (e.g. Hinglish) audio returns confident English gibberish and drops ~a third of
   the words — and since the cut is reasoned from the transcript, it corrupts the *edit*, not just
   the captions. Use `--language multi`; `detect_language` picks one language and fails at this.
+  **Shoaib's "English" episodes carry Hindi asides**, which `en` drops silently (Episode 4: 20
+  holes in 8 of 36 clips). A whisper `-l en` pass reading fluent English proves nothing, because
+  it translates. Scan the loudness of every pause of 1.5 s or more after transcribing. See gotchas.md.
 - **On a first transcription, run the free whisper pass alongside the paid one.** It has caught
   real errors (names, opening lines) that would otherwise be burned into captions. On Hinglish
   use multilingual `ggml-small.bin` with **`-l en`** (it renders Hindi into English and can be
@@ -92,6 +109,8 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   (`grep -nE '[¿¡áéíóúñ]' <edit>/takes_packed.md` — **not** the JSON, which stores `\u00bf` escapes and silently matches nothing) — Deepgram drifts into Spanish on short
   or low-content clips. Hit 3 of 38 on Detour-2, one of them 47% of the clip (re-verified 2026-09-30 with the
   `takes_packed.md` command above: exactly those 3).
+- **iPhone Cinematic clips come as pairs** (`IMG_n` sharp + depth track, `IMG_En` blur baked
+  in). Keep one variant in the batch folder or transcription pays twice. See gotchas.md.
 - **Don't transcribe clips under ~1s** — both engines return pure hallucination for them.
 - **A 0-word transcript is not evidence of silence.** Check with whisper before writing a clip
   off; loud music reads as "empty" and the −60 dBFS silence guard never trips. See gotchas.md.
