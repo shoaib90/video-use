@@ -226,6 +226,18 @@ What it needs and does:
 - **`accepted.json`** entries are flags that were checked and judged fine. Each needs a `why`.
   They are listed in the report, not counted.
 
+**Added 2026-10-12 (Episode 4, M042-M045):**
+- **Monologue mode** (auto: one speaker in the cut). A cut that removes real words inside a
+  sentence is HIGH (C1/C5). A cut that removes only fillers or a pause is LOW. A join whose
+  removal is under 1.6 s, with both edges quiet, is downgraded to LOW
+  (`downgrade_tightening`): Deepgram word times drift too much to judge a fine cut.
+- **C12** sliver: a story range of 2 words or less, or under 1 s, next to removed real words or a
+  1.5 s+ gap (a splice from another attempt).
+- **C13** dead lead-in: more than 1 s before the first word.
+- **C14** said twice: the same 7-word run in two story ranges (a retake left in).
+- **C15** edge on speech: the source audio at any edge where material is removed is louder than
+  −38 dB. This is the check that judges a tightened cut.
+
 Calibrated on podcast Episode 1 v7, where 60 HIGH flags fell to 3 genuine:
 - tag questions ("correct?", "है ना?", "ठीक है?") are not questions
 - a join to the next range on the same source within 60 s is MED ("read the join"), and LOW

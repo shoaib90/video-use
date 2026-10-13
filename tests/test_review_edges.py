@@ -3,6 +3,8 @@ import json
 import sys
 import tempfile
 import unittest
+
+import numpy as np
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "helpers"))
@@ -68,6 +70,112 @@ class EdgeChecks(unittest.TestCase):
                           {"source": "A", "start": 9.0, "end": 10.0}]}
         st, _, _ = review.story_ranges(edl, 30.0)
         self.assertEqual([(s[1], s[2]) for s in st], [(0.0, 5.0), (9.0, 10.0)])
+
+    # ---- Episode 4 v1 (M042-M045)
+    def run_mono(self, ws, stories):
+        st = [(s[0], s[1], s[2], 0.0, 0.0, 0) for s in stories]
+        flags, _ = review.edge_checks(Path("."), st, lambda src: ws, monologue=True)
+        return {(f[0], f[1], f[3]) for f in flags}
+
+    def test_monologue_mid_sentence_join_is_high(self):  # M042
+        # real words removed inside a sentence: HIGH
+        ws = words(seq("So I really really was rejected in my first two interviews.", 0.0))
+        got = self.run_mono(ws, [("S", 0.0, 0.6), ("S", 1.15, 3.5)])
+        self.assertIn(("HIGH", "C5", "OUT"), got)
+        # only a filler / a pause removed: tightening, LOW (C15 checks the edges are quiet)
+        ws = words(seq("So I", 0.0) + [("uh,", 1.0, 0.3)] + seq("was rejected in my first two interviews.", 3.0))
+        got = self.run_mono(ws, [("S", 0.0, 0.6), ("S", 2.95, 5.2)])
+        self.assertNotIn(("HIGH", "C5", "OUT"), got)
+        self.assertIn(("LOW", "C5", "OUT"), got)
+        # a cut between two whole sentences is clean
+        ws2 = words(seq("I was rejected.", 0.0) + seq("Then I called.", 3.0))
+        self.assertNotIn(("HIGH", "C5", "OUT"), self.run_mono(ws2, [("S", 0.0, 0.9), ("S", 2.95, 4.0)]))
+        # the same join in a conversation stays a deliberate tightening (not HIGH)
+        st = [(x[0], x[1], x[2], 0.0, 0.0, 0) for x in [("S", 0.0, 0.6), ("S", 2.95, 5.2)]]
+        flags, _ = review.edge_checks(Path("."), st, lambda src: ws)
+        self.assertFalse([f for f in flags if f[1] in ("C1", "C5") and f[0] == "HIGH"])
+
+    def test_sliver_range(self):  # M043
+        ws = words([("It", 3.92, 0.3)] + seq("was July 2019 and I was in my seventh semester.", 6.56))
+        got = self.run_checks(ws, [("S", 3.9, 4.3), ("S", 6.5, 9.6)])
+        self.assertIn(("C12", "IN"), got)          # 2.2 s gap: a splice from another attempt
+        # "So," left alone by a trimmed pause (< 1.5 s, nothing said) is not a splice
+        ws = words([("So,", 1.0, 0.3)] + seq("I think around February.", 2.2))
+        got = self.run_checks(ws, [("S", 0.9, 1.4), ("S", 2.1, 3.5)])
+        self.assertNotIn(("C12", "IN"), got)
+
+    def test_edge_on_speech(self):  # M042: C15
+        import wave, tempfile, os
+        sr = 16000
+        x = np.zeros(sr * 4, dtype=np.float32)
+        x[sr:2 * sr] = 0.3 * np.sin(np.arange(sr) * 2 * np.pi * 200 / sr)   # "speech" 1-2 s
+        f = tempfile.NamedTemporaryFile(suffix=".wav", delete=False); f.close()
+        with wave.open(f.name, "wb") as w:
+            w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr)
+            w.writeframes((x * 32767).astype("<i2").tobytes())
+        edl = {"sources": {"S": f.name}}
+        st = [("S", 0.0, 1.5, 0, 0, 0), ("S", 3.0, 4.0, 0, 0, 1)]     # OUT at 1.5 s is mid-"speech"
+        got = {(g[1], g[3]) for g in review.edge_level_checks(edl, st, Path("."))}
+        self.assertIn(("C15", "OUT"), got)
+        self.assertNotIn(("C15", "IN"), got)                          # IN at 3.0 s is silent
+        st = [("S", 0.0, 0.5, 0, 0, 0), ("S", 2.5, 4.0, 0, 0, 1)]
+        self.assertEqual(review.edge_level_checks(edl, st, Path(".")), [])
+        os.unlink(f.name)
+
+    def test_dead_lead_in(self):  # M044
+        ws = words(seq("So this one is from Suma.", 14.87))
+        self.assertIn(("C13", "IN"), self.run_checks(ws, [("S", 12.0, 16.8)]))
+        self.assertNotIn(("C13", "IN"), self.run_checks(ws, [("S", 14.6, 16.8)]))
+
+    def test_said_twice_in_the_cut(self):  # M045
+        a = words(seq("Looking back what she saw is what got me hired.", 0.0))
+        b = words(seq("Looking back what she saw is what got me hired again.", 0.0))
+        st = [("A", 0.0, 3.0, 0, 0, 0), ("B", 0.0, 3.5, 0, 0, 1)]
+        flags = review.dup_checks(st, lambda src: a if src == "A" else b)
+        self.assertEqual([f[1] for f in flags], ["C14"])
+        self.assertEqual(review.dup_checks(st[:1], lambda src: a), [])
+
+    def test_sentence_opening_the_is_not_dangling(self):
+        ws = words(seq("The real answer is in a note.", 0.3))
+        self.assertNotIn(("C6", "IN"), self.run_checks(ws, [("S", 0.2, 2.6)]))
+        ws = words(seq("I went to the school.", 0.0))
+        self.assertIn(("C6", "IN"), self.run_checks(ws, [("S", 0.85, 1.6)]))   # starts on "the"
+
+    def test_tightening_downgrade(self):
+        st = [("S", 0.0, 1.0, 0, 0, 0), ("S", 1.5, 3.0, 0, 0, 1), ("S", 6.0, 7.0, 0, 0, 2)]
+        flags = [("HIGH", "C1", 1, "IN", "x"), ("HIGH", "C5", 1, "OUT", "y"), ("HIGH", "C15", 1, "OUT", "z")]
+        quiet = {(0, "OUT"): -60, (1, "IN"): -55, (1, "OUT"): -50, (2, "IN"): -50}
+        got = review.downgrade_tightening(flags, st, quiet)
+        self.assertEqual(got[0][0], "LOW")      # 0.5 s removed between quiet edges
+        self.assertEqual(got[1][0], "HIGH")     # 3 s removed: a story cut, read it
+        self.assertEqual(got[2][0], "HIGH")     # C15 itself never downgrades
+        loud = dict(quiet); loud[(1, "IN")] = -20
+        self.assertEqual(review.downgrade_tightening(flags[:1], st, loud)[0][0], "HIGH")
+
+    def test_still_frame_hold(self):  # M046
+        ws = words(seq("The answer was in that stack of notes.", 0.0))     # ends at 2.35
+        self.assertIn(("C16", "OUT"), self.run_checks(ws, [("S", 0.0, 3.5)]))
+        self.assertNotIn(("C16", "OUT"), self.run_checks(ws, [("S", 0.0, 2.6)]))
+        ws = words(seq("That was my first week.", 0.0) + seq("That's not what she saw.", 3.5))
+        self.assertIn(("C16", "IN"), self.run_checks(ws, [("S", 0.0, 4.9)]))   # 2.3 s with no word
+
+    def test_still_confirmed_by_audio(self):  # M046
+        import wave, tempfile, os
+        sr = 16000
+        x = np.zeros(sr * 4, dtype=np.float32)
+        x[:2 * sr] = 0.3 * np.sin(np.arange(2 * sr) * 2 * np.pi * 200 / sr)   # speech to 2.0 s
+        f = tempfile.NamedTemporaryFile(suffix=".wav", delete=False); f.close()
+        with wave.open(f.name, "wb") as w:
+            w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr)
+            w.writeframes((x * 32767).astype("<i2").tobytes())
+        edl = {"sources": {"S": f.name}}
+        review._AUDIO.clear()
+        flag = [("HIGH", "C16", 0, "OUT", "held")]
+        held = review.confirm_stills(flag, [("S", 0.0, 3.5, 0, 0, 0)], edl, Path("."))   # 1.5 s silent tail
+        self.assertEqual(held[0][0], "HIGH")
+        drift = review.confirm_stills(flag, [("S", 0.0, 2.3, 0, 0, 0)], edl, Path("."))  # 0.3 s: word times drifted
+        self.assertEqual(drift[0][0], "LOW")
+        os.unlink(f.name)
 
     def test_caps_unsafe_stamp(self):  # M020
         g = review.graphics_checks({"cards": [{"id": "x", "kind": "stamp", "text": "24 SSBs"},

@@ -53,6 +53,10 @@ FILLERS = {"मतलब", "तो", "so", "and", "but", "yeah", "like", "ok", "
 SPANISH = re.compile(r"[¿¡áéíóúñ]")
 TURN_GAP = 1.5          # s; a longer pause ends a turn
 JOIN_WINDOW = 60.0      # s; a neighbouring story range on the same source this close is a deliberate join
+DEAD_IN = 1.0           # s; more than this before the first word reads as waiting (M044)
+HOLD_MAX = 0.8          # s; held past the last word: reads as a still frame / forgotten line (M046)
+STILL_MAX = 1.2         # s; no word for this long inside a shot reads as a still frame (M046)
+SLIVER_WORDS, SLIVER_S = 2, 1.0   # a story range this small is a splice, not a shot (M043)
 # tag questions ("…, correct?", "…, है ना?", "ठीक है?") are fillers, not questions to be answered
 TAGS = {"correct", "right", "ok", "okay", "na", "ना", "no", "हां", "हाँ", "yes", "न", "huh", "बोलिए"}
 
@@ -119,8 +123,13 @@ def covered(stories, src, t0, t1) -> bool:
 
 
 # ------------------------------------------------------------------- content checks
-def edge_checks(edit: Path, stories, words_of, exempt=lambda k: False):
-    """Return flags [(sev, id, story_idx, edge 'IN'|'OUT', message)] and context per story."""
+def edge_checks(edit: Path, stories, words_of, exempt=lambda k: False, monologue=False):
+    """Return flags [(sev, id, story_idx, edge 'IN'|'OUT', message)] and context per story.
+
+    monologue: one speaker throughout (a talking head). Joining two parts of one sentence
+    across a cut is then never a deliberate tightening, it is an audible jump inside a
+    sentence (M042, Episode 4 v1), so C1/C5 joins are HIGH instead of MED/LOW."""
+    join_sev = "HIGH" if monologue else "MED"
     flags, ctx = [], {}
     for k, (src, a, b, o0, o1, _) in enumerate(stories):
         ws = words_of(src)
@@ -161,7 +170,7 @@ def edge_checks(edit: Path, stories, words_of, exempt=lambda k: False):
             if len(lead) <= 4 and all(norm(w["text"]) in FILLERS for w in lead):
                 flags.append(("LOW", "C1", k, "IN", f"lead-in filler trimmed (“{' '.join(w['text'] for w in lead)}”)"))
             elif joined_from:
-                flags.append(("MED", "C1", k, "IN", f"joins #{k - 1} mid-sentence (after “{ws[i - 1]['text']}”, "
+                flags.append((join_sev, "C1", k, "IN", f"joins #{k - 1} mid-sentence (after “{ws[i - 1]['text']}”, "
                                                     f"{a - prev_story[2]:.1f} s cut): read the join"))
             else:
                 flags.append(("HIGH", "C1", k, "IN", f"starts mid-sentence after “{ws[i - 1]['text']}”"))
@@ -188,15 +197,33 @@ def edge_checks(edit: Path, stories, words_of, exempt=lambda k: False):
         if nxt and not FINAL.search(last["text"]) and nxt["start"] - last["end"] < 0.8 \
                 and not covered(stories, src, nxt["start"], nxt["end"]):
             if joined_to and next_story[1] - b < 3.0:
-                flags.append(("LOW", "C5", k, "OUT", f"tightened inside a sentence (drops “{nxt['text']}…”, resumes at #{k + 1})"))
+                real = [w for w in removed_words(ws, b, next_story[1]) if norm(w["text"]) not in FILLER_SOUNDS]
+                flags.append(("HIGH" if monologue and real else "LOW", "C5", k, "OUT", f"tightened inside a sentence (drops “{nxt['text']}…”, resumes at #{k + 1})"))
             elif joined_to:
-                flags.append(("MED", "C5", k, "OUT", f"sentence continues at #{k + 1} after {next_story[1] - b:.1f} s cut: read the join"))
+                flags.append((join_sev, "C5", k, "OUT", f"sentence continues at #{k + 1} after {next_story[1] - b:.1f} s cut: read the join"))
             else:
                 flags.append(("HIGH", "C5", k, "OUT", f"ends mid-sentence on “{last['text']}”, next: “{nxt['text']}…”"))
+        # C5 (monologue): a cut INSIDE a sentence even when no word is dropped, i.e. a pause
+        # removed mid-sentence ("So I | was | rejected", M042). The checks above only see a
+        # dropped next word; this one sees the jump itself.
+        if monologue and not FINAL.search(last["text"]) and next_story and next_story[0] == src \
+                and next_story[1] >= b - 0.05 and nxt and covered(stories, src, nxt["start"], nxt["end"]) \
+                and not any(f[1] == "C5" and f[2] == k for f in flags):
+            gone = removed_words(ws, b, next_story[1])
+            real = [w for w in gone if norm(w["text"]) not in FILLER_SOUNDS]
+            if real:
+                flags.append(("HIGH", "C5", k, "OUT", f"words removed inside a sentence: “…{last['text']}” | "
+                                                      f"“{nxt['text']}…” (removed “{' '.join(w['text'] for w in gone)}”)"))
+            else:   # tightening: only fillers / a pause went (Shoaib wants this; C15 checks it is clean)
+                flags.append(("LOW", "C5", k, "OUT", f"tightened inside a sentence (removed "
+                                                     f"{'“' + ' '.join(w['text'] for w in gone) + '”' if gone else 'a pause'}, "
+                                                     f"{next_story[1] - b:.1f} s)"))
         # C6 dangling edge word
         if norm(last["text"]) in DANGLING and not FINAL.search(last["text"]):
             flags.append(("HIGH", "C6", k, "OUT", f"ends on a dangling “{last['text']}”"))
-        if norm(first["text"]) in {"कि", "the", "of", "to"}:
+        # a function word that OPENS a sentence (new take, or after . ? !) is not dangling
+        # ("The real answer is in a note.", Episode 4 v2)
+        if norm(first["text"]) in {"कि", "the", "of", "to"} and i > 0 and not FINAL.search(ws[i - 1]["text"]):
             flags.append(("HIGH", "C6", k, "IN", f"starts on a dangling “{first['text']}”"))
         # C7 ghost duplicates near either edge
         for edge, t in (("IN", a), ("OUT", b)):
@@ -232,12 +259,183 @@ def edge_checks(edit: Path, stories, words_of, exempt=lambda k: False):
                                                      f"restarted after a pause, src {ws[i + p_]['start']:.1f} → {ws[i + hit]['start']:.1f}"))
                 p_ = hit
             p_ += 1
+        # C12 sliver: a story range of one or two words is a splice from another attempt
+        # ("It" + 2.6 s cut + "was July 2019…", Episode 4 v1, M043)
+        if j - i + 1 <= SLIVER_WORDS or b - a < SLIVER_S:
+            # a short piece left by tightening (only fillers/pauses removed beside it, under 1.5 s)
+            # is not a splice; one next to removed real words or a long gap is (M043)
+            def splice_side(o):
+                if not o or o[0] != src:
+                    return False
+                g0, g1 = (o[2], a) if o[2] <= a else (b, o[1])
+                gone = removed_words(ws, g0, g1)
+                return g1 - g0 >= 1.5 or any(norm(w["text"]) not in FILLER_SOUNDS for w in gone)
+            if splice_side(prev_story) or splice_side(next_story):
+                flags.append(("HIGH", "C12", k, "IN", f"sliver: {j - i + 1} word(s), {b - a:.2f} s "
+                                                      f"(“{' '.join(w['text'] for w in ws[i:j + 1])}”)"))
+        # C13 dead lead-in: the shot opens on waiting/handling before a word is said (M044)
+        if first["start"] - a > DEAD_IN and not exempt(k):
+            flags.append(("HIGH", "C13", k, "IN", f"{first['start'] - a:.1f} s before the first word "
+                                                  f"(“{first['text']}”): waiting on screen?"))
+        # C16 still frame (M046, Episode 4 v2 at 11:43 and 12:22): a shot held past its last word,
+        # or a long wordless stretch inside it, looks frozen ("looks like forgot the lines")
+        if not exempt(k) and b - last["end"] > HOLD_MAX:
+            flags.append(("HIGH", "C16", k, "OUT", f"held {b - last['end']:.1f} s after the last word "
+                                                   f"(“{last['text']}”): reads as a still frame"))
+        for n in range(i, j):
+            g = ws[n + 1]["start"] - ws[n]["end"]
+            if STILL_MAX < g < 5:
+                flags.append(("HIGH", "C16", k, "IN", f"{g:.1f} s with no word inside the shot at src "
+                                                      f"{ws[n]['end']:.1f} (after “{ws[n]['text']}”): still frame?"))
         # C8 transcript gap inside the cut
         for n in range(i, j):
             g = ws[n + 1]["start"] - ws[n]["end"]
             if g >= 5:
                 flags.append(("MED", "C8", k, "IN", f"{g:.1f} s with no transcript inside the cut at src {ws[n]['end']:.1f} (dropped speech? no captions)"))
     return flags, ctx
+
+
+FILLER_SOUNDS = {"uh", "um", "uhh", "umm", "er", "erm", "hmm"}
+EDGE_QUIET_DB = -38.0   # C15: a cut edge louder than this in the source sits on speech (M042)
+
+
+def removed_words(ws, t0, t1):
+    """Words that lie mostly inside a removed stretch [t0, t1] of the source."""
+    return [w for w in ws if min(w["end"], t1) - max(w["start"], t0) >= 0.5 * max(w["end"] - w["start"], 0.01)]
+
+
+_AUDIO = {}
+
+
+def source_audio(edl, edit: Path, src):
+    """Mono 16 kHz samples of a source, cached (shared by C15 and the C16 confirmation)."""
+    if src not in _AUDIO:
+        path = edl["sources"].get(src)
+        if not path:
+            return None
+        p = Path(path) if Path(path).is_absolute() else edit / path
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(p), "-vn", "-ac", "1", "-ar", "16000",
+                              "-f", "f32le", "-"], capture_output=True).stdout
+        _AUDIO[src] = np.frombuffer(raw, "<f4").astype(np.float64)
+    return _AUDIO[src]
+
+
+QUIET_DB = -38.0   # C16 confirmation: silence or a breath
+
+
+def quiet_profile(x, a, b):
+    """(longest quiet run inside [a, b], quiet run ending at b) in seconds, 10 ms frames."""
+    seg = x[int(a * 16000):int(b * 16000)]
+    n = len(seg) // 160
+    if n == 0:
+        return 0.0, 0.0
+    db = 20 * np.log10(np.maximum(np.sqrt((seg[:n * 160].reshape(n, 160) ** 2).mean(axis=1)), 1e-9))
+    q = db < QUIET_DB
+    longest = run = 0
+    for v in q:
+        run = run + 1 if v else 0
+        longest = max(longest, run)
+    tail = 0
+    for v in q[::-1]:
+        if not v:
+            break
+        tail += 1
+    return longest * 0.01, tail * 0.01
+
+
+def confirm_stills(flags, stories, edl, edit: Path):
+    """C16 is computed from Deepgram word times, which drift; keep it HIGH only when the AUDIO
+    agrees: a quiet tail > HOLD_MAX (OUT) or a quiet run > STILL_MAX inside the shot (IN)."""
+    out = []
+    for f in flags:
+        if f[0] == "HIGH" and f[1] == "C16":
+            src, a, b = stories[f[2]][:3]
+            x = source_audio(edl, edit, src)
+            if x is not None:
+                longest, tail = quiet_profile(x, a, b)
+                real = tail > HOLD_MAX if f[3] == "OUT" else longest > STILL_MAX
+                if not real:
+                    f = ("LOW", f[1], f[2], f[3], f[4] + f" [audio: quiet tail {tail:.2f} s, longest {longest:.2f} s]")
+        out.append(f)
+    return out
+
+
+def edge_level_checks(edl, stories, edit: Path, levels_out=None):
+    """C15 (M042): every edge where material is REMOVED must sit in quiet audio in the source.
+    Loudness of the 10 ms frame at the cut; abutting shots (nothing removed) are skipped.
+    levels_out, if given, receives {(story_idx, 'IN'|'OUT'): dB}."""
+    flags, cache = [], {}
+
+    def level(src, t):
+        path = edl["sources"].get(src)
+        if not path:
+            return -99.0
+        if src not in cache:
+            p = Path(path) if Path(path).is_absolute() else edit / path
+            raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(p), "-vn", "-ac", "1", "-ar", "16000",
+                                  "-f", "f32le", "-"], capture_output=True).stdout
+            cache[src] = np.frombuffer(raw, "<f4").astype(np.float64)
+        x = cache[src]
+        i = int(t * 16000)
+        seg = x[max(0, i - 80):i + 80]
+        return 20 * math.log10(max(1e-9, float(np.sqrt((seg ** 2).mean())))) if len(seg) else -99.0
+
+    for k in range(len(stories) - 1):
+        p, q = stories[k], stories[k + 1]
+        for idx, src, t, edge in ((k, p[0], p[2], "OUT"), (k + 1, q[0], q[1], "IN")):
+            lv = level(src, t)
+            if levels_out is not None:
+                levels_out[(idx, edge)] = lv
+            if lv > EDGE_QUIET_DB:
+                flags.append(("HIGH", "C15", idx, edge, f"cut at {lv:.0f} dB in the source (on speech, not in a pause)"))
+    return flags
+
+
+TIGHT_MAX = 1.6   # s; a removal this short between quiet edges is tightening, not a story cut
+
+
+def downgrade_tightening(flags, stories, levels):
+    """Monologue tightening (fillers and pauses removed at quiet points, Shoaib's ask on
+    Episode 4) makes Deepgram-timed edge flags (C1/C5/C6/C12) fire on word-time drift, not on
+    real damage: verified by listening on Episode 4 v2, where 12 of 12 such 'removed' words
+    were still audible. A join flag drops to LOW when the removal is under TIGHT_MAX s and both
+    edges are quiet in the source (C15). Loud edges stay HIGH under C15 itself."""
+    out = []
+    for f in flags:
+        sev, cid, k, edge, msg = f
+        if sev == "HIGH" and cid in ("C1", "C5", "C6", "C12"):
+            j = k if edge == "OUT" else k - 1          # the join this flag sits on: j | j+1
+            if 0 <= j < len(stories) - 1:
+                p, q = stories[j], stories[j + 1]
+                gap = q[1] - p[2] if p[0] == q[0] else 99
+                quiet = levels.get((j, "OUT"), 0) <= EDGE_QUIET_DB and levels.get((j + 1, "IN"), 0) <= EDGE_QUIET_DB
+                if 0 <= gap < TIGHT_MAX and quiet:
+                    f = ("LOW", cid, k, edge, msg + " [tightening: quiet edges, C15 ok]")
+        out.append(f)
+    return out
+
+
+def dup_checks(stories, words_of, n=7):
+    """C14 (M045): the same 7-word run kept twice in the cut, i.e. a retake left in beside the
+    take it replaces. Returns flags like edge_checks."""
+    seen, flags = {}, []
+    for k, (src, a, b, *_rest) in enumerate(stories):
+        toks = [norm(w["text"]) for w in (words_of(src) or []) if w["start"] >= a - 0.05 and w["end"] <= b + 0.05]
+        for p_ in range(len(toks) - n + 1):
+            g = tuple(toks[p_:p_ + n])
+            if sum(len(x) >= 3 for x in g) < 4:
+                continue
+            if g in seen and seen[g] != k:
+                flags.append(("HIGH", "C14", k, "IN", f"said twice in the cut: “{' '.join(g)}” (also #{seen[g]})"))
+                break
+            seen.setdefault(g, k)
+    return flags
+
+
+def is_monologue(stories, words_of) -> bool:
+    spk = {w.get("speaker_id") for src, a, b, *_r in stories for w in (words_of(src) or [])
+           if w["start"] >= a and w["end"] <= b}
+    return len(spk) <= 1
 
 
 def word_checks(stories, words_of, starts_of_story):
@@ -442,7 +640,15 @@ def main():
     print("content checks…")
     ex = re.compile(a.exempt_beats) if a.exempt_beats else None
     exempt = lambda k: bool(ex and ex.search(edl["ranges"][stories[k][5]].get("beat", "")))
-    flags, ctx = edge_checks(edit, stories, words_of, exempt)
+    mono = is_monologue(stories, words_of)
+    print(f"  monologue: {mono} (mid-sentence joins are {'HIGH' if mono else 'MED'})")
+    flags, ctx = edge_checks(edit, stories, words_of, exempt, monologue=mono)
+    flags += dup_checks(stories, words_of)
+    levels = {}
+    flags += edge_level_checks(edl, [s for s in stories], edit, levels)
+    if mono:
+        flags = downgrade_tightening(flags, stories, levels)
+    flags = confirm_stills(flags, stories, edl, edit)
     lowc, span = word_checks(stories, words_of, None)
     gflags = graphics_checks(edl)
     acc_path = Path(a.accepted) if a.accepted else edit / "review" / "accepted.json"

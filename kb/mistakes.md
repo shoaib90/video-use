@@ -67,6 +67,64 @@ it again within 15 s. Echoes by the other person and emphatic repeats without a 
 flagged. On the full 89-minute cut the check found exactly this one (an earlier, looser version
 flagged 80 natural repeats).
 
+**M042** · 2026-10-12 · Episode 4 v1 · *"Cut at bad places, in between sentences, not sounding
+natural."* Cause: edges were placed at Deepgram word times, which drift by 0.1-0.7 s, so cuts
+landed on onsets and tails. A one-word sliver from an abandoned attempt was spliced in, and
+every jump got a scale change. review.py flagged 26 joins as MED, and they were not read.
+**Then, on the v2 rework, Shoaib: "not cutting sentences does not mean you should not cut the
+fillers, it should look like a final product."** So the rule is not "never cut inside a
+sentence". It is: **cut fillers, stutters, restarts and dead pauses, but only at measured
+silence or a sharp dip (≤ −38 dB), leaving ~0.15 s of air, and verify by listening.**
+Check: `AUTO C15` (any edge where material is removed must be quiet in the source), plus
+`AUTO C5` in monologue mode (real words removed inside a sentence are HIGH, a removal of only
+fillers or pauses is LOW). Plus Episode 4's `build/verify_joins.py`: whisper the assembled
+audio at every join, and confirm that the words beside it, and any real word Deepgram places in
+the removed gap, are still heard.
+
+**M043** · 2026-10-12 · Episode 4 v1 · *A one-word splice: "It" from an abandoned attempt + 2.6 s
+cut + "was July 2019…".* Cause: the range list used word timings without noticing that the
+first "It" belonged to the restart. Check: `AUTO C12` (a story range of 2 words or less, or under
+1 s, is HIGH).
+
+**M044** · 2026-10-12 · Episode 4 v1 · *The note scene opened on ~3 s of him waiting with the
+note before he spoke.* Cause: `in_at` was set early, on purpose, to show the note being opened,
+without checking how it plays. Check: `AUTO C13` (more than 1 s before the first word of a
+range is HIGH; accept it in accepted.json only when the action is the point).
+
+**M045** · 2026-10-12 · Episode 4 v1 · *Lines said several times; the best take was not chosen.*
+Cause: retakes were chosen by first-seen or by length, without comparing the candidates.
+Check: `AUTO C14` (the same 7-word run kept twice in the cut), plus `READ R10`: for every line
+with a retake, compare all candidates (complete sentence, no restart or filler, delivery) and
+record the pick and why in the episode's take table.
+
+**M046** · 2026-10-12 · Episode 4 v2 (first raised on Episode 3 v2, never logged) · *Still frames: "at 11:43-11:44 there is this still frame after
+the statement is complete"; 12:22-12:25 "looks like forgot the lines… these kind of things I would
+not expect you to miss."* Cause: deliberate holds (`out_at` 1-2.4 s past the last word, from the
+script's "hold still" marks) and "beat" pauses kept up to 1.4 s on static shots. On a locked-off
+talking head a held face reads as a frozen picture, not a beat. **Rule for every video: no holds.
+End each line on a clean cut (≤ 0.2 s of air), and keep no wordless stretch over ~0.7 s in a shot,
+including the zenith and the close.** A pause for weight needs a picture change (a cut, a
+punch, b-roll), never a held face. Check: `AUTO C16`: held more than 0.8 s past the last word, or
+more than 1.2 s with no word inside a shot, confirmed against the source audio so word-time
+drift doesn't fire it. On v2 it fires at both of Shoaib's timestamps and four more. Plus Episode
+4's `build/stills.py`, which lists every quiet stretch over 0.7 s in the output timeline.
+
+**M047** · 2026-10-12 · Episode 4 v1-v2 · *"Why have we kept English-only subtitles? Earlier we
+were keeping Hinglish Devanagari subtitles."* Cause: the episode script said "the edit adds English
+captions" for Hindi lines, and that was followed over the house convention without asking.
+**Captions are Hinglish as spoken: Devanagari for Hindi words, Latin for English, in Kohinoor
+Devanagari.** Fix only mishearings, names and numerals. Check: `READ R2` (captions), and a
+script instruction that changes a house convention is a question for Shoaib, not a default.
+
+**M048** · 2026-10-12 · Episode 4 v2 · *Words clipped at hand-placed cuts: "So I start | my YouTube
+channel" (7:20), "| If I can get 12 LPA" with "What" gone (9:31), "क्यों काम करती है" cut short
+(14:12).* Cause: the cut points came from Deepgram word times and dips that were really *inside*
+words, and the verification transcribed both sides of the join TOGETHER, so whisper's language
+model filled the missing syllables back in ("So I started"). Check: Episode 4's
+`build/verify_sides.py` transcribes each side of every join ALONE and requires the edge word
+whole. Plus `AUTO C15`. Never trust a cut-point word timestamp: read the levels, then listen to
+each side alone.
+
 ## Captions
 
 **M010** · 2026-10-03 · podcast Episode 1 · *A caption showed a misheard word ("Sex है" for "Sexy
@@ -122,7 +180,29 @@ episode's people. Cause: the background was chosen as "calm footage under the en
 elements". Check: `READ R8`. The end screen shows the episode's own people (Episode 1 now holds
 their handshake as a still).
 
+**M049** · 2026-10-05 · Episode 3 v5 (logged 2026-10-12) · *"Don't use random stuff, it should make
+sense": a 2017 selfie on "I started getting some recognition".* Cause: a cutaway was picked to
+break a static stretch, not because it showed the line. Check: `READ R11`: every b-roll, photo
+and card must literally show or say what the line says. If nothing fits, use text (a stamp) or
+ask Shoaib for an image.
+
+**M050** · 2026-10-05 · Episode 3 (logged 2026-10-12) · *The glass list card's timeline spine
+poked out below the card before its last row landed.* Fixed in cards.py the same day
+(kb/gotchas.md). Check: `READ R3`, at a frame BEFORE the last row lands as well as at the midpoint.
+
+**M051** · 2026-10-04 · Episode 3 (logged 2026-10-12) · *A book title was readable in b-roll (The
+Intelligent Investor), which Shoaib didn't want on screen.* Check: `READ R4`, which covers titles
+and covers as well as labels and screens.
+
 ## Sound
+
+**M052** · 2026-10-05 · Episode 3 v4 (logged 2026-10-12) · *Sound effects 17 LU under the voice were
+inaudible* (no change in 2-6 kHz energy against the no-music control). Check: place an effect in
+the pause before its line, or measure its band against the control (`READ R6`).
+Since 2026-10-13 the motion-graphics pass measures this automatically: `mgx.py <edit> sfx` reports each
+effect's energy against the programme in the effect's own bins and flags anything under −10 dB as BURIED.
+On Episode 2's pass, 42 of 75 effects (UI pops, whooshes, paper, soft ticks at −18..−30 dB peak) were buried.
+
 
 **M030** · podcast Episode 1 v1 · *50 camera cuts landed on speech: audible dips and clicks.*
 Check: the cut-placement rule (a quiet fade zone ≤ −32 dB) plus `AUTO T4` (a sample-step spike at
@@ -178,4 +258,7 @@ said by ~0:10?).
 - **R9** Leave exactly one file in the edit folder that looks uploadable. Rename pre-mix and
   no-loudness renders `*_NO_MUSIC_do_not_upload*`, and name the upload file in the delivery
   message.
+- **R10** Retakes (M045): for every line said more than once, list the candidates, pick the
+  best (complete sentence, no restart, fewest fillers, delivery), and write the reason down.
+- **R11** Every cutaway, photo and card shows or says what the line says (M049); none fills time.
 - **R7** Watch the first 15 s: picture from frame 1, the promise by ~0:10, no "last time".
