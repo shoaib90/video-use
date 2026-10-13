@@ -88,6 +88,8 @@ First-time install lives in `install.md` (clone, deps, ffmpeg, skill registratio
 - `yt-dlp`, HyperFrames, Remotion, Manim installed only on first use.
 - First-use animation setup happens inside the slot directory, never at the video-use repo root. HyperFrames can be invoked with `npx --yes hyperframes ...`; Remotion can be scaffolded with `npx create-video@latest` or installed as a project-local dependency before using its `remotion render` command.
 - This skill vendors `skills/manim-video/`. Read its SKILL.md when building a Manim slot.
+- It also vendors `skills/motion-graphics-pass/`: the overlay motion-graphics + SFX pass on a **picture-locked** master (`final.mp4` → `final_mgx.mp4`, cut untouched). Read its SKILL.md whenever Shoaib asks for motion graphics, a graphics blueprint, kinetic type, overlays or SFX on a final cut. Episode 2 is its quality bar.
+- **Choosing any sound effect or music bed, in any edit:** follow `skills/motion-graphics-pass/references/sourcing-audio.md`: local library first (`effects/`, `music/`), and if nothing there is the apt one, the **Epidemic Sound connector** (search, audition by measurement, download, file it locally with `mgx.py fetch`). Never settle for the nearest file on disk.
 
 Helpers (`helpers/transcribe.py`, `helpers/render.py`, etc.) live alongside this SKILL.md. Resolve their paths relative to the directory containing this file — the skill is typically symlinked at `~/.claude/skills/video-use/` or `~/.codex/skills/video-use/`.
 
@@ -360,6 +362,8 @@ claim, or a narrative anchor ("thirteen years **ago**"). It loses the screen whe
 small and conversational ("give me the next ten minutes").
 
 ## Motion graphics
+
+> **For a whole pass over a finished cut** (blueprint → kinetic type, cards, motifs, caption replacement, SFX → `final_mgx.mp4`), use `skills/motion-graphics-pass/SKILL.md`. This section covers the in-render components.
 
 Three layers, and the order matters — components built without the two beneath them produce
 exactly the flat, uniform motion that reads as amateur.
