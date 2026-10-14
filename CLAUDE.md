@@ -52,6 +52,23 @@ mistakes is a failed delivery. So:
 - Parallel animation sub-agents need the `Agent` tool; the user asked that it not be used
   unless they request it, so ask first.
 
+## Shorts
+
+When asked to make Shorts (or "clips", "verticals") from a video:
+
+1. **Read `~/Documents/GitHub/channel-kb/03-formats/shorts.md` first.** It holds the channel's
+   rules: Shorts are only cut from long videos, how to pick a moment, the zenith rule, cadence,
+   and how they are judged. If that file is missing, ask Shoaib before picking any moment.
+2. **For a new episode, use the `[SHORT]` passages marked in its channel-kb script.** For a video
+   already shot, propose candidates from the transcript (the `/yt-shorts` skill helps) and
+   confirm them with Shoaib before cutting (Hard Rule 11 applies to Shorts too).
+3. **Craft and crop rules live here:** `kb/shooting.md` ("Framing for Shorts"), plus anything
+   learned while cutting them, recorded in `kb/` as usual.
+4. Output goes to `<videos_dir>/edit/shorts/`, like any other session output.
+
+channel-kb is private and this repo is public: read it, but never copy its text, story details
+or episode content into this repo.
+
 ## Git
 
 **`main` is the working branch and this fork's copy of the tool.** It is not an upstream
