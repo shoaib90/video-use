@@ -2049,3 +2049,18 @@ the strongest line first ("Throughout my three years…"), a big thumbnail-style
   - `review.py` G4: an EDL with `parent` flags any parent card whose phrase it keeps without
     carrying a card. Replayed on money v1, it flags the dropped Offers stat.
 - Money Short v2 is not cut yet: the matching re-cut was proposed to Shoaib first (Hard Rule 11).
+- **Money Short v2** (Shoaib confirmed the plan and chose the hook, 2026-10-14):
+  `money/episode4_short_money.mp4`, 56.6 s.
+  - It opens on his push-back ("नहीं, my interviews were very good. If it was because of money,
+    please tell me."), which is then dropped from the story so it is not said twice. Plate:
+    "I ASKED FOR 12 LPA. / REJECTED."
+  - Punch-in 1.25 on "It was because of the money." The split points sit in -65/-67 dB valleys,
+    so render.py's 30 ms fades on the abutting ranges fall in silence.
+  - The long video's cards for these moments: a 12 LPA stamp (anchored on Deepgram's "well LPA"),
+    REJECTED, and the Offers stat 6 → 7.5 at scale 0.75 (G4 checks it).
+  - The long video's S6 bed: Power of Freedom, out from "Then next day she called me back"
+    through the payoff, back in sync on "I still remember" with a soft hit. Its drop sound on
+    "I'm rejected".
+  - Review: HIGH 0 / MED 0, -14.2 LUFS. Whisper read the whole render back cleanly. A doubled
+    "I just left it" at the end was the English model hallucinating on the Hindi line; the
+    multilingual model confirms "फिर इनको call नहीं किया कभी मैंने".
