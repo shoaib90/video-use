@@ -2064,3 +2064,8 @@ the strongest line first ("Throughout my three years…"), a big thumbnail-style
   - Review: HIGH 0 / MED 0, -14.2 LUFS. Whisper read the whole render back cleanly. A doubled
     "I just left it" at the end was the English model hallucinating on the Hindi line; the
     multilingual model confirms "फिर इनको call नहीं किया कभी मैंने".
+- **Shorts cleanup (Shoaib approved, 2026-10-14):** he picked the 24 s interview version. 1.1 GB of
+  intermediates went to `~/.Trash/episode4_shorts_intermediates_2026-10-14` (not a hard delete): bases,
+  clips, drafts, no-music controls, v1 renders, phone previews, card render caches and the unused
+  45 s interview render. Kept: the two upload files, and every EDL, caption file, plate, script and
+  review report, so either Short (or the 45 s version) can be re-rendered.
