@@ -1996,3 +1996,32 @@ clips IMG_3632–IMG_3838 (setup walkthrough, monitor on/off, five light placeme
 2x lens, 4K 30, dark monitor, mid-tone top. Written up as `kb/shooting.md`; the tone-map and grade
 side was already in gotchas.md (2026-10-11).
 
+
+## 2026-10-14 — Episode 4 Shorts: the first two, cut from the 4K a-roll
+
+Shoaib confirmed two moments from Episode 4 (channel-kb `03-formats/shorts.md` candidates, and the
+script's own `[SHORT]` marks), and chose **English captions for Shorts** (asked first because it
+contradicts M047; recorded as the Shorts exception in mistakes.md and memory). The note reading
+(the zenith) was left out: it stays out of Shorts while the long video is new.
+
+- **`episode4_short_interview.mp4`** 55.2 s: "I got my first shot at the interview" → LeetCode
+  medium never seen, solved → "never done programming" → CEO "कितने चाहिए?" → 15k → "this is the
+  first step." Hook text "3 years. Zero code."
+- **`episode4_short_money.mp4`** 59.4 s: 12 LPA ask → rejected → "It was because of the money" →
+  6 LPA → 7.5 LPA two days later → "I never called them back." Hook "My first salary negotiation".
+- Both 1080x1920 30 fps bt709, -14.0/-14.1 LUFS, review.py HIGH 0 / MED 0 (18 flags checked and
+  written to each Short's `review/accepted.json`), T1-T6 pass.
+- **Build:** `episode4/edit/shorts/build.py` (ranges + face-centred crop → `<name>/edl.json`),
+  `captions.py` (English SRT on the draft's measured cue times), `finish.sh` (render, gain to
+  -14 LUFS, review). Rebuilt from the a-roll, not cropped from `episode4_final.mp4`: the final
+  has captions and side cards burned in, and a 9:16 crop catches pieces of them.
+- **Edges:** reused the long cut's approved ranges where whole. Seven new edges, each placed in
+  the quietest 10 ms (`build/valley.py`) and checked by whispering each side alone (M048). Two
+  needed it: "so I got" has no valley, and the start that reads "I got" exists only in a
+  50 ms window (95.55-95.60); and "Then I called" moved from a -27 dB start to a -35 dB one
+  0.2 s earlier, which still opens on "Then".
+- **Length:** money was 63 s on the first EDL, then 60.4 s after frame rounding. Brought under 60
+  with cuts, not speed: a repeated "second day as well" line, a 0.7 s pause inside a range, and
+  an audible "uh" that Deepgram does not list (found because review's C16 said the "held" tail
+  was not quiet).
+- Phone previews (720p, ~19 MB) as `phone_preview_*_do_not_upload.mp4`.

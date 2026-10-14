@@ -33,3 +33,5 @@ Record 10 s, then compare against the last good setup with the same frame region
 A 9:16 crop of a 16:9 4K frame is 1215 px wide at full height: **keep the head and hands inside
 the centre third** while shooting, or the vertical crop cuts the gestures. Hands drifting to the
 frame edges is the most common loss.
+Verified on the Episode 4 Shorts (2026-10-14): the face held at 49-52% of frame width in every
+range, so the crop never had to chase it. The open-palm gestures still left the 9:16 window.

@@ -59,8 +59,10 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
 - **No holds, no still frames (M046, Shoaib 2026-10-12).** A face held past the last word reads
   as a frozen picture, even when the script says "hold". End lines on a clean cut, and keep no
   wordless stretch over ~0.7 s in a shot. review.py C16 checks it.
+- **Shorts: rebuild from the a-roll at `--height 1920` with a per-range `crop=1080:1920:X:0`**, face-centred,
+  never a crop of the final (burned captions/cards). Pattern: `episode4/edit/shorts/`. See gotchas.md.
 - **Captions are Hinglish as spoken**, Devanagari for Hindi, in Kohinoor Devanagari (M047),
-  whatever a script says.
+  whatever a script says. **Shorts are the exception: English** (Shoaib, 2026-10-14).
 - **Verify a cut by transcribing each side ALONE** (M048): a joined transcription fills clipped
   words back in.
 

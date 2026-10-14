@@ -114,7 +114,8 @@ were keeping Hinglish Devanagari subtitles."* Cause: the episode script said "th
 captions" for Hindi lines, and that was followed over the house convention without asking.
 **Captions are Hinglish as spoken: Devanagari for Hindi words, Latin for English, in Kohinoor
 Devanagari.** Fix only mishearings, names and numerals. Check: `READ R2` (captions), and a
-script instruction that changes a house convention is a question for Shoaib, not a default.
+script instruction that changes a house convention is a question for Shoaib, not a default. **Shorts are the
+exception (asked, Shoaib chose 2026-10-14): English captions, Hindi translated.**
 
 **M048** · 2026-10-12 · Episode 4 v2 · *Words clipped at hand-placed cuts: "So I start | my YouTube
 channel" (7:20), "| If I can get 12 LPA" with "What" gone (9:31), "क्यों काम करती है" cut short

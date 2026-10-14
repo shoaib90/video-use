@@ -3284,6 +3284,12 @@ overlaps a removal is moved wholly onto the side that holds its sound (frames ab
 Words a cut deliberately removed stay out. render.py's builder has the same exposure on any
 tightened cut, so carry this into the next episode or upstream.
 
+**The inverse also happens: inaudible words get captioned.** On the Episode 4 Shorts, new cuts
+placed by valley + whisper burned "Came.", "So" and "happened." into the auto captions. Deepgram's
+span for each word sat at least half inside the kept range, but whisper on that side alone hears
+none of them (2026-10-14). After any new edge, read the auto cues next to it against a whisper of
+each side.
+
 ## Killing a render's Python wrapper leaves its ffmpeg running, writing the same file
 
 Verified on Episode 4 v5 (2026-10-13). `pkill -f "recomposite.py …"` stopped the Python process,
@@ -3305,3 +3311,23 @@ output first.
   78 → 86 → 92 → 110 → 130, so the fade is continuous with no jump.
 - **`count_frames` crashed on `"26829,"`.** ffprobe 9's csv output can end with a trailing
   separator. It now parses the first field only.
+
+---
+
+## Shorts (9:16) from a 16:9 4K master: render at 1920 high and crop per range
+
+Verified on the Episode 4 Shorts (2026-10-14; T1 `1080x1920@30/1` on all 34 segments):
+- `render.py --height 1920` scales a 16:9 4K source to 3414x1920. A per-range
+  `"filter": "crop=1080:1920:X:0"` then cuts the vertical frame, and every segment ends 1080x1920,
+  so the concat holds. `zoom`/`zoom_x`/`zoom_y` still crop the SOURCE first. At 1.12 the window
+  is ~1085 source px wide, which is native at 1080 and enough to hide a jump cut.
+- **`--draft` alone renders at 720, and the 1080x1920 crop then fails.** Pass `--height 1920`
+  to drafts too.
+- Centre X on the face. `exposure.detect_face` on three tone-mapped 960x540 frames per range,
+  median, is enough for a seated talking head: face X varied only 0.49-0.52 across 34 ranges.
+- **Don't crop a delivered final:** its burned captions and side cards land half inside the crop.
+- render.py's one-pass loudnorm + -3 dBFS limiter lands **-14.7 to -14.8 LUFS** on a ~1 min
+  Short, which fails review's T5 (±0.5). Fix it with an audio-only gain
+  (`-c:v copy -af volume=<-14-I>dB`): +0.7/+0.8 dB gave -14.0/-14.1 LUFS at -1.9/-2.1 dBTP.
+- Hook text through the EDL `graphics` block (`title`, `top-center`): at `font_frac` 1/20,
+  "My first salary negotiation" (27 chars, Helvetica) runs edge to edge on 1080 wide. 1/24 fits.
