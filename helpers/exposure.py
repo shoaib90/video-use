@@ -101,19 +101,25 @@ def red_clip(rgb: np.ndarray) -> dict:
             "clipped": clipped / n_red if n_red else 0.0}
 
 
-def detect_face(rgb: np.ndarray, python: Path = FACE_ENV_PYTHON) -> tuple[list | None, str]:
-    """(x, y, w, h) of the largest face in working-size pixels, or None with the reason."""
+def detect_faces(rgb: np.ndarray, python: Path = FACE_ENV_PYTHON) -> tuple[list, str]:
+    """Every face as (x, y, w, h, score) in working-size pixels, or [] with the reason."""
     if not python.exists():
-        return None, f"face not measured: {python.parent.parent} missing (built by retouch_teeth.py)"
+        return [], f"face not measured: {python.parent.parent} missing (built by retouch_teeth.py)"
     try:
         out = subprocess.run([str(python), "-c", FACE_WORKER, str(rgb.shape[1]), str(rgb.shape[0])],
                              input=np.ascontiguousarray(rgb).tobytes(),
                              capture_output=True, check=True, timeout=120)
         boxes = json.loads(out.stdout.decode().strip().splitlines()[-1])
     except (subprocess.SubprocessError, ValueError, IndexError, OSError) as e:
-        return None, f"face not measured: detector failed ({type(e).__name__})"
+        return [], f"face not measured: detector failed ({type(e).__name__})"
+    return boxes, "" if boxes else "no face in frame"
+
+
+def detect_face(rgb: np.ndarray, python: Path = FACE_ENV_PYTHON) -> tuple[list | None, str]:
+    """(x, y, w, h) of the largest face in working-size pixels, or None with the reason."""
+    boxes, why = detect_faces(rgb, python)
     if not boxes:
-        return None, "no face in frame"
+        return None, why
     x, y, w, h, _score = max(boxes, key=lambda b: b[2] * b[3])
     return [x, y, w, h], ""
 

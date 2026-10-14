@@ -3339,6 +3339,30 @@ Verified on the Episode 4 Shorts (2026-10-14; T1 `1080x1920@30/1` on all 34 segm
   and force_style overrides every style in the .ass.
 - `cards.py --clips clips_graded` on a re-cut Short reads the STALE v1 segments and prints wrong
   stamp times. The render measures its own fresh segments, so trust the render log.
+- **Verified on Episodes 2-3 and podcast Episode 1's Shorts (2026-10-14):**
+  - A parent EDL may list sources **relative to its own folder** (Episode 2: `../IMG_3672.mov`);
+    the Short's EDL lives two folders deeper, so ffprobe failed until shorts.py resolved them.
+  - The parent's **per-range `filter`** carries the real per-take treatment (Episode 3's `cas` on
+    soft takes, the podcast's `colorchannelmixer` match). shorts.py now inherits it; before that a
+    Short silently lost it. In the podcast, a range where the long cut showed the DSLR (`video`)
+    had no own-camera parent range, so a few ranges came out without the match next to ones with it.
+  - **Two people in a wide:** "largest face" or "rightmost face" frames the wrong person when the
+    speaker turns away (only the other face is found). Restrict to that half of the frame
+    (`"who"`), and give `"face"` where nothing is found. Verified with a one-frame-per-range sheet.
+  - **Hinglish word edges** from Deepgram are loose by 0.1-0.4 s ("कहां हुआ?" listed 2841.50-2841.90,
+    spoken 2841.60-2842.32), so word-boundary snapping cut words and kept leading "तो". Quiet-zone
+    snapping (the podcast's own -32 dB / ±30 ms rule) plus a level profile at the first edge fixed
+    it. Whisper `small -l hi` on sub-2 s slices hallucinates ("आद आद आद"): useless for edges.
+  - **Effect audibility (M052) must be measured per 20 ms frame against an effect-free control.**
+    Over a 0.35 s window every click read "buried"; per frame they cleared the control by 2-22 dB.
+    A soft impact has no 2-6 kHz energy, and one landing on a bed re-entry can't be separated by
+    measurement at all. `shorts.py sfx` does this now. On a podcast with a bed under the gaps,
+    the control runs +20 to +35 dB and the check can't decide either way.
+  - **A top-centre stamp in the first 3 s sits on the opening plate** (three podcast Shorts). The
+    plate is the hook text there; `build` now stops on it.
+  - **Snapping an OUT edge to the earliest quiet zone after an early Deepgram word end clips the
+    next word of the same phrase** ("के | लिए"). `shorts.py edges` lists every edge with speech
+    within 0.25 s of it; read each against the transcript and the level profile.
 
 ---
 

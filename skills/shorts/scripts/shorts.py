@@ -3,10 +3,12 @@
     SH="uv run python skills/shorts/scripts/shorts.py"        # from the repo root
     $SH <edit> <name> words          # kept words with indices (author the caption bursts from this)
     $SH <edit> <name> build          # spec -> <edit>/shorts/<name>/edl.json (face-centred crop)
+    $SH <edit> <name> edges          # edges with speech right beside them: clipped word or meant?
     $SH <edit> <name> plate          # the thumbnail-style opening plate -> plate.mov
     $SH <edit> <name> captions       # 2-3 word bursts, key word in the accent -> captions.ass
     $SH <edit> <name> render         # render.py --no-loudnorm -> <output>_NO_MUSIC_do_not_upload.mp4
     $SH <edit> <name> mix            # bed + effects, -14 LUFS -> <output>.mp4
+    $SH <edit> <name> sfx            # is each effect audible? (M052)
     $SH <edit> <name> review [--label v1]
     $SH <edit> <name> preview        # 720p phone preview, <30 MB
     $SH <edit> <name> all [--label v1]
@@ -110,7 +112,18 @@ def next_zoom(prev: float | None) -> float:
     return ZOOMS[1] if prev == ZOOMS[0] else ZOOMS[0]
 
 
-def face_centre(path: str, a: float, b: float, hdr: bool) -> tuple[float, float]:
+def pick_face(boxes: list, who: str | None, width: int = 960):
+    """The face to frame: the largest, or with two people in a wide, the largest on the `left` or
+    `right` half. Only that half counts: when the speaker turns away and only the other face is
+    found, picking "the rightmost face" would frame the wrong person (podcast Episode 1)."""
+    if who in ("left", "right"):
+        boxes = [b for b in boxes if (b[0] + b[2] / 2 < width / 2) == (who == "left")]
+    if not boxes:
+        return None
+    return max(boxes, key=lambda b: b[2] * b[3])[:4]
+
+
+def face_centre(path: str, a: float, b: float, hdr: bool, who: str | None = None) -> tuple[float, float]:
     """Median face centre over three frames of [a, b], as fractions of the frame."""
     import numpy as np
     import exposure
@@ -120,7 +133,8 @@ def face_centre(path: str, a: float, b: float, hdr: bool) -> tuple[float, float]
         raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{a + (b - a) * f:.3f}", "-i", path,
                               "-frames:v", "1", "-vf", vf, "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
                              capture_output=True, check=True).stdout
-        box, why = exposure.detect_face(np.frombuffer(raw, np.uint8).reshape(540, 960, 3))
+        boxes, why = exposure.detect_faces(np.frombuffer(raw, np.uint8).reshape(540, 960, 3))
+        box = pick_face(boxes, who)
         if box:
             x, y, w, h = box
             xs.append((x + w / 2) / 960)
@@ -130,8 +144,37 @@ def face_centre(path: str, a: float, b: float, hdr: bool) -> tuple[float, float]
     return float(np.median(xs)), float(np.median(ys))
 
 
+def source_path(parent_dir: Path, path: str) -> str:
+    """A parent source as an absolute path: a parent EDL may list sources relative to its own
+    folder (Episode 2's `../IMG_3672.mov`), and the Short's EDL lives two levels deeper."""
+    p = Path(path).expanduser()
+    return str(p if p.is_absolute() else (parent_dir / p).resolve())
+
+
+def inherited(parent_ranges: list, src: str, start: float, end: float) -> dict:
+    """The parent range this Short range was cut from (same source, largest overlap), as the
+    per-range settings a Short keeps: `filter` (sharpening, colour match), `grade`, `audio_filter`.
+    A parent range that swaps in another camera (`video`) is skipped; where only those overlap
+    (podcast Episode 1 cut to its DSLR there), the nearest same-source range within 120 s stands in,
+    because these settings belong to the take (a colour match), not to the moment."""
+    best, ov, near = None, 0.0, None
+    for pr in parent_ranges:
+        if pr.get("source") != src or pr.get("video"):
+            continue
+        a, b = float(pr["start"]), float(pr["end"])
+        o = min(end, b) - max(start, a)
+        if o > ov:
+            best, ov = pr, o
+        gap = max(a - end, start - b)
+        if gap <= 120 and (near is None or gap < near[0]):
+            near = (gap, pr)
+    best = best or (near[1] if near else None)
+    return {k: best[k] for k in ("filter", "grade", "audio_filter") if best and k in best}
+
+
 def cmd_build(c: Ctx, a) -> None:
     sp, P = c.spec, c.parent
+    srcs = {k: source_path(c.parent_path.parent, v) for k, v in P["sources"].items()}
     tr = c.dir / "transcripts"
     if not tr.exists():
         tr.symlink_to(c.parent_path.parent / "transcripts")
@@ -139,7 +182,7 @@ def cmd_build(c: Ctx, a) -> None:
     punch = float(sp.get("punch", 1.25))
     for i, r in enumerate(sp["ranges"]):
         src, start, end = r["source"], float(r["start"]), float(r["end"])
-        path = P["sources"][src]
+        path = srcs[src]
         W, H, hdr = probe(path)
         z = r.get("zoom")
         zoom = punch if z == "punch" else float(z) if z is not None else next_zoom(prev)
@@ -147,18 +190,28 @@ def cmd_build(c: Ctx, a) -> None:
             print(f"  warning: range {i} has the same zoom ({zoom}) as the one before on {src}: a visible jump")
         if prev and zoom > prev and zoom / prev < 1.1:
             print(f"  warning: range {i} pushes in only {zoom / prev:.2f}x: below ~1.1x a cut reads as a glitch")
-        fx, fy = r["face"] if r.get("face") else face_centre(path, start, end, hdr)
+        fx, fy = r["face"] if r.get("face") else face_centre(path, start, end, hdr, r.get("who"))
         e = {"source": src, "start": start, "end": end, "beat": f"{c.name} {i:02d}",
              "quote": r.get("quote", "")}
         e.update(framing(fx, fy, zoom, W, H))
+        inh = inherited(P["ranges"], src, start, end)
+        pre = r.get("pre_filter", inh.get("filter", ""))     # e.g. the parent's `cas`, or a colour match
+        if pre:
+            e["filter"] = f"{pre},{e['filter']}"
+        for k in ("grade", "audio_filter"):      # the spec's own value wins (a bleep's volume=0)
+            if k in r:
+                e[k] = r[k]
+            elif k in inh:
+                e[k] = inh[k]
         ranges.append(e)
         total += end - start
         prev, prev_src = zoom, src
         print(f"  {i:02d} {src} {start:8.3f}-{end:8.3f} z={zoom} {e['filter']}  {e['quote'][:50]}")
     edl = {
         "version": 1,
-        "sources": {s: P["sources"][s] for s in dict.fromkeys(r["source"] for r in ranges)},
+        "sources": {s: srcs[s] for s in dict.fromkeys(r["source"] for r in ranges)},
         "grade": P.get("grade"),
+        **({"audio_filter": P["audio_filter"]} if P.get("audio_filter") else {}),
         "parent": c.parent_rel,           # review.py G4: the parent's cards this Short must carry
         "ranges": ranges,
         "subtitles": "captions.ass",
@@ -170,11 +223,62 @@ def cmd_build(c: Ctx, a) -> None:
     if P.get("brand"):
         brand = (c.parent_path.parent / P["brand"]).resolve()
         edl["brand"] = os.path.relpath(brand, c.dir)
-    if sp.get("plate"):
-        edl["overlays"] = [{"file": "plate.mov", "start_in_output": 0.0,
-                            "duration": float(sp["plate"].get("seconds", 3.0))}]
+    edl["overlays"] = []
+    (c.dir / "edl.json").write_text(json.dumps(edl, indent=1, ensure_ascii=False) + "\n")
+    if sp.get("plate") and edl["cards"]:
+        clash = cards_under_plate(edl["cards"], resolver(kept(c)[0]), float(sp["plate"].get("seconds", 3.0)))
+        if clash:
+            sys.exit("cards land under the opening plate (both sit at the top): " + ", ".join(clash)
+                     + ". The plate is the hook text there; drop the card or anchor it later.")
+    if sp.get("broll"):
+        edl["overlays"] += build_broll(c, sp["broll"])
+    if sp.get("plate"):                      # last, so it sits on top
+        edl["overlays"].append({"file": "plate.mov", "start_in_output": 0.0,
+                                "duration": float(sp["plate"].get("seconds", 3.0))})
     (c.dir / "edl.json").write_text(json.dumps(edl, indent=1, ensure_ascii=False) + "\n")
     print(f"{c.name}: {len(ranges)} ranges, {total:.1f} s -> {c.dir / 'edl.json'}")
+
+
+def cards_under_plate(cards: list, T, plate_s: float) -> list[str]:
+    """Cards whose first anchor resolves before the plate has gone (+0.2 s): a top-centre stamp
+    then sits on the plate (podcast Episode 1's Microsoft Short, 2026-10-14)."""
+    out = []
+    for k in cards:
+        at = k.get("at") or (k.get("steps") or [{}])[0].get("at")
+        if at is not None and T(at) < plate_s + 0.2:
+            out.append(f"{k.get('id')} at {T(at):.2f} s")
+    return out
+
+
+def broll_crop(x: float, W: int, H: int) -> int:
+    """Left edge of a full-height 9:16 window centred on x (a frame fraction), clamped, even."""
+    cw = H * 9 // 16
+    return int(min(W - cw, max(0, x * W - cw / 2))) // 2 * 2
+
+
+def build_broll(c: Ctx, items: list) -> list[dict]:
+    """The parent's cutaways, re-cut vertical: each item is {"file", "src" (seconds into it),
+    "at" (spoken anchor), "duration", "x" (subject centre, frame fraction), "vf" (optional grade)}.
+    Rendered full-frame 1080x1920 at 30 fps, BT.709-tagged, so render.py composites it at 0:0
+    with no scaling (overlays are resolution-specific, kb/index.md)."""
+    T = resolver(kept(c)[0])
+    out = []
+    for k, b in enumerate(items):
+        f = Path(b["file"]).expanduser()
+        W, H, hdr = probe(str(f))
+        x0 = broll_crop(float(b.get("x", 0.5)), W, H)
+        vf = ",".join(v for v in ((TONEMAP if hdr else ""), f"crop={H * 9 // 16}:{H}:{x0}:0",
+                                  "scale=1080:1920:flags=lanczos", "fps=30", b.get("vf", ""),
+                                  "format=yuv420p,setparams=colorspace=bt709:color_trc=bt709:"
+                                  "color_primaries=bt709:range=tv") if v)
+        dst = c.dir / f"broll_{k:02d}.mp4"
+        dur = float(b["duration"])
+        run(["ffmpeg", "-v", "error", "-y", "-ss", f"{float(b.get('src', 0.0)):.3f}", "-i", f, "-t", f"{dur:.3f}",
+             "-vf", vf, "-an", "-c:v", "libx264", "-crf", "16", "-preset", "medium", "-colorspace", "bt709", dst])
+        at = T(b["at"])
+        print(f"  broll {k:02d} {f.name} @ {at:.2f} s for {dur:.1f} s, crop x {x0} of {W}x{H}")
+        out.append({"file": dst.name, "start_in_output": round(at, 3), "duration": dur})
+    return out
 
 
 # ---------------------------------------------------------------- words / anchors
@@ -457,6 +561,98 @@ def cmd_mix(c: Ctx, a) -> None:
     print(f"output {got:.2f} LUFS -> {out}")
 
 
+def band_db(x, t: float, n: float = 0.02, lo: float = 2000, hi: float = 6000) -> float:
+    """lo-hi Hz energy of mono 48 kHz samples x over [t, t+n], dB. Pure, for tests."""
+    import numpy as np
+    seg = x[max(0, int(t * 48000)):int((t + n) * 48000)]
+    if len(seg) < 8:
+        return -120.0
+    f = np.fft.rfftfreq(len(seg), 1 / 48000)
+    p = np.abs(np.fft.rfft(seg * np.hanning(len(seg)))) ** 2
+    return float(10 * np.log10(p[(f >= lo) & (f <= hi)].sum() + 1e-12))
+
+
+BANDS = ((2000, 6000), (60, 400))       # clicks and ticks; thuds and soft impacts
+
+
+def excess(mix, dry, t: float, offset: float, band=(2000, 6000)) -> float:
+    """The most a 20 ms frame of the mix rises above the dry render in one band, around t."""
+    import numpy as np
+    return max(band_db(mix, u, 0.02, *band) - band_db(dry, u, 0.02, *band)
+               for u in np.arange(t - 0.05, t + 0.4, 0.02)) - offset
+
+
+def cmd_sfx(c: Ctx, a) -> None:
+    """M052: is each effect audible? Its peak 20 ms excess over the no-music render in 2-6 kHz,
+    against the same number on windows with no effect (the bed and the gain make those > 0). A
+    0.35 s window dilutes a 50 ms click to 'buried', so it is measured per frame. Low thuds and
+    soft impacts live under 2 kHz and read low here; judge those by ear."""
+    import numpy as np
+
+    def pcm(p):
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(p), "-vn", "-ac", "1", "-ar", "48000",
+                              "-f", "f32le", "-"], capture_output=True, check=True).stdout
+        return np.frombuffer(raw, "<f4").astype(np.float64)
+    W, total = kept(c)
+    _, hits = plan_mix(c, W, total)
+    mix, dry = pcm(c.dir / f"{c.output}.mp4"), pcm(raw_path(c))
+    ht = [t for _, _, t, _ in hits]
+    far = lambda t: all(abs(t - h) > 1.5 for h in ht)
+    res = {}
+    for b in BANDS:     # per band: the programme offset, then the effect-free control
+        off = float(np.median([band_db(mix, t, 0.35, *b) - band_db(dry, t, 0.35, *b)
+                               for t in np.arange(0.5, total - 0.5, 0.37) if far(t)]))
+        ctl = [excess(mix, dry, t, off, b) for t in np.arange(1.0, total - 1.0, 0.9) if far(t)]
+        res[b] = (off, float(np.percentile(ctl, 90)) if ctl else 10.0)
+    print("  control (90th pct, effect-free): " + ", ".join(f"{b[0]}-{b[1]} Hz {v[1]:+.1f} dB" for b, v in res.items()))
+    for f, _, t, _ in hits:
+        m = max(((excess(mix, dry, t, res[b][0], b) - res[b][1], b) for b in BANDS))
+        print(f"  {t:6.2f}  {Path(f).name[3:50]:<47} {m[0]:+5.1f} dB over control in {m[1][0]}-{m[1][1]} Hz"
+              f"{'  BURIED: raise its trim' if m[0] < 0 else ''}")
+
+
+SPEECH_DB, TIGHT = -30.0, 0.25
+
+
+def tight_edges(ranges: list, level) -> list[str]:
+    """Edges with speech within TIGHT s on the removed side: an OUT where speech resumes right
+    after, an IN where it stops right before. Either the removed word is meant to go (a "तो", the
+    other speaker) or the edge clips a word of the same phrase. Loose Hinglish word times made
+    the second happen six times on podcast Episode 1 ("…के | लिए"), and whisper cannot judge a
+    1 s slice, so each one is read by hand. `level(src, t)` is the 10 ms dB at t. Pure."""
+    out = []
+    for i, r in enumerate(ranges):
+        nxt = ranges[i + 1] if i + 1 < len(ranges) else None
+        prv = ranges[i - 1] if i else None
+        if not (nxt and nxt["source"] == r["source"] and abs(nxt["start"] - r["end"]) < 0.02):
+            k = next((k for k in range(60) if level(r["source"], r["end"] + k * 0.01) >= SPEECH_DB), 60)
+            if k * 0.01 < TIGHT:
+                out.append(f"#{i:02d} OUT {r['end']:.3f}: speech resumes {k * 10} ms after ({r.get('quote', '')[-30:]})")
+        if not (prv and prv["source"] == r["source"] and abs(prv["end"] - r["start"]) < 0.02):
+            j = next((j for j in range(60) if level(r["source"], r["start"] - 0.01 - j * 0.01) >= SPEECH_DB), 60)
+            if j * 0.01 < TIGHT:
+                out.append(f"#{i:02d} IN  {r['start']:.3f}: speech ends {j * 10} ms before ({r.get('quote', '')[:30]})")
+    return out
+
+
+def cmd_edges(c: Ctx, a) -> None:
+    """Print every tight edge (see tight_edges) to read against the transcript and the levels."""
+    import numpy as np
+    edl, cache = c.edl, {}
+
+    def level(src, t):
+        if src not in cache:
+            raw = subprocess.run(["ffmpeg", "-v", "error", "-i", edl["sources"][src], "-vn", "-ac", "1",
+                                  "-ar", "16000", "-f", "f32le", "-"], capture_output=True, check=True).stdout
+            cache[src] = np.frombuffer(raw, "<f4").astype(np.float64)
+        seg = cache[src][int(t * 16000):int(t * 16000) + 160]
+        return float(20 * np.log10(max(np.sqrt((seg ** 2).mean()), 1e-9))) if len(seg) else -99.0
+    hits = tight_edges(edl["ranges"], level)
+    print(f"{c.name}: {len(hits)} tight edge(s): check each is a word meant to go, not a clipped one")
+    for h in hits:
+        print("  " + h)
+
+
 def cmd_review(c: Ctx, a) -> None:
     label = a.label or "v1"
     run(["rm", "-rf", c.dir / "review" / label])
@@ -477,7 +673,7 @@ def cmd_preview(c: Ctx, a) -> None:
 
 
 def cmd_all(c: Ctx, a) -> None:
-    for step in (cmd_build, cmd_plate, cmd_captions, cmd_render, cmd_mix, cmd_review, cmd_preview):
+    for step in (cmd_build, cmd_plate, cmd_captions, cmd_render, cmd_mix, cmd_sfx, cmd_review, cmd_preview):
         if step is cmd_plate and not c.spec.get("plate"):
             continue
         print(f"== {step.__name__[4:]}")

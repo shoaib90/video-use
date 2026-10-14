@@ -2107,3 +2107,34 @@ yt-script's `hookscore.py`, and lints the title against the plate with yt-packag
   `title.py` against their plates. Interview: "3 years without code, then a LeetCode medium in 35
   minutes" (98). Money: "HR said my interviews were bad. 2 days later: a better offer" (84). The
   rejected money candidate "Lost an offer over money" claimed more than happened.
+
+## 2026-10-14/15 — Shorts for Episode 2, Episode 3 and podcast Episode 1 (six, awaiting review)
+
+Shoaib picked the moments from my candidates (Hard Rule 11; zeniths and withheld images excluded):
+Episode 2 "the 20 cm", Episode 3 "6 AM gym", and four from the podcast (Kapurthala, merit list,
+6 AM → Microsoft, Bangalore lift); "fuck it" is bleeped (his choice). Specs in each parent's
+`edit/shorts/<name>/short.json`. Every Short: review.py HIGH 0 / MED 0 after `accepted.json`, T1-T5
+pass, G4 pass, whisper readback (English model, or Hindi `-tr` for the podcast), a frame sheet, and
+titles linted by yt-package `title.py` (80-98).
+- **Episode 2** `episode2_short_height.mp4` 45.1 s. Moved hook "The detail that still gets me…";
+  the long video's ruler cue carried as a 150 → 170 cm stat; Breathing Woods bed (the parent's,
+  synced) drops out under the reveal, as in the long cut.
+- **Episode 3** `episode3_short_gym.mp4` 40.7 s. Hook "Most of the people around me… asleep by
+  ten"; the 2019 gym clip re-cut vertical; 10 PM / 6 AM / 8 AM stamps; alarm effect and bed from
+  the parent; punch on "not over them, but over myself".
+- **Podcast** 32-40 s each, framed per speaker at 1.6/1.8 (punch 2.0) from the 4K wide, English
+  captions translated from the Hinglish, Kikoru bed from the episode's intro.
+- **skills/shorts changes** (tests 11 → 18, all 18 pass; full suite passes): relative parent source
+  paths; per-range filter/grade/audio_filter inheritance (nearest own-camera range when only a DSLR
+  range overlaps); a spec range's own audio_filter now wins (it was silently dropped, so the first
+  bleep render still had the word at -22 dB); `who: left|right` speaker framing, half-frame only;
+  vertical `broll`; a build-time stop when a card would land under the opening plate (it did on
+  three podcast Shorts); `edges` (tight edges to read); `sfx` (per-frame effect audibility vs an
+  effect-free control). `exposure.detect_faces` returns every face.
+- **Found while checking (verified):** six clipped Hindi words ("लिए", "academy", "पकड़ी", "था",
+  "secondary", "सीधा") from snapping to the EARLIEST quiet zone after a Deepgram word end that ran
+  early; caught by the edges scan plus level profiles, each fixed and re-checked. One fix was wrong
+  ("रगड़ा होगा" extended into Shoaib's "तो guys") and was reverted after a whisper of the join.
+- **Not proven:** effect audibility on the podcast Shorts. The bed fills the conversation's gaps,
+  so the effect-free control runs +20 to +35 dB and `sfx` can't separate effects from it. Levels
+  match the Episode 2-4 Shorts' settings; judge them by ear.

@@ -80,6 +80,22 @@ Do not duplicate its rules here:
 - **ranges:** `zoom` is 1.0, 1.12, `"punch"`, or omitted (then it alternates with the range before).
   The build warns on two same-take ranges at the same zoom (a visible jump) and on a push-in
   below 1.1x. Add `"face": [x, y]` (frame fractions) where detection fails.
+  - Each range **inherits its parent range's `filter`, `grade` and `audio_filter`** (sharpening on
+    a soft take, a per-take colour match), from the same-source parent range it overlaps most, or
+    the nearest one within 120 s when only a second-camera (`video`) range overlaps. `pre_filter`
+    overrides the inherited filter (`""` turns it off). The parent's EDL-level `audio_filter` is
+    carried too.
+  - **Two people in one wide (a podcast):** `"who": "left"` or `"right"` frames the face on that
+    half of the frame, never the other person when the speaker turns away (then the build stops
+    and asks for `"face"`). From a full-body 4K wide use zooms **1.6 / 1.8** and `"punch": 2.0`;
+    1.0 leaves a small full-length figure.
+  - **Bleeping a word:** give it its own range with `"audio_filter": "volume=0"` and a hit with
+    an absolute path to a tone (`ffmpeg -f lavfi -i sine=frequency=1000:duration=0.5`, -14 dB).
+    Caption it `F—`: an asterisk is the accent markup.
+- **broll:** the parent's cutaways, re-cut vertical: `[{"file", "src", "at", "duration", "x",
+  "vf"}]`, where `x` is the subject's centre (frame fraction). Built full-frame 1080x1920 at build
+  time and placed by spoken anchor. Real footage of Shoaib carries a Short; a 720p clip upscales
+  ~2.7x, which reads as archival.
 - **plate:** at most 6 words and different from the spoken line, held about 3 s. The thumbnail
   style is a yellow kicker over big white type on a dark plate.
 - **cards:** carry the **parent's cards** for the kept moments; review G4 flags any you drop.
@@ -98,8 +114,9 @@ Do not duplicate its rules here:
 ### 4. Build and render
 ```bash
 $SH <edit> <name> build      # prints every range's zoom + crop; read the warnings
+$SH <edit> <name> edges      # edges with speech right beside them: a word meant to go, or a clipped one?
 $SH <edit> <name> words      # author the caption bursts against these indices
-$SH <edit> <name> all --label v1    # plate, captions, render, mix, review, phone preview
+$SH <edit> <name> all --label v1    # plate, captions, render, mix, sfx, review, phone preview
 ```
 A full 1080x1920 render of about 60 s takes a few minutes on this Mac. Each step can run alone
 (`plate`, `captions`, `render`, `mix`, `review`, `preview`).
@@ -122,7 +139,16 @@ A full 1080x1920 render of about 60 s takes a few minutes on this Mac. Each step
    file, length, plate text, the linted title, and Related video set to the long video. Post on
    a day between long uploads.
 
-## Known traps (all measured on Episode 4)
+## Known traps (Episode 4, plus Episodes 2-3 and podcast Episode 1 on 2026-10-14)
+- **Stamps over ~18 characters clip** on 9:16 at scale 0.68 ("CRYING, ALL THE WAY" is 490 of
+  480 units). Keep them short; cards.py refuses rather than clips.
+- **Hindi word times are loose** (Deepgram, podcast Episode 1): edges snapped to word boundaries
+  landed on speech or kept a leading "तो". Snap every edge to a quiet zone (loudest 10 ms within
+  ±30 ms at -32 dB or lower) and read the level profile at each Short's FIRST edge. Whisper
+  `small -l hi` invents repeats on slices under ~2 s, so it can't judge a short range.
+- **Check effect audibility per 20 ms frame against a control**, not over a 0.35 s window: a
+  window dilutes a 50 ms click to "buried" (M052). A click landing on continuous speech needs
+  ~+5 dB trim to clear the programme.
 - **Never crop the delivered final.** Its burned captions and cards land half inside the 9:16
   window. Rebuild from the parent's sources; the spec reuses its grade and brand.
 - `render.py --draft` alone renders at 720 and breaks the 1080x1920 crop. This script always

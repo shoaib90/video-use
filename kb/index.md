@@ -61,7 +61,8 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
   wordless stretch over ~0.7 s in a shot. review.py C16 checks it.
 - **Shorts: `skills/shorts/`** (2026-10-14): one `short.json` per Short in `<edit>/shorts/<name>/`;
   rebuilt from the parent's sources (never a crop of the final), strongest line first, a 3 s thumbnail-style
-  plate, the parent's cards and bed (review G4 checks the cards; M053). Episode 4's three are the examples.
+  plate, the parent's cards and bed (review G4 checks the cards; M053). Episode 4's three are the examples;
+  Episodes 2-3 and podcast Episode 1 (two speakers: `"who": "left"|"right"`) followed (2026-10-15). Run `edges` on Hinglish.
 - **The youtube-agent plugin does the writing side** (`/youtube-agent:yt-shorts` picks Shorts, `hookscore.py`
   ranks hooks, `title.py` lints a title against its plate): use it instead of re-deriving. Map in environment.md.
 - **Captions are Hinglish as spoken**, Devanagari for Hindi, in Kohinoor Devanagari (M047),
