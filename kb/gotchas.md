@@ -3339,3 +3339,15 @@ Verified on the Episode 4 Shorts (2026-10-14; T1 `1080x1920@30/1` on all 34 segm
   and force_style overrides every style in the .ass.
 - `cards.py --clips clips_graded` on a re-cut Short reads the STALE v1 segments and prints wrong
   stamp times. The render measures its own fresh segments, so trust the render log.
+
+---
+
+## The bed + effects mix is not bit-reproducible after the last effect ends
+
+Verified on Episode 4's money Short (2026-10-14). The same script, inputs and ffmpeg command,
+run twice, gave audio that is identical up to the moment the last effect's input stream ends
+(53.27 s), then differs: by -80 dB on one run, and by up to a -29 dB peak (-54 dB RMS) on
+another. The graph is beds/effects -> amix -> sidechaincompress -> amix(duration=first) ->
+limiter. The cause is unproven (EOF handling across the amix/sidechain inputs is the suspect).
+**Consequence:** do not prove a remix by hashing the audio. Compare up to the last effect's end,
+and listen after it.

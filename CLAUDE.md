@@ -62,8 +62,9 @@ When asked to make Shorts (or "clips", "verticals") from a video:
 2. **For a new episode, use the `[SHORT]` passages marked in its channel-kb script.** For a video
    already shot, propose candidates from the transcript (the `/yt-shorts` skill helps) and
    confirm them with Shoaib before cutting (Hard Rule 11 applies to Shorts too).
-3. **Craft and crop rules live here:** `kb/shooting.md` ("Framing for Shorts"), plus anything
-   learned while cutting them, recorded in `kb/` as usual.
+3. **Build them with `skills/shorts/`** (read its SKILL.md): one `short.json` spec per Short, one
+   script for crop, plate, captions, render, mix and review. Craft and crop rules: that SKILL.md,
+   `kb/shooting.md` ("Framing for Shorts"), and anything learned while cutting them, recorded in `kb/` as usual.
 4. Output goes to `<videos_dir>/edit/shorts/`, like any other session output.
 
 channel-kb is private and this repo is public: read it, but never copy its text, story details

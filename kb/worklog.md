@@ -2069,3 +2069,22 @@ the strongest line first ("Throughout my three years…"), a big thumbnail-style
   clips, drafts, no-music controls, v1 renders, phone previews, card render caches and the unused
   45 s interview render. Kept: the two upload files, and every EDL, caption file, plate, script and
   review report, so either Short (or the 45 s version) can be re-rendered.
+
+## 2026-10-14 — `skills/shorts/`: the Shorts build turned into a reusable skill
+
+Shoaib asked for the Shorts build scripts to be pushed. They lived in `episode4/edit/shorts/`
+(not a repo, and full of Episode 4's lines), so they became `skills/shorts/` (general code only)
+plus one `short.json` per Short in the edit dir.
+- `scripts/shorts.py`: `words | build | plate | captions | render | mix | review | preview | all`.
+  It derives the render geometry from the source (not hardcoded 4K), takes HDR or SDR, reads
+  effect names from the motion-graphics-pass table, resolves phrase anchors with `after`/`shift`,
+  and supports `"src": "sync"` bed drop-outs.
+- **Equivalence, verified:** rebuilding Episode 4's three Shorts from their specs gave identical
+  EDL ranges, cards and captions, byte-identical plates, a byte-identical interview mix, and a
+  money mix whose audio matches the delivered file exactly.
+- **Found on the way (verified, cause unproven):** the mix's ffmpeg graph is not bit-reproducible
+  run to run after the LAST effect's stream ends. Running the ORIGINAL v2 script twice on one input
+  gave two different tails: one -80 dB, one a -29 dB peak / -54 dB RMS from 53.27 s. It is
+  identical before that point. Recorded in gotchas.md.
+- `tests/test_shorts.py` (11). The old per-episode scripts and artifacts went to
+  `~/.Trash/episode4_shorts_intermediates_2026-10-14/old_scripts/`.
