@@ -265,3 +265,33 @@ class FalseStartNoise(unittest.TestCase):
             w["speaker_id"] = "speaker_1"
         f = review.edge_checks(Path("."), [("S", 0.0, 6.0, 0.0, 0.0, 0)], lambda src: a + b)[0]
         self.assertNotIn("C11", [x[1] for x in f])
+
+
+class ParentCards(unittest.TestCase):  # M053
+    """A Short (or any cut with an EDL `parent`) that keeps the phrase a parent card lands on must
+    carry a card there. Episode 4 Shorts v1 dropped every one, and review still passed."""
+
+    parent = [{"id": "ask12", "kind": "stamp", "text": "12 LPA", "at": "twelve LPA package"},
+              {"id": "offers", "kind": "stat", "label": "Offers",
+               "steps": [{"at": "six LPA", "value": "6"}, {"at": "seven and a half LPA", "value": "7.5"}]},
+              {"id": "lakh", "kind": "stamp", "text": "1 lakh", "at": "one lakh"}]
+    kept = {"six LPA": 46.8, "seven and a half LPA": 55.0, "but within": 49.3}
+
+    def find(self, p):
+        return self.kept.get(p)
+
+    def test_kept_phrase_without_a_card_is_flagged(self):
+        g = review.parent_card_gaps(self.parent, [], self.find)
+        self.assertEqual([x[1] for x in g], ["G4"])          # offers only: 12 LPA and lakh are not kept
+        self.assertIn("offers", g[0][2])
+
+    def test_card_near_the_phrase_satisfies_it(self):
+        own = [{"id": "o", "kind": "stamp", "text": "6 LPA", "at": "six LPA"}]
+        self.assertEqual(review.parent_card_gaps(self.parent, own, self.find), [])
+
+    def test_card_elsewhere_does_not(self):
+        own = [{"id": "x", "kind": "stamp", "text": "Then", "at": "but within"}]   # 2.5 s off
+        self.assertEqual(len(review.parent_card_gaps(self.parent, own, self.find)), 1)
+
+    def test_no_parent_no_check(self):
+        self.assertEqual(review.parent_checks({"ranges": []}, Path("."), 30.0), [])

@@ -3331,3 +3331,11 @@ Verified on the Episode 4 Shorts (2026-10-14; T1 `1080x1920@30/1` on all 34 segm
   (`-c:v copy -af volume=<-14-I>dB`): +0.7/+0.8 dB gave -14.0/-14.1 LUFS at -1.9/-2.1 dBTP.
 - Hook text through the EDL `graphics` block (`title`, `top-center`): at `font_frac` 1/20,
   "My first salary negotiation" (27 chars, Helvetica) runs edge to edge on 1080 wide. 1/24 fits.
+- **v2 (what Shorts actually need, M053):** a thumbnail-style plate as a ProRes 4444 overlay
+  (`shorts/hook_plate.py`, converted to BT.709 in the encode so the overlay needs no matrix
+  change). Glass stamps at `scale` 0.68 (the stage is 607 units wide on 9:16; cards.py now refuses
+  a stamp that would clip). Captions as an `.ass` with PlayRes 1080x1920. **Give render.py a
+  non-empty `force_style`** (e.g. `Bold=1`): an empty one falls back to the Helvetica default,
+  and force_style overrides every style in the .ass.
+- `cards.py --clips clips_graded` on a re-cut Short reads the STALE v1 segments and prints wrong
+  stamp times. The render measures its own fresh segments, so trust the render log.

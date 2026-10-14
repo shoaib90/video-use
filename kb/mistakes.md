@@ -195,6 +195,19 @@ poked out below the card before its last row landed.* Fixed in cards.py the same
 Intelligent Investor), which Shoaib didn't want on screen.* Check: `READ R4`, which covers titles
 and covers as well as labels and screens.
 
+**M053** · 2026-10-14 · Episode 4 Shorts v1 · *"They look very plain."* Both Shorts were a bare
+talking head with white sentence captions and a grey drawtext hook box. The long video carries
+graphics in exactly these moments: the LeetCode card, the "three years" chart, ₹15K and 12 LPA
+stamps, the interview tally with the rejected X, and the 6 → 7.5 LPA offers stat, all with
+effects, plus a music bed. The Shorts dropped every one of them. Cause: the Shorts were rebuilt
+from the a-roll for a clean crop, and only the cut and captions were carried across. review.py
+measures correctness (edges, sync, loudness), and its pass was reported as "fine". Nothing
+compares a Short's treatment with its parent's. Check: a Short carries the parent's
+graphics, effects and bed for the windows it keeps, re-laid out for 9:16, or the delivery says
+why not. `AUTO G4` (an EDL with `parent` flags HIGH any parent card whose phrase it keeps
+but carries no card for; it flags money v1's dropped Offers stat), plus `READ R12` for what G4
+cannot see: mgx cues, effects and music.
+
 ## Sound
 
 **M052** · 2026-10-05 · Episode 3 v4 (logged 2026-10-12) · *Sound effects 17 LU under the voice were
@@ -262,4 +275,7 @@ said by ~0:10?).
 - **R10** Retakes (M045): for every line said more than once, list the candidates, pick the
   best (complete sentence, no restart, fewest fillers, delivery), and write the reason down.
 - **R11** Every cutaway, photo and card shows or says what the line says (M049); none fills time.
+- **R12** Shorts and other derived cuts (M053): list every card, mgx cue, effect and music cue
+  the parent has inside the kept windows, and say for each whether it is carried, re-laid out or
+  dropped, and why. A pass from review.py is not a verdict on how it looks.
 - **R7** Watch the first 15 s: picture from frame 1, the promise by ~0:10, no "last time".

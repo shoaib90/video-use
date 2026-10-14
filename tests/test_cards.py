@@ -321,7 +321,7 @@ if __name__ == "__main__":
 
 class ScaleTests(unittest.TestCase):
     """`scale` makes a compact tracker: it must reach the page, bound the card by its SCALED
-    height, and never apply to a stamp."""
+    height, and apply to stamps too (portrait Shorts) but not to a keyline."""
 
     def setUp(self):
         self.e = _Edit()
@@ -354,7 +354,40 @@ class ScaleTests(unittest.TestCase):
         with self.assertRaises(cards.CardError):
             self.resolve(_routine(scale=0.2))
         with self.assertRaises(cards.CardError):
-            self.resolve({"id": "s", "kind": "stamp", "text": "ARMY", "at": "lunch", "scale": 0.5})
+            self.resolve({"id": "s", "kind": "stamp", "text": "ARMY", "at": "lunch", "scale": 0.3})
+        with self.assertRaises(cards.CardError):
+            self.resolve({"id": "k", "kind": "keyline", "text": "A line", "at": "lunch", "scale": 0.5})
+
+    def test_stamp_scales(self):
+        s = self.resolve({"id": "s", "kind": "stamp", "text": "ARMY", "at": "lunch", "scale": 0.6})
+        self.assertEqual(s["box"]["k"], 0.6)
+
+
+class PortraitStampTests(unittest.TestCase):
+    """On a 1080x1920 Short the stage is ~607 units wide: a stamp that does not fit must raise,
+    not run off the frame (Episode 4 Shorts v2, 'LEETCODE · MEDIUM' clipped at the left edge)."""
+
+    def setUp(self):
+        self.e = _Edit()
+
+    def resolve(self, c):
+        return cards.resolve([c], self.e.edl, self.e.dir, self.e.durs, 1080, 1920)[0]
+
+    def test_wide_stamp_raises_on_portrait(self):
+        with self.assertRaises(cards.CardError) as cm:
+            self.resolve({"id": "s", "kind": "stamp", "text": "Bus for fifteen minutes", "at": "lunch",
+                          "position": "top-center"})
+        self.assertIn("scale", str(cm.exception))
+
+    def test_scaled_stamp_fits_on_portrait(self):
+        s = self.resolve({"id": "s", "kind": "stamp", "text": "Bus for fifteen minutes", "at": "lunch",
+                          "position": "top-center", "scale": 0.5})
+        self.assertLessEqual(s["box"]["w"] * 0.5, s["stage"]["w"] - 2 * cards.MARGIN)
+
+    def test_landscape_unchanged(self):
+        s = cards.resolve([{"id": "s", "kind": "stamp", "text": "Bus for fifteen minutes", "at": "lunch",
+                            "position": "top-center"}], self.e.edl, self.e.dir, self.e.durs, 1920, 1080)[0]
+        self.assertEqual(s["box"]["k"], 1.0)
 
 
 class SpineTests(unittest.TestCase):

@@ -172,6 +172,9 @@ These three fields are local extensions (not upstream). All optional and backwar
   ("holder") around the card. It leaves the card's own entrance and exit tweens alone, and the
   mask pass runs the same wrapper, so the glass stays under the card. The bound check uses the
   SCALED height. Tests are in `tests/test_cards.py` `ScaleTests`.
+  **Stamps take `scale` too (2026-10-14)**: on a 1080x1920 Short the stage is 607 units wide, so a
+  16:9-sized stamp is 1.78x too big; a stamp that does not fit the frame now RAISES (it used to be
+  clipped by the frame edge, silently). Shorts use 0.68 for every stamp. `PortraitStampTests`.
   **`keyline`, `deck`, `annotate`** (added 2026-10-06; the Kallaway look, `storytelling.md` §13)
   use the brand's new `glow` key (default `#8B5CF6`), not `accent`. A keyline's mask is empty (no
   glass); deck and annotate are full frame over the frosted picture, and fade their container
@@ -234,6 +237,9 @@ What it needs and does:
 - **C12** sliver: a story range of 2 words or less, or under 1 s, next to removed real words or a
   1.5 s+ gap (a splice from another attempt).
 - **C13** dead lead-in: more than 1 s before the first word.
+- **G4** (2026-10-14, M053): a derived cut whose EDL has `"parent": "<path to parent edl.json>"`
+  (a Short) is flagged HIGH for every parent card whose phrase it keeps without a card of its own
+  within 2 s. Cards only: mgx cues, effects and beds are `READ R12`. `tests/test_review_edges.py` `ParentCards`.
 - **C14** said twice: the same 7-word run in two story ranges (a retake left in).
 - **C15** edge on speech: the source audio at any edge where material is removed is louder than
   −38 dB. This is the check that judges a tightened cut.

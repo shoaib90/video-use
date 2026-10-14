@@ -29,6 +29,7 @@ Checks:
   C7 ghost duplicate words      C8 transcript gap inside cut    C9 lowest-confidence words
   C10 Spanish drift             G1 overlay/card contact sheets  G2 caps-unsafe card text
   C11 false start / restart     G3 goodbye on a single
+  G4 a derived cut (a Short; EDL `parent`) keeps a phrase the parent's card lands on, but carries no card
 """
 from __future__ import annotations
 
@@ -559,6 +560,51 @@ def graphics_checks(edl: dict):
     return out
 
 
+def card_anchors(c: dict) -> list[str]:
+    """Every spoken phrase a card lands on: its `at`, each step's and each row's."""
+    out = [c.get("at")] + [x.get("at") for x in c.get("steps", []) + c.get("rows", [])]
+    return [p for p in out if p]
+
+
+def parent_card_gaps(parent_cards: list[dict], own_cards: list[dict], find, window: float = 2.0):
+    """G4 (M053): cards of the parent video that this derived cut silently dropped.
+
+    `find(phrase)` returns the phrase's output time in THIS cut, or None when the cut does not
+    keep it. A parent card with any kept phrase is satisfied by an own card landing within
+    `window` seconds of one of them (a stat need not repeat every step); otherwise it is a gap. Pure, so it is testable without a render.
+    """
+    own_t = [t for c in own_cards for p in card_anchors(c) if (t := find(p)) is not None]
+    out = []
+    for c in parent_cards:
+        kept = [(p, t) for p in card_anchors(c) if (t := find(p)) is not None]
+        if kept and not any(abs(t - u) <= window for _, t in kept for u in own_t):
+            p, t = kept[0]
+            label = c.get("text") or c.get("label") or c.get("id")
+            out.append(("HIGH", "G4", f"the parent's {c.get('kind')} card '{c.get('id')}' (“{label}”) lands on "
+                                      f"“{p}”, kept here at {fmt(t)}, but this cut carries no card there"))
+    return out
+
+
+def parent_checks(edl: dict, edit: Path, fps: float):
+    """G4 for an EDL with a `parent` (path to the parent edl.json, relative to the edit dir)."""
+    if not edl.get("parent"):
+        return []
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("video_use_cards", Path(__file__).with_name("cards.py"))
+    cards = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cards)
+    parent = json.loads((edit / edl["parent"]).read_text())
+    durs = [max(1, round((r["end"] - r["start"]) * fps)) / fps for r in edl["ranges"]]
+    words = cards.kept_words(edl, edit, durs)
+
+    def find(phrase):
+        try:
+            return cards.find_phrase(words, phrase, 0.0, "G4")
+        except cards.CardError:
+            return None
+    return parent_card_gaps(parent.get("cards") or [], edl.get("cards") or [], find)
+
+
 def contact_sheet(render: Path, items, out: Path, title: str):
     """One frame per (time, label), tiled 4 wide."""
     if not items:
@@ -650,7 +696,7 @@ def main():
         flags = downgrade_tightening(flags, stories, levels)
     flags = confirm_stills(flags, stories, edl, edit)
     lowc, span = word_checks(stories, words_of, None)
-    gflags = graphics_checks(edl)
+    gflags = graphics_checks(edl) + parent_checks(edl, edit, a.fps)
     acc_path = Path(a.accepted) if a.accepted else edit / "review" / "accepted.json"
     accepted = json.loads(acc_path.read_text()) if acc_path.exists() else []
     def acc_of(f):
@@ -712,7 +758,7 @@ def main():
         rep.append(f"\n## Accepted after checking ({len(acc_flags)}, {acc_path.name})\n")
         rep += [f"- {f[0]} {f[1]} #{f[2]} {f[3]}: {f[4]} — **{x['why']}**" for f, x in acc_flags]
     rep.append("\n## Graphics\n")
-    rep += [f"- {g[0]} {g[1]}: {g[2]}" for g in gflags] or ["- PASS G2/G3: card text caps-safe; the goodbye shows everyone"]
+    rep += [f"- {g[0]} {g[1]}: {g[2]}" for g in gflags] or ["- PASS G2-G4: card text caps-safe; the goodbye shows everyone; no parent card dropped"]
     rep += [f"- G1 contact sheet: {s.name}" for s in sheets]
     rep.append("\n## Words to read (C9 lowest confidence in the cut; C10 Spanish drift)\n")
     rep += [f"- {fmt(t)}  “{w}”  conf {c:.2f}  ({s})" for c, t, w, s in lowc]

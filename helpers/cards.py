@@ -50,7 +50,8 @@ EDL block (all lengths in 1080-high units; all `at` values are spoken phrases):
        "position": "top-right", "accent": true}
     ]
 
-`scale` (0.4-1.0, list and stat only) shrinks the whole card toward its top corner: a compact
+`scale` (0.4-1.0; list, stat and stamp) shrinks the whole card toward its top corner (a stamp: its
+top centre when top-center): a compact
 tracker, e.g. a three-pillar list that stays up through a scene over the talking head.
 
 A `stamp` is one word or figure in a glass pill: it lands AS its phrase is said (no settle
@@ -356,8 +357,10 @@ def resolve(cards: list[dict], edl: dict, edit_dir: Path, segment_durations: lis
         # compact tracker that can stay up over a talking head. Applied to a wrapper in the
         # runtime, so the entrance/exit tweens on the card itself are untouched, and the mask
         # pass runs the same wrapper, so the frosted glass stays exactly under the card.
+        # A stamp takes `scale` too (2026-10-14): on a 9:16 Short the 1080-unit stage is only ~607
+        # units wide, so a stamp sized for 16:9 is 1.78x too big and runs off the frame.
         card_scale = float(c.get("scale", 1.0))
-        if kind not in ("list", "stat") and card_scale != 1.0:
+        if kind not in ("list", "stat", "stamp") and card_scale != 1.0:
             raise CardError(f"{where}: a {kind} has no scale")
         if not 0.4 <= card_scale <= 1.0:
             raise CardError(f"{where}: scale must be between 0.4 and 1.0, got {card_scale}")
@@ -419,6 +422,11 @@ def resolve(cards: list[dict], edl: dict, edit_dir: Path, segment_durations: lis
             box_w = stamp_width(shown)
             if box_w > STAMP["max_w"]:
                 raise CardError(f"{where}: {shown!r} is too long for a stamp (one word or figure)")
+            if box_w * card_scale > stage_w - 2 * MARGIN:
+                # silently clipped by the frame edge otherwise (a portrait stage is ~607 units wide)
+                raise CardError(f"{where}: {shown!r} is {box_w * card_scale:.0f} units wide at scale "
+                                f"{card_scale}; the frame fits {stage_w - 2 * MARGIN:.0f}. Shorten it or "
+                                f"set a smaller `scale`.")
             box_h0 = STAMP["h"]
             y = MARGIN + int(c.get("stack", 0)) * (STAMP["h"] + STAMP["gap"])
             spec["_stamp"] = {"text": shown, "accent": bool(c.get("accent", False))}

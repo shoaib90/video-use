@@ -2025,3 +2025,27 @@ contradicts M047; recorded as the Shorts exception in mistakes.md and memory). T
   an audible "uh" that Deepgram does not list (found because review's C16 said the "held" tail
   was not quiet).
 - Phone previews (720p, ~19 MB) as `phone_preview_*_do_not_upload.mp4`.
+
+## 2026-10-14 — Episode 4 Shorts v2: "they look very plain" (M053), and the interview re-cut
+
+Shoaib called v1 plain. True, and I had called it fine on a clean review.py. The long video carries
+cards, effects and a bed in exactly these windows, and the Shorts dropped all of it (M053). He then
+sent four notes for the interview Short. All four are applied in `episode4/edit/shorts/build_v2.py`:
+the strongest line first ("Throughout my three years…"), a big thumbnail-style plate held 3 s
+("FIRST INTERVIEW. / NEVER CODED."), the Hindi repeat and the restart cut, and two versions to test.
+- `interview/episode4_short_interview.mp4` 24.4 s, ends on "offer in December" (punch-in 1.25).
+- `interview_long/episode4_short_interview_long.mp4` 45.4 s, to "this is the first step".
+- Treatment (both): glass stamps from the long video (LEETCODE · MEDIUM, NEVER SEEN IT,
+  SOLVED · 30-35 MIN, ₹15K A MONTH) at scale 0.68; the long video's bed for the scene (Felt Like
+  November), +14 dB under the plate, dead stop on the punch-in line with a soft hit; the long
+  video's click and hit on LeetCode/solved; 2-3 word ASS captions in Avenir Next Heavy with the key
+  word in #F25435 and a small pop (`captions_v2.py`); alternating 1.0/1.12 framing.
+- review.py: HIGH 0 / MED 0 on both, G4 pass, -14.1/-14.2 LUFS. Every join was read back by
+  whispering the render. That caught "So yeah, he he said": a repeated "he" sat after the pause
+  I had cut. Fixed by starting on "said" (200.25).
+- **Repo changes, with tests (314 pass):**
+  - `cards.py`: stamps take `scale`, and a stamp wider than the frame now raises. On 9:16 the
+    1080-unit stage is 607 units wide, so v2's first draft clipped "LEETCODE · MEDIUM" off the left edge.
+  - `review.py` G4: an EDL with `parent` flags any parent card whose phrase it keeps without
+    carrying a card. Replayed on money v1, it flags the dropped Offers stat.
+- Money Short v2 is not cut yet: the matching re-cut was proposed to Shoaib first (Hard Rule 11).
