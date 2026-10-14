@@ -1987,3 +1987,12 @@ the Mac yet.**
   Episode 4 with a demucs split (storytelling.md §8b). Beds went from 16 to ~28 dB under the voice, with a hook lift to ~12 dB.
   The final's audio was swapped with the picture untouched. The previous final is in the Trash as
   `episode4_final_v5levels_music16dB.mp4`.
+
+## 2026-10-14 — kb/shooting.md: the camera and lighting setup
+
+Shoaib asked why his face looked unclear on the published videos. Tested 2026-10-09 to 10-11 on
+clips IMG_3632–IMG_3838 (setup walkthrough, monitor on/off, five light placements, 1x vs 2x,
+1080p vs 4K), measuring face vs frame luma on matched regions. Result: a diffused key at ~45°,
+2x lens, 4K 30, dark monitor, mid-tone top. Written up as `kb/shooting.md`; the tone-map and grade
+side was already in gotchas.md (2026-10-11).
+

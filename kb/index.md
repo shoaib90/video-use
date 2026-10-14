@@ -25,6 +25,7 @@ Transcribe ──> Pack ──> reason over text ──> EDL ──> Render ─�
 | [data-contract.md](data-contract.md) | **The transcript JSON schema** — the repo's real seam | Swapping ASR providers, debugging captions |
 | [helpers.md](helpers.md) | Per-script reference: flags, behaviour, EDL schema | Before invoking any helper |
 | [environment.md](environment.md) | This machine: paths, keys, versions, what's installed | Cold start, "is X available?" |
+| [shooting.md](shooting.md) | **Camera and lighting setup** for indoor talking heads: 2x, 4K, diffused key at 45°, dark monitor | Before a shoot; when a face looks unclear |
 | [gotchas.md](gotchas.md) | Verified traps that cost real debugging time | Anything fails unexpectedly |
 | [storytelling.md](storytelling.md) | **Retention craft for talking-head cuts** — contrast, rhythm, withholding, the zenith | Planning a cut; before picture lock |
 | [ideation.md](ideation.md) | **Where ideas come from** — recombination, the A+B=C identity formula, constraints | Deciding what to make; choosing a style |
