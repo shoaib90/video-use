@@ -2103,3 +2103,7 @@ yt-script's `hookscore.py`, and lints the title against the plate with yt-packag
   hook scored lowest of the openings (25). The tool says it barely separates hits from misses, so it is
   recorded as a relative signal only, with no change made.
 - environment.md maps all 11 plugin skills, and which ones have scripts, onto our workflow.
+- **Shipped (Shoaib, 2026-10-14):** both Shorts handed over for upload, with titles linted by
+  `title.py` against their plates. Interview: "3 years without code, then a LeetCode medium in 35
+  minutes" (98). Money: "HR said my interviews were bad. 2 days later: a better offer" (84). The
+  rejected money candidate "Lost an offer over money" claimed more than happened.
