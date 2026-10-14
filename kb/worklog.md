@@ -2088,3 +2088,18 @@ plus one `short.json` per Short in the edit dir.
   identical before that point. Recorded in gotchas.md.
 - `tests/test_shorts.py` (11). The old per-episode scripts and artifacts went to
   `~/.Trash/episode4_shorts_intermediates_2026-10-14/old_scripts/`.
+
+## 2026-10-14 — skills/shorts now hands picking, writing and titles to the youtube-agent plugin
+
+Shoaib pointed out that `/youtube-agent:yt-shorts` already exists. It is writing guidance only (no
+scripts); our skill builds the video. `skills/shorts` SKILL.md step 1 now hands picking, the opening
+line, the on-screen text and the loop to yt-shorts. It notes our one difference: no new
+recordings, so the strongest line already said is moved to the front. It also scores openings with
+yt-script's `hookscore.py`, and lints the title against the plate with yt-package's `title.py`.
+- **title.py caught my own mistake:** the interview title I suggested ("…in my first interview") repeated
+  the plate's words, which the channel rules forbid. The replacement "3 years without code, then a
+  LeetCode medium in 35 minutes" scores 98/100.
+- hookscore ranked all five Episode 4 opening candidates WEAK (21-40), and Shoaib's chosen money
+  hook scored lowest of the openings (25). The tool says it barely separates hits from misses, so it is
+  recorded as a relative signal only, with no change made.
+- environment.md maps all 11 plugin skills, and which ones have scripts, onto our workflow.

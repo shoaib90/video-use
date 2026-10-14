@@ -1,7 +1,7 @@
 ---
 name: shorts
-description: "Cut a vertical 9:16 Short (20-60 s) from a finished long video: pick a self-contained moment, re-order it so the strongest line comes first, rebuild it from the long video's own sources with a face-centred crop, and give it the long video's treatment (its cards as stamps, its bed and effects), a thumbnail-style opening plate and bold 2-3 word captions. One spec file per Short; one script does build, plate, captions, render, mix, review and a phone preview. Use when Shoaib asks for Shorts, clips or verticals from a video."
-version: 1.0.0
+description: "BUILD a vertical 9:16 Short (20-60 s) from a finished long video, once the moment is chosen (picking and writing are /youtube-agent:yt-shorts): re-order it so the strongest line comes first, rebuild it from the long video's own sources with a face-centred crop, and give it the long video's treatment (its cards as stamps, its bed and effects), a thumbnail-style opening plate and bold 2-3 word captions. One spec file per Short; one script does build, plate, captions, render, mix, review and a phone preview. Use when Shoaib asks for Shorts, clips or verticals from a video."
+version: 1.1.0
 ---
 
 # Shorts
@@ -25,17 +25,22 @@ $SH <edit> <name> <command>                          # spec: <edit>/shorts/<name
 `<edit>` is the long video's edit dir (it holds `edl.json` and `transcripts/`). Everything is
 written to `<edit>/shorts/<name>/` (Hard Rule 12).
 
-### 1. Pick the moment, and confirm it (Hard Rule 11)
-Candidates come from the script's `[SHORT]` marks, or from the transcript (`/yt-shorts` helps).
-A moment qualifies only if it opens on a complete thought, has a turn, and ends on a line. Never
-use the zenith while the long video is new. Show Shoaib the candidates with timecodes and
-first lines, and cut nothing until he picks.
+### 1. Pick and write it: `/youtube-agent:yt-shorts`, then confirm (Hard Rule 11)
+**This skill only BUILDS.** Choosing the moment and writing it belong to the youtube-agent plugin.
+Do not duplicate its rules here:
+- **`/youtube-agent:yt-shorts`** picks the candidates (complete opening thought, a turn, ends on
+  a line; top five with timecodes and first lines). It writes the opening line, the on-screen
+  text and the loop point. For a new episode, the script's `[SHORT]` marks come first.
+- **Channel difference:** yt-shorts says "write a NEW first line". Our Shorts are cut only from
+  footage already shot (channel-kb rule), so the "new" first line is the strongest line Shoaib
+  already said, **moved to the front**. Reordering is still "cut from the long video".
+- **Score the candidate openings** with yt-script's `hookscore.py`
+  (`python3 "$(dirname "$(find ~/Library/Application\ Support/Claude -name hookscore.py -path '*yt-script*' | head -1)")/hookscore.py" hooks.txt`).
+  Use it to rank lines **relative to each other** only. The tool says it barely separates a
+  creator's hits from misses, and every Episode 4 hook scored WEAK (21-40).
+- Never the zenith while the long video is new. Show Shoaib the candidates, and cut nothing until he picks.
 
-### 2. Shape it in text, before any render
-These are Shoaib's notes on v1, and they apply to every Short:
-- **The strongest line goes first,** even if it comes later in the clip. Reordering pieces of the
-  long video is still "cut from the long video". The original first line ("I got my first …")
-  usually assumes context the viewer does not have.
+### 2. The editing rules (Shoaib's notes on Episode 4 v1)
 - **Do not say the hook line twice.** Once it opens the Short, cut it from where it sat in the story.
 - **Cut every repeat and restart:** a Hindi restatement of the English line, "I mean, when I…",
   a pause inside a phrase. Whisper each join; a cut pause can hide a repeated word
@@ -108,9 +113,14 @@ A full 1080x1920 render of about 60 s takes a few minutes on this Mac. Each step
    captions sit clear of the Shorts UI (y ~1380 of 1920), and no screen or label is legible (R4).
 4. `READ R12`: everything G4 cannot see (mgx cues, effects, the bed) is carried or dropped for a
    stated reason.
-5. Send the phone preview (`phone_preview_*_do_not_upload.mp4`, <30 MB) and the copy block:
-   file, length, plate text, a title idea that does not repeat the plate, and Related video set
-   to the long video. Post on a day between long uploads.
+5. **Lint the title against the plate** with yt-package's `title.py`
+   (`python3 title.py --title "…" --thumb "<plate text>"`, from that skill's folder; find it like
+   hookscore.py). The channel rule is that a Short's title never repeats its on-screen text, and
+   `title.py` flags any shared word. It caught that on Episode 4: "…in my first interview" against
+   "FIRST INTERVIEW. NEVER CODED.". Ignore its `thumb-length` warning: a Short's plate is not a feed thumbnail.
+6. Send the phone preview (`phone_preview_*_do_not_upload.mp4`, <30 MB) and the copy block:
+   file, length, plate text, the linted title, and Related video set to the long video. Post on
+   a day between long uploads.
 
 ## Known traps (all measured on Episode 4)
 - **Never crop the delivered final.** Its burned captions and cards land half inside the 9:16

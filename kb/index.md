@@ -62,6 +62,8 @@ Plus: all outputs go to `<videos_dir>/edit/`, **never** inside this repo.
 - **Shorts: `skills/shorts/`** (2026-10-14): one `short.json` per Short in `<edit>/shorts/<name>/`;
   rebuilt from the parent's sources (never a crop of the final), strongest line first, a 3 s thumbnail-style
   plate, the parent's cards and bed (review G4 checks the cards; M053). Episode 4's three are the examples.
+- **The youtube-agent plugin does the writing side** (`/youtube-agent:yt-shorts` picks Shorts, `hookscore.py`
+  ranks hooks, `title.py` lints a title against its plate): use it instead of re-deriving. Map in environment.md.
 - **Captions are Hinglish as spoken**, Devanagari for Hindi, in Kohinoor Devanagari (M047),
   whatever a script says. **Shorts are the exception: English** (Shoaib, 2026-10-14).
 - **Verify a cut by transcribing each side ALONE** (M048): a joined transcription fills clipped

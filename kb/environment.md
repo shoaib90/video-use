@@ -167,6 +167,28 @@ breakdowns), a separate Remotion skill, Figma/Canva connectors for branded overl
 and scheduled tasks. Parallel animation sub-agents (Hard Rule 10) work via the `Agent` tool —
 but **the user asked that it not be used unless they request it**, so confirm before fanning out.
 
+### The youtube-agent plugin (11 skills) — use it, don't duplicate it
+
+Installed as a claude.ai plugin (skills invoked as `/youtube-agent:<name>`). Its files live under a
+session-specific path, so find a script with
+`find ~/Library/Application\ Support/Claude -name <script>.py -path '*<skill>*'`; never hardcode it.
+Verified 2026-10-14 by listing the plugin. Which skills have scripts:
+
+| Skill | Script | Where it fits here |
+|---|---|---|
+| `yt-shorts` | — | **Picks and writes Shorts**; `skills/shorts` builds them (its SKILL.md step 1) |
+| `yt-script` | `hookscore.py` | Ranks opening lines, **relatively only**: every Episode 4 Short hook scored WEAK (21-40) |
+| `yt-package` | `title.py` | Lints a title against its thumbnail/plate text; caught a Short title repeating its plate |
+| `yt-chapters` | `chapters.py` | Chapters checked against YouTube's rules |
+| `yt-retention` | `retention.py` | Reads a Studio retention export (pairs with kb/distribution.md) |
+| `yt-viral` | `swipe.py` | Outliers in the niche |
+| `yt-edit` | `deadair.py` | Transcript to a dead-air list. **Overlaps video-use's own cut**; the cut stays in video-use |
+| `yt-audit`, `yt-plan`, `yt-seo`, `yt-comment` | — | Channel audit, upload plan, description/tags, comment replies |
+
+Channel-specific packaging still goes through `youtube-title-thumbnail-description` (Shoaib's own
+skill) and the private channel-kb; `title.py` is a lint on top of it, not a replacement. Only
+`hookscore.py` and `title.py` have been run here so far (on Episode 4's Shorts).
+
 ## Neural denoising — `helpers/denoise.py`
 
 DeepFilterNet3 runs locally for wind/broadband speech denoising. It cannot live in the repo's
