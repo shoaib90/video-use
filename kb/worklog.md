@@ -2138,3 +2138,6 @@ titles linted by yt-package `title.py` (80-98).
 - **Not proven:** effect audibility on the podcast Shorts. The bed fills the conversation's gaps,
   so the effect-free control runs +20 to +35 dB and `sfx` can't separate effects from it. Levels
   match the Episode 2-4 Shorts' settings; judge them by ear.
+- **Descriptions for the Episode 4 Shorts (2026-10-19)**, written after they shipped with titles
+  only. In `shorts/<name>/description.txt`, following SKILL.md step 6. They avoid the title's and the
+  plate's words and add no salary figures (voice.md: figures only where the story needs them).
