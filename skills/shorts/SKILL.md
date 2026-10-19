@@ -135,9 +135,18 @@ A full 1080x1920 render of about 60 s takes a few minutes on this Mac. Each step
    hookscore.py). The channel rule is that a Short's title never repeats its on-screen text, and
    `title.py` flags any shared word. It caught that on Episode 4: "…in my first interview" against
    "FIRST INTERVIEW. NEVER CODED.". Ignore its `thumb-length` warning: a Short's plate is not a feed thumbnail.
-6. Send the phone preview (`phone_preview_*_do_not_upload.mp4`, <30 MB) and the copy block:
-   file, length, plate text, the linted title, and Related video set to the long video. Post on
-   a day between long uploads.
+6. **Write the description with the title, every time** (Shoaib, 2026-10-19). Use the voice rules of
+   the channel's `youtube-title-thumbnail-description` skill, cut down for a Short:
+   - 1-2 first-person sentences that give the stakes in plain words, without repeating the title's
+     or the plate's wording;
+   - one line pointing to the full story ("Full story: <long video's title>"). The clickable
+     link is the Related video setting, not the description;
+   - the series line ("Become Someone You're Proud Of");
+   - 2-4 topic hashtags.
+   No claim beyond what the Short shows (the constitution), and English, like the captions.
+7. Send the phone preview (`phone_preview_*_do_not_upload.mp4`, <30 MB) and the copy block:
+   file, length, plate text, the linted title, **the description**, and Related video set to the
+   long video. Post on a day between long uploads.
 
 ## Known traps (Episode 4, plus Episodes 2-3 and podcast Episode 1 on 2026-10-14)
 - **Stamps over ~18 characters clip** on 9:16 at scale 0.68 ("CRYING, ALL THE WAY" is 490 of
