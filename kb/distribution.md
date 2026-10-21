@@ -405,3 +405,21 @@ measurements.** The channel-specific reading is in the private channel-kb
   falls as reach widens, and on ~19 clicks it's noise.
 - **AI "is a regression towards an average"** (The Studio). That's the reason the scripting
   rules require every fact to come from the creator's own notes.
+
+## Thumbnail craft: the subject in front of the words (Shoaib's references, 2026-10-21)
+
+Shoaib picked 12 thumbnails he would click (fitness explainers, Huberman Lab, creator-economy and
+storytelling channels). Four things recur, and our v1 (Episodes 3-5) had none of them:
+1. **Depth:** the person is cut out and sits IN FRONT of huge words, overlapping their edges.
+2. **The words are the background:** 2-3 words fill 50-90% of the width, in a heavy, often condensed face,
+   never in a caption box.
+3. **The subject pops:** the background is blurred, darkened or flattened, and the subject is brighter and
+   sharper, sometimes with a faint edge glow.
+4. **One accent colour** on one word, and at most one graphic (a numbered muscle diagram, a glowing spine).
+
+How to build it locally: `helpers/subject_mask.swift` (macOS Vision "lift subject", which keeps held
+objects such as dumbbells) cuts the subject out, then layer it as background (blur 16, saturation
+0.55, brightness 0.42, vignette), the words with a soft shadow, a faint white halo, and the subject on
+top. Pattern: `episode5/edit/build/thumbnails_v2.py`. Rule from building it: let the subject cover
+a word's EDGE, never a key letter. "LATER." read "ATER." and "15 MINUTES" read "15 M…UTES"
+until both moved. Unproven: whether it lifts CTR on our channel. It is the look Shoaib clicks.
