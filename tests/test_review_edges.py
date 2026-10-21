@@ -295,3 +295,20 @@ class ParentCards(unittest.TestCase):  # M053
 
     def test_no_parent_no_check(self):
         self.assertEqual(review.parent_checks({"ranges": []}, Path("."), 30.0), [])
+
+
+class CaptionFragments(unittest.TestCase):  # M056: T8
+    @staticmethod
+    def _srt(lines):
+        return "\n\n".join(f"{i}\n00:00:0{i},000 --> 00:00:0{i},900\n{t}" for i, t in enumerate(lines, 1))
+
+    def test_fragments_stranded_by_picture_cuts_are_counted(self):
+        n, short, ex = review.caption_fragments(self._srt(
+            ["And in 2023, the doctor told", "me, you are done.", "first job.", "go for surgery."]))
+        self.assertEqual((n, short), (4, 2))
+        self.assertIn("first job.", ex)
+
+    def test_sentence_cues_pass_the_share(self):
+        n, short, _ = review.caption_fragments(self._srt(
+            ["And in 2023, the doctor told me, you are done.", "So by May 2021, I got my first job."]))
+        self.assertLessEqual(short / n, review.FRAGMENT_SHARE)

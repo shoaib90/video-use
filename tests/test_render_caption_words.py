@@ -36,5 +36,43 @@ class CaptionWordSelectionTests(unittest.TestCase):
         self.assertEqual(got, ["b"])
 
 
+class SpanSegmentsTests(unittest.TestCase):
+    """A camera switch inside a sentence splits it across two segments. Chunked per segment,
+    each side becomes its own cue ("and I went to" / "the doctor."); with span_segments the
+    sentence is chunked once across the switch (Episode 5, 2026-10-21)."""
+
+    def _srt(self, style, ranges):
+        import json
+        import tempfile
+        d = Path(tempfile.mkdtemp())
+        (d / "transcripts").mkdir()
+        words = [("And", 0.0, 0.2), ("then", 0.2, 0.4), ("I", 0.4, 0.5), ("went", 0.5, 0.8),
+                 ("to", 0.8, 0.9), ("the", 0.9, 1.0), ("doctor.", 1.0, 1.5)]
+        (d / "transcripts" / "A.json").write_text(json.dumps(_tr(*words)))
+        edl = {"sources": {"A": "a.mp4"}, "ranges": ranges, "subtitle_style": style}
+        render.build_master_srt(edl, d, d / "m.srt")
+        blocks = (d / "m.srt").read_text().strip().split("\n\n")
+        return [" ".join(b.split("\n")[2:]) for b in blocks]
+
+    def test_default_chunks_each_segment_alone(self):
+        style = {"words_per_chunk": 8, "break_on": ".!?", "case": "sentence"}
+        cues = self._srt(style, [{"source": "A", "start": 0.0, "end": 0.9},
+                                 {"source": "A", "start": 0.9, "end": 1.6}])
+        self.assertEqual(cues, ["And then I went to", "the doctor."])
+
+    def test_span_segments_keeps_the_sentence_in_one_cue(self):
+        style = {"words_per_chunk": 8, "break_on": ".!?", "case": "sentence", "span_segments": True}
+        cues = self._srt(style, [{"source": "A", "start": 0.0, "end": 0.9},
+                                 {"source": "A", "start": 0.9, "end": 1.6}])
+        self.assertEqual(cues, ["And then I went to the doctor."])
+
+    def test_a_segment_without_transcript_still_breaks(self):
+        style = {"words_per_chunk": 8, "break_on": ".!?", "case": "sentence", "span_segments": True}
+        cues = self._srt(style, [{"source": "A", "start": 0.0, "end": 0.9},
+                                 {"source": "CARD", "start": 0.0, "end": 1.0},
+                                 {"source": "A", "start": 0.9, "end": 1.6}])
+        self.assertEqual(len(cues), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

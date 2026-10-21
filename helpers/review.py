@@ -510,7 +510,26 @@ def render_checks(edit: Path, edl: dict, render: Path, durs, fps):
                "blackdetect=d=0.3:pix_th=0.10", "-an", "-f", "null", "-"]).stderr
     black = [l for l in err.splitlines() if "black_start" in l]
     res.append(("T6", not black and rms > -45, f"first 2 s: {'black ' if black else ''}audio {rms:.1f} dBFS"))
+    srt = edit / str(edl.get("subtitles") or "master.srt")
+    if srt.exists():
+        n, short, ex = caption_fragments(srt.read_text())
+        res.append(("T8", n == 0 or short / n <= FRAGMENT_SHARE,
+                    f"{short} of {n} caption cues have <= 3 words{' e.g. ' + repr(ex) if ex else ''}"))
     return res
+
+
+FRAGMENT_SHARE = 0.05
+
+
+def caption_fragments(srt_text: str):
+    """T8 (M056): captions chunked per segment strand fragments ("go for surgery.", "first
+    job.") wherever the picture cuts inside a sentence. Episode 5 v1: 62 of 391 cues (16%);
+    with subtitle_style.span_segments: 2 of 318. Returns (cues, cues of <= 3 words, examples)."""
+    import re as _re
+    cues = [b.split("\n") for b in _re.split(r"\n\s*\n", srt_text.strip()) if b.strip()]
+    texts = [" ".join(c[2:]).strip() for c in cues if len(c) >= 3]
+    short = [x for x in texts if len(x.split()) <= 3]
+    return len(texts), len(short), short[:3]
 
 
 def music_check(render: Path, raw: Path, ok_windows):

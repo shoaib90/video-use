@@ -932,7 +932,14 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path,
                 print(f"  warning: could not measure segments ({exc}); using EDL durations")
                 measured = None
 
-    entries: list[tuple[float, float, str]] = []
+    # `span_segments` (default False): chunk the whole output timeline instead of each segment
+    # alone. A cut that splits a sentence across segments (a camera switch inside a phrase,
+    # Episode 5's two-framing camera) otherwise strands cue fragments like "go for surgery."
+    # A segment with no transcript (an end card) and a silence over `span_max_gap` still break.
+    span = bool(style.get("span_segments", False))
+    max_gap = float(style.get("span_max_gap", 1.0))
+
+    groups: list[list[dict]] = []
     seg_offset = 0.0
 
     for seg_i, r in enumerate(edl["ranges"]):
@@ -944,21 +951,50 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path,
         tr_path = transcripts_dir / f"{src_name}.json"
         if not tr_path.exists():
             print(f"  no transcript for {src_name}, skipping captions for this segment")
+            groups.append([])
             seg_offset += seg_duration
             continue
 
         transcript = json.loads(tr_path.read_text())
-        words_in_seg = _words_in_range(transcript, seg_start, seg_end)
-
-        # Split into runs at punctuation first, then divide each run into cues.
-        runs: list[list[dict]] = []
-        current: list[dict] = []
-        for w in words_in_seg:
+        seg_words: list[dict] = []
+        for w in _words_in_range(transcript, seg_start, seg_end):
             text = (w.get("text") or "").strip()
             if not text:
                 continue
+            ws = max(seg_start, w.get("start", seg_start))
+            we = min(seg_end, w.get("end", seg_end))
+            seg_words.append({"text": text,
+                              "start": max(0.0, ws - seg_start) + seg_offset,
+                              "end": max(0.0, we - seg_start) + seg_offset})
+        groups.append(seg_words)
+        seg_offset += seg_duration
+
+    if span:
+        spans: list[list[dict]] = []
+        cur: list[dict] = []
+        for g in groups:
+            if not g:                      # no transcript: a hard break
+                if cur:
+                    spans.append(cur)
+                cur = []
+                continue
+            for w in g:
+                if cur and w["start"] - cur[-1]["end"] > max_gap:
+                    spans.append(cur)
+                    cur = []
+                cur.append(w)
+        if cur:
+            spans.append(cur)
+        groups = spans
+
+    entries: list[tuple[float, float, str]] = []
+    for words in groups:
+        # Split into runs at punctuation first, then divide each run into cues.
+        runs: list[list[dict]] = []
+        current: list[dict] = []
+        for w in words:
             current.append(w)
-            if text[-1] in break_on:
+            if w["text"][-1] in break_on:
                 runs.append(current)
                 current = []
         if current:
@@ -993,21 +1029,16 @@ def build_master_srt(edl: dict, edit_dir: Path, out_path: Path,
             chunks = merged
 
         for chunk in chunks:
-            local_start = max(seg_start, chunk[0].get("start", seg_start))
-            local_end = min(seg_end, chunk[-1].get("end", seg_end))
-            out_start = max(0.0, local_start - seg_start) + seg_offset
-            out_end = max(0.0, local_end - seg_start) + seg_offset
+            out_start, out_end = chunk[0]["start"], chunk[-1]["end"]
             if out_end <= out_start:
                 out_end = out_start + 0.4
-            text = " ".join((w.get("text") or "").strip() for w in chunk)
+            text = " ".join(w["text"] for w in chunk)
             text = re.sub(r"\s+", " ", text).strip()
             # Strip trailing punctuation for cleaner uppercase look
             text = text.rstrip(",;:")
             if case_mode == "upper":
                 text = text.upper()
             entries.append((out_start, out_end, text))
-
-        seg_offset += seg_duration
 
     # Sort and write as SRT
     entries.sort(key=lambda e: e[0])
