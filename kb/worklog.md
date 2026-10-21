@@ -2141,3 +2141,94 @@ titles linted by yt-package `title.py` (80-98).
 - **Descriptions for the Episode 4 Shorts (2026-10-19)**, written after they shipped with titles
   only. In `shorts/<name>/description.txt`, following SKILL.md step 6. They avoid the title's and the
   plate's words and add no salary figures (voice.md: figures only where the story needs them).
+
+## 2026-10-21 — Episode 5 (the injury): footage sorted and transcribed
+
+- 27 clips arrived flat in `Editing/episode5/`. Sorted into `a-roll/` (20), `b-roll/` (2 wordless
+  desk clips; Shoaib adds the rest), `outtakes/` (3 tests) and `unsorted/` (2). Full table in
+  `episode5/edit/inventory.md`.
+- **`unsorted/` holds the 17 Oct bedroom recording (IMG_3945/3946, 40 min, 29.97 fps)**: an
+  unscripted personal recording, not this script. Excluded from paid transcription pending Shoaib.
+- 20 a-roll clips transcribed with Deepgram `multi` (22m 12s). Checks run, each verified: no
+  Spanish drift (grep on `takes_packed.md`); 19 Devanagari phrases; every gap of 1.5 s or more
+  measured, and the four at speech level whispered with `-l hi -tr`: restarts or drawn-out words,
+  nothing dropped.
+- Shoot gaps vs the shooting script: the cold open was shot once (not 3-4) and not reframed
+  tighter; Ladakh was told freely rather than as the locked 7.7-7.8; 8.1's numbers and 9.3's
+  career promise were not said.
+- Edit strategy proposed, waiting on Shoaib's confirmation (Hard Rule 11).
+
+## 2026-10-21 — Episode 5 v1 preview: the two-framing camera, after Leila Hormozi
+
+- Shoaib asked to learn from Leila Hormozi's two-camera cut, which never feels cut. Downloaded
+  (his OK) and measured: `storytelling.md` §14. Pauses matched Episode 4 already; the
+  difference is picture: a change every ~3 s, every same-angle cut a ~1.25x scale change.
+- Built `episode5/edit/build/cut.py` from Episode 4's: two framings from the 4K (A medium with
+  a slow push; B 1.35x, face moved left of centre, measured on 6 takes), a framing change at
+  every join except an invisible one that would leave a shot under 1.4 s, plus picture-only
+  switches every 3.2-7 s at word boundaries. v1: 212 visible shots, median 3.4 s, 16.9/min
+  (Leila 3.1 s, ~16.5/min), none under 1.4 s. Pauses tightened slightly (between sentences
+  0.30 s kept, inside 0.22 s).
+- Takes: every line kept as said (Shoaib: "whatever I said, just keep it", the 99% line
+  included). Ends on "completely free" (no promise for the next episode, his choice). Stat card
+  33.6 kg / 13.9% on "best shape of my life".
+- B-roll: global-b-rolls (dumbbell press, back extensions, knees over toes, the Ladakh riding
+  POV), YT1 (MRI film, June 2025 gym photo), Episode 4's bed clip (IMG_3899, whiteboard
+  cropped). Eight cutaways, each printed against its line.
+- Verified: every join by whisper (both sides, and each side alone); the flags were numerals,
+  accent mishearings, and three soft trailing words checked in the envelope (cuts at -53 to -70
+  dB). Face sharpness 49-61 on every take, so no `cas`. review.py v1: 0 HIGH, 0 MED after one
+  real fix ("And [11 s] And I was" at 6:56) and 7 accepted flags with reasons. Render flags
+  explained: T3 is the static end card; T5 -14.8 LUFS is the preview's one-pass loudnorm.
+- Fixed in the repo: `helpers/cards.py` kept_words now uses the caption half-word rule (test
+  added; 333 tests pass). Traps in gotchas.md ("Picture-only switches inside speech").
+- Not done yet: music (after the cut is approved), the 4K final.
+
+## 2026-10-21 — Episode 5 v2: Shoaib's notes on v1
+
+- His read: the two-framing camera "has worked tremendously", "didn't feel boring". Framing B
+  reads "very close to" a second camera.
+- **Cutaway in-points (M055):** the lift showed him sitting with the dumbbells, the back
+  extension showed the setup. Picked from 3 stills, never the window used. Now 0:28 (the press,
+  reps 0:26-0:48) and 0:31 (a full rep, reps 0:30-0:58), checked at start/mid/end.
+- **Captions (M056):** 62 of 391 cues were fragments, because render.py chunked per segment
+  and the camera switches split sentences. Added `subtitle_style.span_segments` to render.py
+  (3 tests) and review.py `T8` (2 tests); Episode 5 now 2 of 318. 338 tests pass.
+- **New b-roll:** TRAFFIC = Detour-1 dashcam `NO20260821-182328` from 28 s (stopped under the
+  metro), cropped above the bonnet and OSD, 5 number plates blurred; LBA = his Instagram
+  profile from Shoaib's screen recording, cropped to exclude the status bar, "Followed by"
+  (friends' usernames) and suggestions; the LOW BACK ABILITY stamp removed. IMG_3810 (portrait
+  traffic photo) kept as a backup; IMG_2848 (back-seat ride, two other people) not used.
+- **Eyebrow (M054):** diagnosed as the Dolby Vision tonemap; fix not chosen yet (Shoaib).
+
+## 2026-10-21 — Episode 5 v3: Apple SDR sources and a measured grade
+
+- Shoaib chose the Apple pipeline for the eyebrow (M054) and left the grade to me, aiming for
+  "premium… natural", Leila Hormozi as the reference. Added `helpers/apple_sdr.swift` (helpers.md):
+  12 a-roll takes and 4 iPhone b-roll clips converted (9.4 GB, seconds per clip).
+- Grade chosen by measurement (cheeks in CIELAB, frame luma percentiles; method in gotchas.md).
+  Skin hue already matched Leila (51.2 vs 51.1 deg), so no white balance; Episode 4's cooling
+  grade dropped. Luma-only lift/gamma/cap plus saturation 0.92: p5 28->40 (Leila 41), skin chroma
+  27->24 (21). The same look is applied to every video cutaway; photo overlays are now tagged 709.
+- Full re-render (250 segments). Exposure check p5 42.6, face 112, no red clip. R13: the lit brow
+  is dark and matches AVFoundation. review.py v3: 0 HIGH, 0 MED; T8 2/318.
+- Hardened `rerender_changed.py` and `recomposite.py`: segment reuse now keys on source file
+  and grade, not only the range (a new source map would otherwise reuse every old segment).
+- v2's segments and base kept as `clips_preview_v2/` and `build/base_preview_v2.mp4` until
+  Shoaib approves (his rule).
+- Next: music pass, then the 4K final (two-pass loudnorm), after Shoaib approves v3.
+
+## 2026-10-21 — Episode 5 music pass and 4K final (in progress)
+
+- Music map in `episode5/edit/build/mix.py` (docstring has the map). Library tracks only, with
+  series callbacks: Faith on the contract (as Episode 4) and Movements resolving the close. fauna
+  (builds from near-silent) carries "the way out", stops dead on "…but let's see", the Ladakh
+  zenith plays naked, and the track returns IN SYNC with a soft hit on "So that gave me perspective".
+  Placed absences: cold open, the MRI/doctors, the 15-minutes opening, "the plans gone / fed up",
+  the zenith. Verified on the bed stem: all five are -91 dB (digital silence).
+- Levels measured per cue (bed stem vs the no-music programme): 26.5-27.8 dB under the voice. Power
+  of Freedom read 24.3 because Episode 4's TRIM +3 dB was carried over; trim removed (TRIM is
+  per mix, never inherited).
+- Cue ends anchor BEFORE sentence-final words (Deepgram stretch, gotchas.md); a dead stop is
+  clamped to land before the next line so the hit follows a silence.
+- 4K overlays built (`ov_2160`), all bt709/tv; plate blur re-checked at 4K: unreadable.

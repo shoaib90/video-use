@@ -3375,3 +3375,80 @@ another. The graph is beds/effects -> amix -> sidechaincompress -> amix(duration
 limiter. The cause is unproven (EOF handling across the amix/sidechain inputs is the suspect).
 **Consequence:** do not prove a remix by hashing the audio. Compare up to the last effect's end,
 and listen after it.
+
+## Picture-only switches inside speech: four traps (Episode 5, 2026-10-21)
+
+Episode 5's two-framing camera (`storytelling.md` §14) switches the picture inside phrases with
+no audio removed. Verified on its v1 build:
+- **A switch must sit within 20 ms of a word boundary**, not just in a quiet valley. render.py
+  fades EVERY segment edge 30 ms, and a valley can be inside a word (a stop closure). With a
+  ±50 ms tolerance, 42 switches straddled a word; at ±20 ms the half-word rule assigns every
+  boundary word to exactly one side. (`between_words` in `episode5/edit/build/cut.py`.)
+- **`cards.kept_words` used "any overlap"**, unlike the caption builder's half-word rule, so a
+  word cut at its own boundary was listed twice ("three times of of what") and the anchor failed.
+  Fixed in `helpers/cards.py` to the caption rule; `tests/test_cards.py` pins it.
+- **Deepgram stretches a sentence's last word into the pause after it.** Where that pause is
+  trimmed, the word fails the half-word test: a card anchored on it raises ("only fifteen
+  minutes"), and review.py reads the OUT as dangling (C5/C6), though the audio is whole. Anchor
+  on the words before it; prove a C5/C6 at such a join from the envelope plus whisper of that
+  side ALONE, then record it in `accepted.json`.
+- **A pause trim with a fixed keep can land on a click inside the pause** (3979 @9.92, -34.9 dB,
+  after KEEP_BETWEEN went 0.35 -> 0.30). Snap every internal edge to the quietest 10 ms within
+  ±40 ms (`snap` in the same cut.py).
+
+## A card's text can fail HyperFrames' layout check late in the composite
+
+A stat step with unit "hrs a day" plus tag "no physical activity" failed `content_overlap`
+after base, segments and earlier cards were done (Episode 5). Test-render new or changed
+cards alone first: `cards.resolve` then `cards.render([spec], edit, 1920, 1080, "30")` per card,
+about a minute each. Short units and tags fit ("14 hours" / "a day").
+
+## Re-extract only the ranges that changed
+
+Every segment is a pure function of its range, so a small fix need not re-extract a 4K cut
+(~40 min for 250 segments). `episode5/edit/build/rerender_changed.py <old ranges.json>
+<render args>` moves the old clips to `clips_*_prev/`, copies every identical range, and
+extracts only the rest. Episode 5 v1: 248 of 250 reused, minutes instead of ~40. Write the
+new ranges snapshot after it (the script does) so `recomposite.py` accepts the cut.
+
+## SendUserFile reaches the phone only under 30 MiB
+
+A 12.7 min 1080p preview (296 MB) is desktop-only. A two-pass 960x540 x264 at 230 kb/s with
+64 kb/s mono AAC came to 27.5 MB, small enough to send. Keep the full file in the edit folder.
+
+## iPhone HLG is Dolby Vision 8.4, and our tonemap ignores the Dolby Vision part (Episode 5, 2026-10-21)
+
+`ffprobe -show_entries stream_side_data` on every Episode 5 take shows `dv_profile=8`,
+`rpu_present_flag=1`, `dv_bl_signal_compatibility_id=4`: an HLG base layer plus per-frame
+Dolby Vision metadata. render.py's `TONEMAP_CHAIN` reads only the HLG base. Apple's player
+(Photos, AVFoundation) applies the RPU. **Verified side by side** on IMG_3967 @60 s:
+AVFoundation keeps the lit-side eyebrow dark and the skin neutral; ours turns the brow
+grey-white and the skin more orange. npl=400, hable and desat=2 all keep the white brow, so it
+is not a parameter. **Unproven:** Episode 4's "spray-tanned" skin (fixed then with a cooling
+grade) may be the same cause.
+- **Ground truth on this Mac:** `AVAssetImageGenerator` (a 15-line Swift tool,
+  `swiftc frame.swift`) gives Apple's SDR frame at any time.
+- **libplacebo can apply the RPU** (`libplacebo=apply_dolbyvision=1`) and is compiled into this
+  ffmpeg, but it needs Vulkan: "Unable to open the libvulkan library" (MoltenVK not installed).
+- **Fix (Shoaib's choice, 2026-10-21): `helpers/apple_sdr.swift`**, Apple SDR as prepped sources
+  (helpers.md). Verified on the same frame: the lit brow is dark again and the skin hue matches
+  Apple's. The iPhone b-roll (gym clips, Episode 4's bed clip) goes through it too.
+- **With Apple SDR, drop the old cooling grade.** Skin hue measured 51.2 deg (Leila 51.1); Episode
+  4's grade compensated for the bad tonemap and pushes skin off. Episode 5's grade is LUMA-only
+  (`lutyuv` lift 3.5 percent / gamma 0.92 / cap 95.5 percent, `eq` saturation 0.92): an RGB `curves`
+  black lift drifted skin hue 4-7 deg yellow, the luma-only curve 2.4 deg.
+
+## Dashcam footage is FULL range, and `format=yuv420p` does not convert it (Episode 5, 2026-10-21)
+
+The 70mai dashcam (Detour-1/2) records `yuvj420p`, `color_range=pc`. A cutaway built with
+`...,format=yuv420p` stays tagged full range (verified with `ffprobe -show_frames`), so over a
+TV-range picture its blacks and whites read wrong. Convert the levels: `scale=out_range=tv`
+before the format. Every overlay in `visuals.py` now ends that way; all ten Episode 5
+overlays probe `color_range=tv`.
+
+## boxblur fails on a small box with a misleading "Error reinitializing filters"
+
+`boxblur=12:2` on a 48x30 crop (a number plate) fails: the chroma plane is 24x15 and the
+radius must be under half its smaller side. ffmpeg's top-level message is only "Error
+reinitializing filters"; the real one ("Invalid chroma_param radius value 12") is above it.
+Size the radius per box (`visuals.py` build_video: luma < min(w,h)/2, chroma < min(w,h)/4).

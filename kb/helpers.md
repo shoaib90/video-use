@@ -256,3 +256,18 @@ Pinned by `tests/test_review_edges.py` (13 tests). Render checks reuse the episo
 - step spikes at the cuts
 - ebur128 loudness
 - music presence measured in pauses against the aligned no-music render
+
+## apple_sdr.swift — iPhone HLG / Dolby Vision to SDR with Apple's pipeline *(local addition, 2026-10-21)*
+```
+swiftc -O helpers/apple_sdr.swift -o ~/.cache/video-use/apple_sdr
+~/.cache/video-use/apple_sdr <in.mov> <out.mov> [video Mbps, default 80]
+```
+AVFoundation converts to BT.709 SDR and applies the Dolby Vision RPU, which ffmpeg ignores (M054).
+The output is HEVC Main10 at 80 Mb/s (a mezzanine), and the audio is copied untouched. Rotation is
+baked in, so a portrait clip comes out 2160x3840. Use the output as a PREPPED SOURCE (EDL
+`sources`), so render.py sees SDR and skips `TONEMAP_CHAIN`. ~4 s per 7 s of 4K on this Mac.
+- **Frame grid:** output is constant 30 fps. Where the iPhone source drifts 1.7 ms off the grid
+  (IMG_3984 from 6 s), frames snap to the grid, as render.py's `--fps 30` already does. Durations
+  match the source to within a frame (12 Episode 5 takes).
+- **A still from `AVAssetImageGenerator` tone-maps slightly flatter than this export path.**
+  Judge the look on the exported file.

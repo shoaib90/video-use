@@ -35,3 +35,17 @@ the centre third** while shooting, or the vertical crop cuts the gestures. Hands
 frame edges is the most common loss.
 Verified on the Episode 4 Shorts (2026-10-14): the face held at 49-52% of frame width in every
 range, so the crop never had to chase it. The open-palm gestures still left the 9:16 window.
+
+## iPhone HDR and Dolby Vision: what the camera hands us (2026-10-21)
+
+By default the iPhone records **HDR video: an HLG picture plus Dolby Vision metadata** (frame-by-frame
+instructions for showing it on a normal screen). Nothing is missing from these files. They hold MORE
+than an SDR file, and ffmpeg reads only the HLG part. Converting with the metadata needs Apple's own
+pipeline, so iPhone footage goes through `helpers/apple_sdr.swift` first (M054). Two options per shoot:
+- **HDR Video off** (Settings > Camera > Record Video > HDR Video): the phone writes SDR BT.709 itself,
+  already tone-mapped by Apple. What Photos shows is what we edit, with no conversion step. This costs a
+  little highlight recovery, which a locked exposure on a controlled indoor set does not need.
+- **HDR on** (unchanged): fine. The conversion runs automatically in seconds per clip.
+- **Either way:** the white sheen on the lit eyebrow in Episode 5 came from the key light skimming
+  hair at a steep angle. More diffusion, or the key moved slightly toward the lens axis, softens it
+  at the source.

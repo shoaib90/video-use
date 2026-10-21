@@ -159,6 +159,21 @@ overlays drain ahead of the timeline. Check: `AUTO T3` (freezedetect, d=1.0).
 **M023** · Detour-3 · *A serial number was readable on a box label.* Check: `READ R4` (frame-scan
 anything with a label at DELIVERY resolution).
 
+**M054** · 2026-10-21 · Episode 5 v1 · *The eyebrow toward the key light rendered white; on the
+iPhone both are black.* Cause: iPhone clips are Dolby Vision 8.4 (HLG base + RPU). render.py's
+`TONEMAP_CHAIN` (zscale + mobius) maps the HLG base and ignores the RPU. Apple's player applies
+it, so the specular sheen on the hair stays dark there. Verified on IMG_3967 @60 s, our chain vs
+AVFoundation's `AVAssetImageGenerator`: ours whitens the brow and pushes skin more orange; npl
+400, hable and desat do not fix it. Fix: iPhone sources go through `helpers/apple_sdr.swift` as prepped sources.
+Check: `READ R13` (compare the first face segment against an AVFoundation frame of the same
+time) until an automated check exists.
+
+**M055** · 2026-10-21 · Episode 5 v1 · *The lifting cutaway showed him sitting with the dumbbells,
+not pressing; the back-extension cutaway showed the machine setup, not a rep.* Cause: each
+in-point was picked from 3 stills of the whole clip (20/50/80%), never from the 2-5 s actually
+used. The reps were at 0:26-0:48 and 0:30-0:58. Check: `READ R3` now includes the START, MIDDLE
+and END frame of every cutaway's own window (a 1 fps sheet of the source to pick the in-point).
+
 **M024** · Episode 2 · *A graphic anchored to a word that had been cut landed on a silent frame.*
 Check: graphics/cards raise on a missing anchor. Read the resolution printout (`READ R3`).
 
@@ -207,6 +222,12 @@ graphics, effects and bed for the windows it keeps, re-laid out for 9:16, or the
 why not. `AUTO G4` (an EDL with `parent` flags HIGH any parent card whose phrase it keeps
 but carries no card for; it flags money v1's dropped Offers stat), plus `READ R12` for what G4
 cannot see: mgx cues, effects and music.
+
+**M056** · 2026-10-21 · Episode 5 v1 · *Captions broke into fragments ("go for surgery.",
+"first job.", "introduced") all through the video.* Cause: render.py chunked captions per
+SEGMENT, and the two-framing camera puts a segment edge at every switch, often mid-sentence:
+62 of 391 cues had 3 words or fewer. Fix: `subtitle_style.span_segments` (2 of 318). Check:
+`AUTO T8` (more than 5% of cues with <= 3 words).
 
 ## Sound
 
@@ -262,7 +283,8 @@ said by ~0:10?).
 - **R2** Read the low-confidence word list (C9) against the audio or a whisper pass. Fix
   mishearings in the caption builder.
 - **R3** Look at the overlay/card contact sheet (G1). Check: no face covered, text spelled
-  right, the anchor landed on the right line.
+  right, the anchor landed on the right line, and every cutaway shows its ACTION at the start,
+  middle and end of its own window, not just one still (M055).
 - **R4** Scan frames at delivery resolution for readable labels, screens and plates.
 - **R5** Look at a contact sheet of singles and check the shot shows whoever is speaking.
 - **R6** Spot-listen at each music cue entry, exit and duck.
@@ -278,4 +300,6 @@ said by ~0:10?).
 - **R12** Shorts and other derived cuts (M053): list every card, mgx cue, effect and music cue
   the parent has inside the kept windows, and say for each whether it is carried, re-laid out or
   dropped, and why. A pass from review.py is not a verdict on how it looks.
+- **R13** iPhone (Dolby Vision) sources: put one face frame from the render beside the same
+  source frame from AVFoundation. Brows, hair and skin must match the phone (M054).
 - **R7** Watch the first 15 s: picture from frame 1, the promise by ~0:10, no "last time".

@@ -860,3 +860,33 @@ gap on the render (demucs, as above) rather than trusting a mixer constant.
   read Power of Freedom 3 dB deeper than the rest, so measure per cue and trim.
 - **Re-mixing a delivered final is audio-only:** mix the no-music render, run mgx `sfx`, then
   `-map 0:v -map 1:a -c copy` onto the final. Verified: frames, A/V offset and duration identical.
+
+## 14. Two angles, no visible cuts: Leila Hormozi (2026-10-21)
+
+"How to Articulate Your Thoughts More Clearly Than 99% of People" (12:01, 4.7M views). Shoaib's
+note: two cameras, yet it never feels cut. **Measured on the 1080p file** (scratch, not kept):
+`scdet=threshold=8` cuts, a face box per shot (`exposure.detect_face`) to sort front / side /
+graphic, and a 10 ms RMS envelope for pauses. A vidIQ AI watch gave the qualitative notes.
+
+| | Leila | Episode 4 final |
+|---|---|---|
+| Talking-head shots | 166 (108 front, 58 side), median **3.1 s** | camera blocks of ~22 s |
+| Picture changes / min (scdet) | ~17 | ~10 |
+| Same-angle cuts | 41, and all but ~4 change face size by **1.15-1.5x** | 1.00 <-> 1.12, punch +0.10 |
+| Pauses, p90 / > 0.5 s per min | 0.29 s / 0.3 | 0.33 s / 0.7 |
+
+- **Pauses were NOT the difference** (same envelope measure on both: p90 0.29 vs 0.33 s).
+  The difference is picture: a change every ~3 s, and every change is big.
+- **No same-framing jump cut anywhere.** A cut inside one angle is always a punch in/out of
+  ~1.25x (median face-size ratio), so the front camera alone runs two framings.
+- **Picture cuts sit inside phrases, not in pauses**: 44% of the 142 talking-head cuts land
+  where the audio is within 10 dB of speech level. Switches follow emphasis (punchline, list
+  item 1 vs 2, a quoted line), so the ones hiding a repair look like the ones keeping rhythm.
+- From the AI watch (not measured): many switches land mid-gesture; the side camera's eyeline
+  stays on one fixed off-lens line; voice never stops under b-roll; a low bed throughout; big
+  kinetic keyword captions on the talking head.
+- Whisper word times on her (and generally) are back to back, so pauses must come from RMS.
+
+**One camera translation:** two framings from the 4K at a ratio of ~1.3 (B tight, face moved
+off-centre), a framing change on EVERY internal cut, and picture-only switches inside phrases
+every ~3-6 s on emphasis. The real fix is upstream: a second phone at 45° (`shooting.md`).
