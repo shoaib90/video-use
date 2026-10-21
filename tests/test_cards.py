@@ -125,6 +125,18 @@ class AnchorTests(unittest.TestCase):
         b = cards.resolve([_routine()], e.edl, e.dir, [0.9333, 59.1], 1920, 1080)[0]
         self.assertAlmostEqual(b["start"] - a["start"], 0.0333, places=3)
 
+    def test_a_word_split_at_its_boundary_counts_once(self):
+        """A picture switch 10 ms into a word (Episode 5) must not list the word on both sides:
+        kept_words uses the caption builder's half-overlap rule, not any overlap."""
+        e = _Edit()
+        bus = e.t("bus", 3)                         # "this bus for fifteen"
+        e.edl["ranges"] = [{"source": "A", "start": 0.0, "end": bus + 0.01},
+                           {"source": "A", "start": bus + 0.01, "end": 60.0}]
+        e.durs = [bus + 0.01, 60.0 - bus - 0.01]
+        words = [w for _, w in cards.kept_words(e.edl, e.dir, e.durs)]
+        self.assertEqual(" ".join(words).count("this bus for"), 1)
+        self.assertNotIn("bus bus", " ".join(words))
+
 
 class GeometryTests(unittest.TestCase):
     def setUp(self):

@@ -166,11 +166,24 @@ def kept_words(edl: dict, edit_dir: Path, segment_durations: list[float]) -> lis
             f = Path(edit_dir) / "transcripts" / f"{key}.json"
             cache[key] = ([w for w in json.loads(f.read_text()).get("words", [])
                            if w.get("type", "word") == "word"] if f.exists() else [])
-        for w in cache[key]:
-            if w["end"] > r["start"] + 1e-3 and w["start"] < r["end"] - 1e-3:
-                text = _norm(w.get("text", w.get("word", "")))
-                if text:
-                    out.append((t + max(0.0, w["start"] - r["start"]), text))
+        last_end: dict = {}
+        for w in sorted(cache[key], key=lambda w: w["start"]):
+            # render._words_in_range's rule: a word counts only if at least half of it is inside
+            # the range, after clamping a same-speaker overlap. "Any overlap" counted a word cut at
+            # a word boundary on BOTH sides (Episode 5's picture switches, 2026-10-21), so a
+            # phrase across the switch read "three times of of what" and failed to resolve.
+            spk = w.get("speaker_id")
+            ws = max(w["start"], last_end.get(spk, float("-inf")))
+            we = w["end"]
+            last_end[spk] = max(we, last_end.get(spk, float("-inf")))
+            if we <= r["start"] or ws >= r["end"]:
+                continue
+            dur = we - ws
+            if dur > 0 and (min(we, r["end"]) - max(ws, r["start"])) < dur / 2:
+                continue
+            text = _norm(w.get("text", w.get("word", "")))
+            if text:
+                out.append((t + max(0.0, w["start"] - r["start"]), text))
         t += d
     return out
 
