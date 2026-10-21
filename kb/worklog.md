@@ -2232,3 +2232,7 @@ titles linted by yt-package `title.py` (80-98).
 - Cue ends anchor BEFORE sentence-final words (Deepgram stretch, gotchas.md); a dead stop is
   clamped to land before the next line so the hit follows a silence.
 - 4K overlays built (`ov_2160`), all bt709/tv; plate blur re-checked at 4K: unreadable.
+- **Final delivered (2026-10-21):** `episode5/edit/episode5_final.mp4`, 4K 30 fps, 12:40.7,
+  -14.4 LUFS, -1.2 dBTP, bt709 on all three. review.py final: 0 HIGH, 0 MED, 6/7 render
+  checks (T3 = the static end card). R13 at 4K: brows dark. Two fixes on the way: the limiter
+  to -2.0 (T5) and `-map_chapters -1` (a stray chapter track from a music file). Both are in gotchas.md.

@@ -3452,3 +3452,16 @@ overlays probe `color_range=tv`.
 radius must be under half its smaller side. ffmpeg's top-level message is only "Error
 reinitializing filters"; the real one ("Invalid chroma_param radius value 12") is above it.
 Size the radius per box (`visuals.py` build_video: luma < min(w,h)/2, chroma < min(w,h)/4).
+
+## Epidemic mp3s carry CHAPTERS, and a mix copies them into the final (Episode 5, 2026-10-21)
+
+The final came out with a third stream (`bin_data`, handler SubtitleHandler). It was not mapped:
+the MP4 muxer writes a chapter track when the output has chapters, and ffmpeg copies chapters
+from the first input that has them. "Felt Like November" carries one ("ch0", 0-170 s), and 17
+Epidemic effect files carry 1-8. `-map 0:v -map 0:a` does NOT remove it. **`-map_chapters -1`**
+does: it is in Episode 5's mix.py now, and the final was remuxed with it (lossless).
+
+## Set the limiter 2 dB under the true-peak target: AAC overshoots (Episode 5, 2026-10-21)
+
+An `alimiter` at -1.5 dBTP measured -0.9 dBTP after the AAC 320k encode (Episode 4: -1.0 to
+-0.9). At -2.0 the final measured -1.2 dBTP and -14.4 LUFS (review T5 passes at <= -1.0).
