@@ -421,7 +421,8 @@ storytelling channels). Four things recur, and our v1 (Episodes 3-5) had none of
 soft. The fix was a sharp, large face: an a-roll frame from the 4K source, near 1:1 (face ~500 px),
 mouth closed, eyes to the lens, on a CLEAN background (a gradient, not the blurred room), with the face
 filling ~85% of the height. Action stills from b-roll (motion blur, side-on, small) and dim phone
-photos fail at 168 px. Pattern: `episode5/edit/build/thumbnails_v3.py`. A radial glow pasted as a
+photos fail at 168 px. Pattern: `episode5/edit/build/thumbnails_v3.py`. **Poppins is installed** (`~/Library/Fonts/Poppins-*.otf`, 2026-10-22): use
+Poppins Black; it is wider than Avenir Next Condensed, so fit each line's size to its room. A radial glow pasted as a
 square must fade to zero inside the square, or it leaves a hard vertical edge.
 
 How to build it locally: `helpers/subject_mask.swift` (macOS Vision "lift subject", which keeps held
