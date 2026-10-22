@@ -266,6 +266,12 @@ next to the real final. Check:
 
 ## Openings & packaging
 
+**M057** · 2026-10-22 · Episode 5 final · *The "SWITCH TO 1.25X" badge was missing.* Cause: it is
+added in the motion-graphics pass (`MOVIE_LAYERS`), not by render.py, and Episode 5's cues.py started
+from a config with no `MOVIE_LAYERS`. Check: `READ R7` now includes "the badge shows on the first
+line after the cold open". Fix: Episode 4's `prepped/ov_2160/GFX_SPEED.mov`, `start=` the first line
+after the cold open, then `layers`, `compose --dirty speed_badge` and `mux` (one chunk, about a minute).
+
 **M040** · Episode 1 (talking-head series) · *95% → 52% retention in 8 s of silent black at the
 open.* Check: `AUTO T6` (black or silence in the first 2 s).
 
@@ -302,4 +308,5 @@ said by ~0:10?).
   dropped, and why. A pass from review.py is not a verdict on how it looks.
 - **R13** iPhone (Dolby Vision) sources: put one face frame from the render beside the same
   source frame from AVFoundation. Brows, hair and skin must match the phone (M054).
-- **R7** Watch the first 15 s: picture from frame 1, the promise by ~0:10, no "last time".
+- **R7** Watch the first 30 s: picture from frame 1, the promise by ~0:10, no "last time", and the
+  "SWITCH TO 1.25X" badge on the first line after the cold open (M057).

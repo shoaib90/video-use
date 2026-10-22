@@ -2261,3 +2261,7 @@ titles linted by yt-package `title.py` (80-98).
   face (closed mouth, eye contact) on a clean gradient, with "2 YEARS LATER." Photos from other folders
   were checked and rejected: a dim gym-mirror photo, InBody screens with 2026 figures and a partial
   phone number, and a college selfie that would imply a transformation. Lesson in distribution.md.
+- **1.25x badge added (2026-10-22, M057):** Shoaib noticed it was missing. Episode 4's 4K `GFX_SPEED.mov` went
+  in as a `MOVIE_LAYERS` entry at 21.80 s ("And the strange part"). Only chunk 001 was recomposed;
+  verify OK (frames, duration, A/V and loudness identical). Frames read: top-right 21.8-26.8, clear of the list card.
+- **Thumbnail chosen:** `thumb_E5_hands_poppins.jpg` (head in hands, red field, "MENTAL JAIL." in Poppins Black).
