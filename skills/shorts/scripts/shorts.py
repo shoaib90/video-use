@@ -447,7 +447,7 @@ def cmd_render(c: Ctx, a) -> None:
 
 BED_UNDER, SFX_UNDER = 26.0, 9.0          # kb/storytelling.md §8b: beds ~26-28 LU under the voice
 DUCK = "sidechaincompress=threshold=0.060:ratio=2.5:attack=25:release=250:makeup=1"
-TARGET_I, TARGET_TP = -14.0, -1.5
+TARGET_I, TARGET_TP = -14.0, -2.5   # -1.5 measured +0.2 dBTP after AAC on Episode 5's fifteen_minutes (a boom transient)
 
 
 def sfx_lib() -> dict:

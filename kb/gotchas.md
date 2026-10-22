@@ -3465,3 +3465,12 @@ does: it is in Episode 5's mix.py now, and the final was remuxed with it (lossle
 
 An `alimiter` at -1.5 dBTP measured -0.9 dBTP after the AAC 320k encode (Episode 4: -1.0 to
 -0.9). At -2.0 the final measured -1.2 dBTP and -14.4 LUFS (review T5 passes at <= -1.0).
+
+## Shorts: the limiter and a false "BURIED" (Episode 5 Shorts, 2026-10-22)
+
+- `shorts.py`'s `TARGET_TP` of -1.5 measured **+0.2 dBTP** after AAC on a Short with a low boom. It is now
+  -2.5, measured -2.2 / -2.2 on both Episode 5 Shorts. The same overshoot as the episode mix (limit 2 dB under).
+- **An effect placed on the frame where a bed returns reads "BURIED"** whatever its trim: the sfx check picks its
+  band against an effect-free control, and the returning bed fills that frame. A +11 dB trim moved the reading
+  0.1 dB. Read the `mix` line's applied level (here -12 dB, above a hit that measured clear) and listen,
+  rather than chasing the number.

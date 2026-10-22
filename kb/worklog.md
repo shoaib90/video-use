@@ -2265,3 +2265,21 @@ titles linted by yt-package `title.py` (80-98).
   in as a `MOVIE_LAYERS` entry at 21.80 s ("And the strange part"). Only chunk 001 was recomposed;
   verify OK (frames, duration, A/V and loudness identical). Frames read: top-right 21.8-26.8, clear of the list card.
 - **Thumbnail chosen:** `thumb_E5_hands_poppins.jpg` (head in hands, red field, "MENTAL JAIL." in Poppins Black).
+
+## 2026-10-22 — Episode 5 Shorts (`skills/shorts`), the script's two [SHORT] passages
+
+- **everything_right** (34.2 s, "Discipline Wasn't My Problem"): "I was doing everything right" -> 5 AM / 9 PM / gym
+  daily -> "still my back gave out" -> Bangalore, one month off, the pain back -> "Looking back, discipline was
+  never the problem" (punch, no music) -> "training wrong fundamentals". The "micros/macros" restart had no
+  silence around it (-24 to -29 dB), so the macros line was dropped; "it took me" could not start cleanly, so
+  the range starts at "I specifically remember".
+- **fifteen_minutes** (26.6 s, "I Could Only Sit for 15 Minutes"): the cold-open close-up's "By 2023, I could sit
+  for only fifteen minutes" -> tea stall, motorcycle, five minutes in a car -> "and the doctor told me, don't lift
+  now. Just do simple walking" (punch, no music, boom) -> "I didn't take his advice… I didn't have the answer".
+  The plate avoids "AGE 25" (unconfirmed) and uses "A SLIP DISC. / NO MORE LIFTING?".
+- review: HIGH 0 / MED 0 on both, after 3 accepted edges with reasons. G4 passes: the parent's list card,
+  keyline and 15 MINUTES stamp are carried as stamps (15 MINUTES re-anchored after the plate clears).
+  T5 -2.2 / -2.2 dBTP. Each opening edge was checked by whisper ALONE; the whole renders were read as prose.
+  A "Looking back" missing from the full-file whisper was present in a 2 s window: a model skip, not a clip.
+- **Not a fault:** the soft hit where the bed returns reads "BURIED" in the 2-6 kHz band, because the bed enters
+  on the same frame. It is mixed at -12 dB, louder than the -21 dB hit that measures +5.8. See gotchas.md.
