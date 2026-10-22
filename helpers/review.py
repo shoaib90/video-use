@@ -604,6 +604,51 @@ def parent_card_gaps(parent_cards: list[dict], own_cards: list[dict], find, wind
     return out
 
 
+PAUSE_LONG, PAUSE_PER_30S, PAUSE_MAX = 0.45, 1.5, 0.70
+
+
+def pause_flags(runs: list[float], dur: float):
+    """P1 (M058): a derived cut (a Short) that kept the speaker's thinking pauses. Episode 5's first Shorts
+    kept 5-10 pauses over 0.4 s (p90 0.44-0.60 s; Shoaib: "they sound very slow"); Episode 4's, which
+    performed, kept 0-1. runs: quiet-run lengths (s) inside the kept ranges; dur: the cut's length. Pure."""
+    long_ = [r for r in runs if r > PAUSE_LONG]
+    out = []
+    if any(r > PAUSE_MAX for r in runs):
+        out.append(("HIGH", "P1", f"a {max(runs):.2f} s pause inside a kept range (over {PAUSE_MAX} s): tighten it"))
+    elif dur > 0 and len(long_) / dur * 30 > PAUSE_PER_30S:
+        out.append(("MED", "P1", f"{len(long_)} pauses over {PAUSE_LONG} s in {dur:.0f} s: tighten them "
+                                 f"(Episode 4's Shorts kept 0-1)"))
+    return out
+
+
+def pace_checks(edl: dict, edit: Path):
+    """P1 for an EDL with a `parent` (a Short): quiet runs (-38 dB, 10 ms frames) inside every kept range,
+    measured on the SOURCE audio, so the music bed under the final cannot hide them."""
+    if not edl.get("parent"):
+        return []
+    runs, dur = [], 0.0
+    for r in edl["ranges"]:
+        x = source_audio(edl, edit, r["source"])
+        if x is None:
+            continue
+        a, b = float(r["start"]) + 0.05, float(r["end"]) - 0.05
+        dur += float(r["end"]) - float(r["start"])
+        seg = x[int(a * 16000):int(b * 16000)]
+        n = len(seg) // 160
+        if n <= 0:
+            continue
+        e = 20 * np.log10(np.maximum(np.sqrt((seg[:n * 160].reshape(n, 160) ** 2).mean(axis=1)), 1e-9))
+        cur = 0
+        for v in list(e) + [0.0]:
+            if v < QUIET_DB:
+                cur += 1
+            else:
+                if cur >= 6:
+                    runs.append(cur * 0.01)
+                cur = 0
+    return pause_flags(runs, dur)
+
+
 def parent_checks(edl: dict, edit: Path, fps: float):
     """G4 for an EDL with a `parent` (path to the parent edl.json, relative to the edit dir)."""
     if not edl.get("parent"):
@@ -715,7 +760,7 @@ def main():
         flags = downgrade_tightening(flags, stories, levels)
     flags = confirm_stills(flags, stories, edl, edit)
     lowc, span = word_checks(stories, words_of, None)
-    gflags = graphics_checks(edl) + parent_checks(edl, edit, a.fps)
+    gflags = graphics_checks(edl) + parent_checks(edl, edit, a.fps) + pace_checks(edl, edit)
     acc_path = Path(a.accepted) if a.accepted else edit / "review" / "accepted.json"
     accepted = json.loads(acc_path.read_text()) if acc_path.exists() else []
     def acc_of(f):

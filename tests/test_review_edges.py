@@ -312,3 +312,17 @@ class CaptionFragments(unittest.TestCase):  # M056: T8
         n, short, _ = review.caption_fragments(self._srt(
             ["And in 2023, the doctor told me, you are done.", "So by May 2021, I got my first job."]))
         self.assertLessEqual(short / n, review.FRAGMENT_SHARE)
+
+
+class ShortPauses(unittest.TestCase):  # M058: P1
+    def test_kept_thinking_pauses_flag(self):
+        # Episode 5 Short 1 v1: 10 pauses over 0.4 s in 34 s
+        f = review.pause_flags([0.5, 0.52, 0.48, 0.6, 0.47, 0.5, 0.3, 0.2], 34.2)
+        self.assertEqual([x[:2] for x in f], [("MED", "P1")])
+
+    def test_one_very_long_pause_is_high(self):
+        self.assertEqual(review.pause_flags([0.2, 0.9], 25.0)[0][:2], ("HIGH", "P1"))
+
+    def test_tight_short_passes(self):
+        # Episode 4's Shorts: 0-1 pause over 0.4 s
+        self.assertEqual(review.pause_flags([0.2, 0.3, 0.46, 0.25], 30.0), [])

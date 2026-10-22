@@ -229,6 +229,14 @@ SEGMENT, and the two-framing camera puts a segment edge at every switch, often m
 62 of 391 cues had 3 words or fewer. Fix: `subtitle_style.span_segments` (2 of 318). Check:
 `AUTO T8` (more than 5% of cues with <= 3 words).
 
+**M058** · 2026-10-22 · Episode 5 Shorts v1 · *"They sound very slow."* Cause: the long cut tightens
+every pause (build/cut.py + tighten.py), but the Shorts tool cut ranges with their pauses intact: 25-27% silence
+and p90 pauses of 0.44-0.60 s, against Episode 4's Shorts (which performed) at 0.25-0.30 s with 0-1 over 0.4 s.
+Speaking pace was never the issue (152-161 wpm, Episode 4's 162-183). Fix: tighten to the long cut's rules
+(pattern `episode5/edit/shorts/tighten_short.py`), normal speed. Check: `AUTO P1` (review.py, derived cuts:
+a pause over 0.70 s is HIGH, more than 1.5 pauses over 0.45 s per 30 s is MED; measured on the source audio,
+so the bed cannot hide them). It flags both v1 Shorts and passes both v3s.
+
 ## Sound
 
 **M052** · 2026-10-05 · Episode 3 v4 (logged 2026-10-12) · *Sound effects 17 LU under the voice were

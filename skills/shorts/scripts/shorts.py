@@ -447,7 +447,7 @@ def cmd_render(c: Ctx, a) -> None:
 
 BED_UNDER, SFX_UNDER = 26.0, 9.0          # kb/storytelling.md §8b: beds ~26-28 LU under the voice
 DUCK = "sidechaincompress=threshold=0.060:ratio=2.5:attack=25:release=250:makeup=1"
-TARGET_I, TARGET_TP = -14.0, -2.5   # -1.5 measured +0.2 dBTP after AAC on Episode 5's fifteen_minutes (a boom transient)
+TARGET_I, TARGET_TP = -14.0, -2.0   # limited at 4x (192 kHz) so inter-sample peaks are caught; the true-peak loop below is the backstop
 
 
 def sfx_lib() -> dict:
@@ -545,11 +545,12 @@ def cmd_mix(c: Ctx, a) -> None:
         parts.append("[sfx][k2]sidechaincompress=threshold=0.090:ratio=2:attack=20:release=250:makeup=1[sfxduck]")
         mixin.append("[sfxduck]")
     parts.append("".join(mixin) + f"amix=inputs={len(mixin)}:normalize=0:dropout_transition=0:duration=first[premix]")
-    limit = 10 ** (TARGET_TP / 20)
+    tp_limit = [TARGET_TP]
 
     def run_mix(g):
+        limit = 10 ** (tp_limit[0] / 20)
         run(["ffmpeg", "-hide_banner", "-v", "error"] + inputs +
-            ["-filter_complex", ";".join(parts + [f"[premix]volume={g:.2f}dB,alimiter=limit={limit:.4f}:level=disabled[out]"]),
+            ["-filter_complex", ";".join(parts + [f"[premix]volume={g:.2f}dB,aresample=192000,alimiter=limit={limit:.4f}:level=disabled,aresample=48000[out]"]),
              "-map", "0:v", "-map", "[out]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
              "-t", f"{total:.3f}", "-movflags", "+faststart", "-y", out])
         return lufs(out, 0, 10 ** 6)
@@ -558,7 +559,26 @@ def cmd_mix(c: Ctx, a) -> None:
     got = run_mix(g)
     if abs(got - TARGET_I) > 0.25:
         got = run_mix(g + TARGET_I - got)
-    print(f"output {got:.2f} LUFS -> {out}")
+    # The AAC encode overshoots a sample-peak limiter by a different amount per mix (Episode 5: +1.7 dB,
+    # then +3.2 dB on a low boom: inter-sample peaks a 48 kHz sample-peak limiter cannot see). The limiter runs
+    # at 192 kHz; this measures the true peak AFTER the encode and lowers the limit only if it still overshoots.
+    for _ in range(3):
+        tp = true_peak(out)
+        if tp <= TP_CEILING:
+            break
+        tp_limit[0] -= tp - TP_CEILING + 0.2
+        got = run_mix(g + TARGET_I - got)
+    print(f"output {got:.2f} LUFS, true peak {true_peak(out):.1f} dBTP (limit {tp_limit[0]:.1f}) -> {out}")
+
+
+TP_CEILING = -1.2      # review T5 passes at <= -1.0 dBTP
+
+
+def true_peak(path) -> float:
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(path), "-vn", "-af",
+                        "ebur128=peak=true:framelog=quiet", "-f", "null", "-"], capture_output=True, text=True).stderr
+    vals = [float(l.split("Peak:")[1].split("dBFS")[0]) for l in r.splitlines() if "Peak:" in l]
+    return vals[-1] if vals else 0.0
 
 
 def band_db(x, t: float, n: float = 0.02, lo: float = 2000, hi: float = 6000) -> float:

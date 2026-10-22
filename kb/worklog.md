@@ -2283,3 +2283,8 @@ titles linted by yt-package `title.py` (80-98).
   A "Looking back" missing from the full-file whisper was present in a 2 s window: a model skip, not a clip.
 - **Not a fault:** the soft hit where the bed returns reads "BURIED" in the 2-6 kHz band, because the bed enters
   on the same frame. It is mixed at -12 dB, louder than the -21 dB hit that measures +5.8. See gotchas.md.
+- **Shorts v3 (2026-10-22, M058):** Shoaib found the Shorts "very slow". Measured against Leila and Episode 4's Shorts:
+  the cause was untrimmed pauses, not speaking pace. Tightened to the long cut's rules at normal speed (Episode 4's
+  proven recipe): 34.2 -> 31.1 s and 26.9 -> 24.9 s, all words kept (87 / 72), p90 pause 0.29 / 0.37 s.
+  Two traps hit on the way, both in SKILL.md 3b: soft or stretched sentence-final words, and range-edge slivers.
+  Mix now limits at 192 kHz (-1.7 dBTP, -14.2/-14.3 LUFS). New review check P1 (3 tests, 341 pass).

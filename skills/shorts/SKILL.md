@@ -47,6 +47,9 @@ Do not duplicate its rules here:
   ("he… uh… he said").
 - **One story.** A second payoff (a figure that is also the thumbnail's hook) belongs to the long
   video. When unsure, build both and test them.
+- **Get to the payoff by ~20 s; aim for 25–35 s in all** (early signal, see the channel's
+  `03-formats/shorts.md`): the first podcast Short kept 42% of viewers and averaged 15 s of 39, with
+  its payoff at ~27 s. Cut middle setup, not the turn. The plate names the stakes for a stranger.
 - **The payoff gets a punch-in** (`"zoom": "punch"`, 1.25) and plays **with no music**: the bed drops out under
   it and returns on the next line with a soft hit (kb/storytelling.md §10).
 - Every edge goes in the quietest 10 ms nearby, and each side is checked by whisper ALONE (M048).
@@ -110,6 +113,20 @@ Do not duplicate its rules here:
   (default `~/Documents/Ambitious/Editing`). `sfx` names come from the motion-graphics-pass table.
   Use the **parent's bed for that scene**: about 26 dB under the voice, lifted under the plate.
   `"src": "sync"` continues the same track in time, so it is a drop-out, not a new cue.
+
+### 3b. Tighten the pauses (M058)
+A Short must be as tight as the long cut, at normal speed. Episode 4's Shorts, which performed, kept 0-1 pauses
+over 0.4 s; Episode 5's first ones kept 5-10, and Shoaib heard them as "very slow". Run the episode's pause
+tightener over the spec before building (pattern: `episode5/edit/shorts/tighten_short.py`, which uses that
+episode's `build/cut.py`). Its rules, each learned on Episode 5:
+- keep 0.22 s inside a sentence and 0.30 s between sentences (the long cut's numbers);
+- a cut starts after the MIDPOINT of a word that began before the pause, and ends before the onset of the next
+  word. Deepgram stretches a sentence's last word across the silence, and cutting past half its span drops the
+  word from the captions ("out.", "hellfire.", "well.") although the audio is whole;
+- a pause at a range's own edge moves the edge in; never split off a sliver;
+- framings alternate across ALL ranges, so a removed pause reads as a camera change.
+`review.py` P1 flags a Short that kept its pauses. Read the edges it reports as OUT on a sentence-final word with
+whisper of that window ALONE, and record the proof in `accepted.json`.
 
 ### 4. Build and render
 ```bash

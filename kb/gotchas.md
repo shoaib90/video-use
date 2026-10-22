@@ -3474,3 +3474,11 @@ An `alimiter` at -1.5 dBTP measured -0.9 dBTP after the AAC 320k encode (Episode
   band against an effect-free control, and the returning bed fills that frame. A +11 dB trim moved the reading
   0.1 dB. Read the `mix` line's applied level (here -12 dB, above a hit that measured clear) and listen,
   rather than chasing the number.
+
+## The Shorts mix: limit at 192 kHz, not a bigger margin (Episode 5 Shorts v3, 2026-10-22)
+
+A 48 kHz sample-peak `alimiter` misses inter-sample peaks, so the AAC encode overshot it by a different amount
+per mix: +1.7 dB, then +3.2 dB with a low boom. Lowering the limit chased it (to -4.6) and dragged loudness
+to -15.8 LUFS. Limiting at 4x (`aresample=192000,alimiter=…,aresample=48000`) held -1.7 dBTP at -14.2/-14.3
+LUFS on both Shorts with no extra pass. `shorts.py` also re-measures the true peak after the encode as a backstop.
+The episode mix (`build/mix.py`) still uses a plain limiter at -2.0; move it to the same chain next time.
