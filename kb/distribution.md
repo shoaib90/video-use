@@ -431,3 +431,10 @@ objects such as dumbbells) cuts the subject out, then layer it as background (bl
 top. Pattern: `episode5/edit/build/thumbnails_v2.py`. Rule from building it: let the subject cover
 a word's EDGE, never a key letter. "LATER." read "ATER." and "15 MINUTES" read "15 M…UTES"
 until both moved. Unproven: whether it lifts CTR on our channel. It is the look Shoaib clicks.
+
+**A second house option: the cinematic-essay look** (Shoaib's "BE DELUSIONAL." reference, 2026-10-22).
+It has a deep red grainy field, the subject in grainy high-contrast black and white, a TIGHT head-and-chest
+crop running off the bottom edge (a waist-up crop read small at 168 px and pulled chair arms into the
+cutout), and a small, widely spaced serif title (Didot Bold, tracking ~0.2 em) centred at the top. It suits
+an emotional or abstract title such as "MENTAL JAIL."; the bold Poppins layout suits a result or a number.
+Pattern: `episode5/edit/build/thumbnails_v5.py`.
