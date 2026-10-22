@@ -30,7 +30,10 @@ never modifies the master. If the cut is not locked, finish the edit first with 
 Every command runs from the repo root:
 ```bash
 export PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig      # pycairo builds against brew cairo
-MGX="uv run --with pycairo python skills/motion-graphics-pass/scripts/mgx.py"
+mgx() { uv run --with pycairo python skills/motion-graphics-pass/scripts/mgx.py "$@"; }
+# a function, not MGX="…": zsh does not word-split $MGX, so `$MGX <edit> render` fails with
+# "command not found" (exit 127; Episode 5, 2026-10-21). Below, `$MGX` means `mgx`.
+MGX=mgx
 $MGX <edit> <command> …
 ```
 Everything is written to `<edit>/mgx/` (Hard Rule 12). The only exception is the delivery,

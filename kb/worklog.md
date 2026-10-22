@@ -2236,3 +2236,23 @@ titles linted by yt-package `title.py` (80-98).
   -14.4 LUFS, -1.2 dBTP, bt709 on all three. review.py final: 0 HIGH, 0 MED, 6/7 render
   checks (T3 = the static end card). R13 at 4K: brows dark. Two fixes on the way: the limiter
   to -2.0 (T5) and `-map_chapters -1` (a stray chapter track from a music file). Both are in gotchas.md.
+
+## 2026-10-21/22 — Episode 5 motion-graphics pass (`skills/motion-graphics-pass`)
+
+- Shoaib: "go ahead with motion graphics and SFX". Built straight away, with the blueprint
+  (`episode5/edit/motion_graphics_blueprint.md`) delivered alongside. Cues: `episode5/edit/mgx/cues.py`,
+  built from Episode 4's (same desk, left-column glass).
+- 13 graphics: a 2016-2024 timeline that returns at each era change; a spine diagram on "slip disc";
+  the plan card (Make videos -> On hold -> Making them, the script's plant and payoff); the opening
+  card's four items called back with "Pain back in a month"; "I asked for help" (planted for the third
+  thing); and a 2023 vs 2025 sit meter. Also a vignette on "mental jail" and sounds on the 16 existing card events.
+  Restraint: the zenith has nothing; each unscored stretch (MRI, 15 minutes, plans gone) has ONE sound.
+- Stills loop fixed: the disc label colliding with its bulge, the disc not reading as a spine, text
+  past the card edge, a meter label on the card's edge, and timeline labels too small.
+- verify OK: 22820/22820 frames, duration and A/V offset identical, -14.4 LUFS both. Audibility:
+  32/32 effects above -10 dB. review.py mgx: 0 HIGH, 0 MED, T5 -14.4 LUFS / -1.6 dBTP, T8 2/318.
+  The delivered-file verify sheets were read: all graphics are clear of the face, legible and on their line.
+- **R9:** the one upload file is `episode5_final.mp4`; the pre-pass master was renamed
+  `episode5_premgx_do_not_upload.mp4`.
+- **Fixed in the skill:** SKILL.md's `MGX="uv run …"` / `$MGX` fails under zsh (no word split, exit
+  127). It is a function now (`mgx() { …; }; MGX=mgx`), tested in zsh.
