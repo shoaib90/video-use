@@ -2256,3 +2256,8 @@ titles linted by yt-package `title.py` (80-98).
   `episode5_premgx_do_not_upload.mp4`.
 - **Fixed in the skill:** SKILL.md's `MGX="uv run …"` / `$MGX` fails under zsh (no word split, exit
   127). It is a function now (`mgx() { …; }; MGX=mgx`), tested in zsh.
+- **Thumbnail v3 (2026-10-22):** `episode5/edit/thumbnails/thumb_A3.jpg`. Shoaib said v2 "still doesn't
+  look crisp". The cause was the source: video stills of motion and a small subject. v3 uses his 4K a-roll
+  face (closed mouth, eye contact) on a clean gradient, with "2 YEARS LATER." Photos from other folders
+  were checked and rejected: a dim gym-mirror photo, InBody screens with 2026 figures and a partial
+  phone number, and a college selfie that would imply a transformation. Lesson in distribution.md.

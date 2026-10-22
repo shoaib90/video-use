@@ -417,6 +417,13 @@ storytelling channels). Four things recur, and our v1 (Episodes 3-5) had none of
    sharper, sometimes with a faint edge glow.
 4. **One accent colour** on one word, and at most one graphic (a numbered muscle diagram, a glowing spine).
 
+**Crisp comes from the SOURCE first (Episode 5 v3, 2026-10-22).** Layering alone (v2) still read
+soft. The fix was a sharp, large face: an a-roll frame from the 4K source, near 1:1 (face ~500 px),
+mouth closed, eyes to the lens, on a CLEAN background (a gradient, not the blurred room), with the face
+filling ~85% of the height. Action stills from b-roll (motion blur, side-on, small) and dim phone
+photos fail at 168 px. Pattern: `episode5/edit/build/thumbnails_v3.py`. A radial glow pasted as a
+square must fade to zero inside the square, or it leaves a hard vertical edge.
+
 How to build it locally: `helpers/subject_mask.swift` (macOS Vision "lift subject", which keeps held
 objects such as dumbbells) cuts the subject out, then layer it as background (blur 16, saturation
 0.55, brightness 0.42, vignette), the words with a soft shadow, a faint white halo, and the subject on
