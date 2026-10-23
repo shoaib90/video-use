@@ -2303,6 +2303,7 @@ titles linted by yt-package `title.py` (80-98).
   `detour2_final6.mp4`, Detour-3 `detour3_final_4k.mp4`, Episode 2 `final_mgx.mp4`, Episode 3 `final.mp4`,
   Episode 4 `episode4_final.mp4`, podcast `Podcast1_with_music.mov` (the upload) + Shoaib's own Resolve cut
   `Podcast1.mov` + `final_raw_NO_MUSIC_do_not_upload.mp4` (its source; his Resolve project may link it).
-- **Not touched, waiting on Shoaib:** prepped sources (podcast `prep/` 33 GB, Detour-1 10 GB, Detour-2 6.7 GB,
-  Episode 2 3.6 GB). They are needed only to re-render, and are rebuilt from the originals by each episode's scripts.
+- **Prepped sources moved too (Shoaib's OK, same day):** podcast `prep/` 33.3 GB, Detour-1 10.0 GB, Detour-2 6.7 GB,
+  Episode 2 3.6 GB (53.6 GB, 160.3 GB in all). Re-rendering any of these episodes now starts by rebuilding its
+  prepped sources from the originals with that episode's scripts (or restoring them from the Trash before it is emptied).
 - Episode 5's cleanup on 2026-10-22 used `rm` (permanent). From now on, clean up by moving to the Trash.
