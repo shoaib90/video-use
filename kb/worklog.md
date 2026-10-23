@@ -2288,3 +2288,7 @@ titles linted by yt-package `title.py` (80-98).
   proven recipe): 34.2 -> 31.1 s and 26.9 -> 24.9 s, all words kept (87 / 72), p90 pause 0.29 / 0.37 s.
   Two traps hit on the way, both in SKILL.md 3b: soft or stretched sentence-final words, and range-edge slivers.
   Mix now limits at 192 kHz (-1.7 dBTP, -14.2/-14.3 LUFS). New review check P1 (3 tests, 341 pass).
+- **Shipped (Shoaib, 2026-10-23):** both Episode 5 Shorts approved for posting (v3, tightened). Upload files are
+  `episode5_short_everything_right.mp4` and `episode5_short_fifteen_minutes.mp4`; titles and descriptions are in each
+  `description.txt`. "Full story:" waits on Episode 5's final title. Intermediates are kept until Shoaib says the
+  episode is done (his rule).
