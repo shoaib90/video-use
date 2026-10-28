@@ -438,3 +438,21 @@ crop running off the bottom edge (a waist-up crop read small at 168 px and pulle
 cutout), and a small, widely spaced serif title (Didot Bold, tracking ~0.2 em) centred at the top. It suits
 an emotional or abstract title such as "MENTAL JAIL."; the bold Poppins layout suits a result or a number.
 Pattern: `episode5/edit/build/thumbnails_v5.py`.
+
+
+## The self-improvement niche's outlier thumbnails are paused moments, not posters (stance-04, 2026-10-26)
+
+/yt-viral on rest guilt / hustle culture / Frankl's inverse law: vidIQ outlier search for candidates, then
+`swipe.py` multiples over each channel's own median (345 public uploads, 12 channels). The top multiples
+(1,150x "I Quit My Job After Burnout", 1,074x livy baker "this is why you can't enjoy anything anymore.", 118x
+istheelf) are candid frames with a natural expression and 0-4 words, or the problem's own objects collaged around a
+real face. None was a posed shock face on a designed poster. For stance-04 this moved the recommendation from the red
+cinematic "THEY GAVE YOU HALF." to a real frame of the hook's quote wall with the centre card split
+(`feel-like-hustler/edit/thumbnails/thumb_D3_quote_wall_lean`). Unproven on our channel until a CTR reads; record it.
+`title.py` counts every word on a thumbnail, slogans included (12 there, ceiling 3).
+- **Reference, Quam Balogun "you're broke because you're too smart" (2026-10-26):** 380K views on a 4.6K-sub channel,
+  73x its 8-video median (5,200), and its shortest upload (5:17 vs 9-20 min). Pairing: the title is a flattering
+  accusation (diagnosis); the thumbnail is the shocking prescription in two huge lowercase words, with a candid
+  mid-gesture frame in front of them covering a non-key part of the word. The thesis is said in the first sentence.
+  Its click word is a slur, which our brand would never use; the transferable parts are the pairing, the depth layout
+  and the one-idea short length.

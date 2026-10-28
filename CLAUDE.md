@@ -23,6 +23,14 @@ durable, reusable lesson into the topic file where it belongs — a new trap int
 - Keep `kb/index.md` short — it loads into every session.
 - Correct or delete entries that turn out to be wrong rather than stacking caveats.
 
+## Episode handoff (two accounts, one Mac)
+
+Shoaib switches between two Claude accounts on this Mac when one hits its limit, sometimes mid-episode.
+**When an episode folder is named, read `<videos_dir>/edit/HANDOFF.md` first** (after `kb/index.md`): it holds
+the current stage, his decisions, open notes and the exact next step. **Keep it current**: rewrite it after every
+approval, delivered render and notes round, before any long background job, and whenever he says the limit is
+close. Format and rules: [kb/handoff.md](kb/handoff.md). Create it at the start of a new episode.
+
 ## Before any preview reaches Shoaib (every video, every iteration)
 
 Shoaib's time is the scarcest resource. A preview he has to rewatch end to end to find our

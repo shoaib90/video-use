@@ -3482,3 +3482,88 @@ per mix: +1.7 dB, then +3.2 dB with a low boom. Lowering the limit chased it (to
 to -15.8 LUFS. Limiting at 4x (`aresample=192000,alimiter=…,aresample=48000`) held -1.7 dBTP at -14.2/-14.3
 LUFS on both Shorts with no extra pass. `shorts.py` also re-measures the true peak after the encode as a backstop.
 The episode mix (`build/mix.py`) still uses a plain limiter at -2.0; move it to the same chain next time.
+
+## yt-dlp: pick the ORIGINAL audio track, never filter by language (stance-04-hustle, 2026-10-25)
+
+YouTube now attaches auto-dubbed audio to many videos, Shorts included (one Williamson Short had 20
+dubbed tracks). `yt-dlp -F` labels them `dubbed-auto`, and the real one `original (default)`. A
+language filter picks the wrong one on a non-English original: Raj Shamani's Hindi Short has an
+`en-US` dub, so `ba[language^=en]` would have downloaded a synthetic English voice and nothing
+in the file says so. Use `-f "bv*+ba[format_note*=original]/bv*+ba"`. Plain `ba` picked the
+original on all four videos here, but check `-F` before trusting it. Verified 2026-10-25 by
+reading `-F` for each format id we actually downloaded.
+
+## Deepgram `multi` returns some takes in ALL CAPS, unpunctuated (stance-04-hustle, 2026-10-25)
+
+On 4 of 26 takes Deepgram nova-3 `--language multi` returned whole stretches in capitals with
+no punctuation ("I WAS NOT ABLE TO REST WITHOUT ANY GUILT ALTHOUGH…"): 70 words, one take
+(IMG_4045) entirely. The whisper pass on the same audio came back in normal sentence case, so
+it is the model's output, not how the lines were said. render.py's "sentence" caption mode keeps
+the ASR's capitalization, so these would burn in as shouting with no full stops. **Before captions,
+count words with `w.isupper()` (length > 1) per transcript** and recase those stretches, taking
+casing and punctuation from the whisper check. Not yet fixed in a helper.
+
+## ffmpeg analysis filters report at INFO: `-v error` silently hides them (2026-10-25)
+
+Generalises the `freezedetect` note: `volumedetect` prints `mean_volume` at INFO too. A pause-loudness
+scan run with `-v error` found no value and reported every pause the same, which reads as a result rather than
+an error. Use `-hide_banner -nostats` instead. Verified on IMG_4028: no output under `-v error`, -28.6 dB without it.
+
+## macOS `xargs -I` caps the substituted command at 255 bytes (2026-10-25)
+
+A batch transcription through `xargs -P 4 -I{} sh -c '…long command…'` failed at once with
+"command line cannot be assembled, too long" and ran nothing. The `echo DONE` after it still printed,
+so it looked finished. Use a shell loop with `&` and a `wait` every N jobs instead.
+
+## Deepgram word spans swallow the silence beside a word: trim them before cutting (stance-04, 2026-10-26)
+
+~87% of Deepgram spans are contiguous, so a word that trails off runs over the pause after it ("tell…"
+18.86-20.86, "uncomfortable." 11.36-15.04) and some words start inside the pause before them. Three things read
+those spans and all three broke on this episode: cut.py's edges ("no real pause before it", "out_at is inside the
+last word"), the half-word rule (15 words vanished from the prose and would have from the captions, with their
+sound intact), and card anchors. Fix that worked: corrected word copies (`feel-like-hustler/edit/build/fix_words.py`),
+paid transcripts untouched. For each word over 0.25 s, at each pause (>=120 ms below -45 dB) inside it, END the word
+at the pause; move the START only when <50 ms is voiced before the pause. Trusting the side with more voice was
+wrong: where spans overlap, the voice after the pause is the NEXT word ("sign," slid onto "I saw"). Keep a 60 ms
+sliver when a word sits ~40 ms before its pause ("out?", "it."). Verified by the prose read-back and verify_sides.
+
+## render.py and review.py read `<edit>/transcripts` only (2026-10-26)
+
+Corrected word copies elsewhere don't reach them. render.py resolves CARD anchors against the paid transcripts,
+so two anchors that resolved on the copies raised there ("Using purpose as a shield", "tripled my salary": both
+end on a stretched word). Test every anchor against both sets and use words they share. For review.py, a shadow
+edit dir of symlinks with `transcripts` pointing at the copies took story flags from HIGH 29 to HIGH 12 real
+ones (`feel-like-hustler/edit/build/rv`).
+
+## whisper word-level output: zero-length words and sub-word pieces (2026-10-26)
+
+`transcribe_whisper.py` on English clips gave "Fran kel 's", "hust le," "don 't" as separate words, and words with
+start == end ("lies@14.52-14.52"), which no range can hold half of, so they never caption. Glue pieces (a token
+starting with an apostrophe, or a known pair) and give zero-length words 0.12 s.
+
+## Devanagari cannot be drawn by PIL or this ffmpeg's drawtext (2026-10-26)
+
+PIL here has no libraqm and drawtext has no harfbuzz: both draw Devanagari unshaped (matras in the wrong place).
+Core Text shapes it: `feel-like-hustler/edit/build/textpng.swift` renders lines to a transparent PNG
+(`KohinoorDevanagari-Bold`). Verified on "मेहनत इतनी ख़ामोशी से करो / कि सफलता शोर मचा दे".
+
+## mix.py: a bed over silence gets -82 dB; the duck takes ~4 dB more on a tightened cut (2026-10-26)
+
+A bed's gain is the programme's LUFS in its own window minus BED_UNDER. Over the end card that window is silent
+(-70), so the bed came out ~-82 dB, inaudible. Level such a bed against the 10 s before it. And with Episode 5's
+gentle duck, beds set 27 dB under MEASURED 31-33 dB under on the stem (dense, tightened speech keeps the duck
+closed); BED_UNDER 23 measured 26.9-27.5. Always measure the stem. Episode 5's mix.py also had its `-c:a aac
+-b:a 320k` args inside a comment, so the mix used ffmpeg's default AAC bitrate.
+
+## Overlays stack in list order (2026-10-26)
+
+render.py chains overlays in `edl["overlays"]` order, so a later entry is drawn on top. A badge that must stay
+visible over cutaways that start under it goes LAST, after the sort by start time.
+
+## Frosted glass on an OVERLAY must read the picture under it (2026-10-26)
+
+render.py overlays composite with alpha but cannot blur what lies beneath, so a "glass" card built as a plain
+translucent tint reads as a grey box. Build the frost INTO the overlay: read the rendered base (`base_preview.mp4`)
+at the overlay's own times, blur it hard, and paste the crop under each card (`feel-like-hustler/edit/build/
+quotewall.py`). The blur hides resolution, so the 1080 base serves the 4K overlay too. It only holds while the cut
+(the base) is unchanged; rebuild the overlay after any re-cut.

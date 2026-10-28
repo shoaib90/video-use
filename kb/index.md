@@ -32,6 +32,7 @@ Transcribe ──> Pack ──> reason over text ──> EDL ──> Render ─�
 | [distribution.md](distribution.md) | **After the render** — how the algorithm distributes, reading a flop, community posts | Judging performance; deciding what to fix |
 | [mistakes.md](mistakes.md) | **Every mistake Shoaib caught, on every video, and the check that now catches it** | Before every delivery |
 | [worklog.md](worklog.md) | Dated log of local changes + why | Understanding a local divergence |
+| [handoff.md](handoff.md) | **Per-episode `edit/HANDOFF.md`**: state, decisions, next step, for switching accounts mid-edit | Opening or pausing any episode |
 | [check-env.sh](check-env.sh) | Re-verifies everything in environment.md | Cold start, or something broke |
 | [new-machine.md](new-machine.md) | Cloning onto another laptop; what doesn't travel | Setting up a second machine |
 | [bootstrap.sh](bootstrap.sh) | Idempotent installer for a fresh macOS machine | Same |

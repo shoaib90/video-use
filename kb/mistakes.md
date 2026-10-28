@@ -237,6 +237,20 @@ Speaking pace was never the issue (152-161 wpm, Episode 4's 162-183). Fix: tight
 a pause over 0.70 s is HIGH, more than 1.5 pauses over 0.45 s per 30 s is MED; measured on the source audio,
 so the bed cannot hide them). It flags both v1 Shorts and passes both v3s.
 
+**M059** · 2026-10-26 · stance-04-hustle v1 · *"When we are popping the quotes, the last two are not matching
+where I'm looking. They are in the opposite direction."* Cause: the quote cards follow his glances, and the glance
+directions were read off a 4 fps sheet of 200 px thumbnails, where a head turned down-right and one turned
+down-left look alike. At full size (15.3 s down-right, 16.3 s down-left) they were plainly reversed. Check:
+`READ R3` now includes: anything placed by where he LOOKS is checked on a full-size frame of each glance, never a
+thumbnail sheet.
+
+**M060** · 2026-10-26 · stance-04-hustle v1 · *"The b-roll on college and 'my whole life'… I'm not sure why we
+have used them."* A 2017 selfie on "So it all started in college" and a reaction shot on "I saw my whole life in
+them". Cause: each matched a WORD in the line (college; seeing) rather than what the line says, the M049 pattern
+again; and the reaction shot spent the realisation 3 minutes before the zenith it belongs to. Check: `READ R11`
+now also asks, for every cutaway, "what does this line MEAN, and does the shot show that?" A shot that only
+matches a noun is filler; if nothing shows the meaning, keep the face.
+
 ## Sound
 
 **M052** · 2026-10-05 · Episode 3 v4 (logged 2026-10-12) · *Sound effects 17 LU under the voice were
@@ -298,7 +312,8 @@ said by ~0:10?).
   mishearings in the caption builder.
 - **R3** Look at the overlay/card contact sheet (G1). Check: no face covered, text spelled
   right, the anchor landed on the right line, and every cutaway shows its ACTION at the start,
-  middle and end of its own window, not just one still (M055).
+  middle and end of its own window, not just one still (M055). Anything placed by where he
+  LOOKS is checked on a full-size frame of each glance (M059).
 - **R4** Scan frames at delivery resolution for readable labels, screens and plates.
 - **R5** Look at a contact sheet of singles and check the shot shows whoever is speaking.
 - **R6** Spot-listen at each music cue entry, exit and duck.
@@ -311,6 +326,7 @@ said by ~0:10?).
 - **R10** Retakes (M045): for every line said more than once, list the candidates, pick the
   best (complete sentence, no restart, fewest fillers, delivery), and write the reason down.
 - **R11** Every cutaway, photo and card shows or says what the line says (M049); none fills time.
+  Ask what the line MEANS: a shot that only matches a noun in it is filler (M060).
 - **R12** Shorts and other derived cuts (M053): list every card, mgx cue, effect and music cue
   the parent has inside the kept windows, and say for each whether it is carried, re-laid out or
   dropped, and why. A pass from review.py is not a verdict on how it looks.

@@ -2307,3 +2307,80 @@ titles linted by yt-package `title.py` (80-98).
   Episode 2 3.6 GB (53.6 GB, 160.3 GB in all). Re-rendering any of these episodes now starts by rebuilding its
   prepped sources from the originals with that episode's scripts (or restoring them from the Trash before it is emptied).
 - Episode 5's cleanup on 2026-10-22 used `rm` (permanent). From now on, clean up by moving to the Trash.
+
+## 2026-10-25 — stance-04-hustle ("If You're a Hustler…"): footage in, third-party clips downloaded
+
+- Footage: `~/Documents/Ambitious/Editing/feel-like-hustler/`, 27 takes in 4K landscape (IMG_4017-4053, ~12 min;
+  IMG_4018 is 0.8 s, so skip it when transcribing) plus `google-answer-screen-recording.mov` (51.9 s, 3024x1814).
+- Downloaded into `edit/clips/` from channel-kb `sources.md` (and one Short Shoaib sent). Times, credits and what each
+  frame shows are in `edit/clips/SOURCES.md`. Lines checked with a local whisper pass. Williamson's key line is at
+  0:39.9 in his long video (the source said "not yet checked"), and FO556's off-button line runs 51:46.2-52:12.8.
+- Audio: each video carries auto-dubbed tracks; verified that every file has the original track (new gotcha).
+- Nothing transcribed with Deepgram yet; no edit plan yet.
+- Shoaib chose the long Williamson video for ¶7, 0:39.9-0:53.4 (recorded in `edit/clips/SOURCES.md`).
+- **Transcribed (2026-10-25):** the 26 takes (not IMG_4018, 0.8 s) with Deepgram nova-3 `--language multi` into
+  `edit/transcripts/`, plus the free whisper check (`ggml-small.bin -l en`) in `edit/whisper_check/`; both packed.
+  All of ¶2-¶19 are on camera. Checks: no Spanish; every pause of 1.5 s or more measured against speech level,
+  and only two are loud (IMG_4017, the test take; IMG_4036, Deepgram missed the "Work" of a false start superseded
+  by IMG_4037). Whisper alone on the disputed windows: IMG_4028 has "Tim" before "Ferriss", which Deepgram dropped
+  (caption fix: "Tim Ferriss", "Tom Bilyeu", "Gary Vee"); IMG_4052 19-21 s is an aside ("All right"/"Not tonight"), unused.
+- Deepgram returned 70 words in ALL CAPS on IMG_4023/4033/4040/4045: recase before captions (new gotcha).
+- Frames: all upright, same set; the monitor behind changes (code to 4038, wallpaper 4039-40, dark from 4041).
+- No b-roll in the folder yet (shoot list: Shorts scroll at night, phone Google search, room, empty chair/sunset,
+  laptop-then-book, camera setup, offer email, thumbnail stills).
+- **B-roll search (2026-10-26):** looked at a frame of every non-dashcam clip and photo in `Editing/global-b-rolls/`
+  and the episode b-roll folders (51 clips, 10 stills; none had notes anywhere). Literal matches mapped per paragraph
+  in `edit/broll_map.md`; reusable finds added to channel-kb `05-broll-inventory.md`. Missing: Joe Rogan / Tim Ferriss
+  photos, Shorts scroll and Google search at night, empty chair / sunset, laptop-then-book, offer email, thumbnail stills.
+- **B-roll shot and reviewed (2026-10-26):** Shoaib added `feel-like-hustler/b-roll/` (15 clips, 5 stills, the offer email
+  screen recording; the Google recording moved there too). Checked with 4-8 frames per clip, plus zooms where the
+  action mattered: IMG_4068 holds the laptop-close-then-book move (~0:51-0:54); 4061/4062 are only desk work. The
+  night sequence (4063/4064/4066/4067) covers the Shorts scroll and the Google search, filmed over the shoulder. Mapped
+  in `edit/broll_map.md`; the script needs nothing more. Frame rates to conform: IMG_4063 24 fps, shocking-face-1 29.97.
+- **Edit plan v1 drafted (2026-10-26), waiting on Shoaib (Hard Rule 11):** `edit/plan.md`. Take table with a reason per
+  pick (M045), the night sequence built from 4063/4064/4066/4067 plus Williamson's own clip, ~6:00 against the script's
+  4:30-5:00. Ledger items applied at plan stage: M046 (the silence after the zenith on a picture change, not a held face),
+  M051 (books-stack only before *The Intelligent Investor* enters, ~19 s), M057 (1.25x badge), M054 (Apple SDR prep).
+- **v1 preview built (2026-10-26), Shoaib approved the plan:** `edit/hustler_v1_preview.mp4`, 1080p, 4:37.7 with the
+  end card (the plan said ~6:00: it estimated pauses at 0.35 s; the house trim is 0.22/0.30 s; nothing in the prose is
+  lost; inside the script's 4:30-5:00). Build: `edit/build/` (fix_words -> cut -> visuals -> quotewall -> captions ->
+  recomposite -> mix). 18 takes via Apple SDR; Raj/Williamson/FO556 as prepped clip sources at the a-roll's loudness.
+  33 overlays (cutaways, sign stills with the sign marked, blurred offer email, quote wall in/out, 1.25x badge last),
+  9 glass cards (5-sign deck, 2 keylines + ¶18 keyline, 3x stat), captions as spoken (Raj's Hindi in Devanagari).
+  Music: Lock In (hook drop on the first glance card, naked ¶3, in-sync return ¶4, low-pass ¶9-12, dead stop before the
+  zenith) and Luxe (¶16 to the end card), both fetched from Epidemic into music/epidemic/ with sidecars. Beds measured
+  26.9-27.5 dB under the voice (hook 9.3). Verified: every join by whisper both together and each side ALONE; review.py
+  HIGH 0 / MED 0 after 17 accepted with reasons (`review/accepted.json`); T3 = the end card, T7 = the swell, T8 = 11
+  whole short sentences + 1 fragment in Raj's clip; -14.0 LUFS, -1.9 dBTP. Not done: the 4K final (after his notes).
+- **v2 preview (2026-10-26), Shoaib's notes on v1:** (1) the last two quote cards pointed opposite to his glances: they
+  were read off 4 fps thumbnails; at full size 15.3 s is down-right and 16.3 s down-left; swapped (M059). (2) b-roll
+  that matched a word, not the meaning (M060): the reaction shot on "I saw my whole life in them" became the night monitor
+  (Google's answer) on "when I read its signs" + a life flip of his own prints, Childhood -> 28 (`build/lifeflip.py`);
+  the 2017 selfie on "it all started in college" became his batch under the BTC OF 2016 sign (`b-roll/college-2.jpg`);
+  the 2020 clip on "And I lived it" (no context) was removed, and a routine list card (Up early / Read before bed /
+  Every spare minute) + AHEAD OF EVERYONE stamp carry ¶6. Chair kept (his call). Same cut (recomposite); review v2
+  HIGH 0 / MED 0, -14.0 LUFS. Changes reel built by hand (`review/v2/reel.mp4`, 33 s): review.py makes reels only for
+  changed story EDGES, so picture-only changes need one cut by hand (ffmpeg in a `while read` loop needs `-nostdin`).
+- **4K final delivered (2026-10-26):** `edit/hustler_final.mp4`, 3840x2160 30 fps, 4:37.7, -14.0 LUFS / -1.9 dBTP,
+  bt709 x3. v3 changes from Shoaib's v2 notes: quote wall rebuilt as frosted glass (frost read from the base), a
+  photo-album flick (Epidemic, `effects/epidemic/photo_flick/`) under the life flip, and no captions where a full-frame
+  graphic owns the screen or already shows the words (quote wall, life flip, the five sign pages; a cue goes only when
+  most of it sits under one). Captions kept otherwise (asked; recommended keeping for muted mobile viewing).
+  Checks: review final HIGH 0 / MED 0 (T3 end card, T7 swell, T8 10/120 whole short sentences); 108 4K segments
+  identical; exposure on face frames p5 31-38; R4 at 4K: offer email signature/logo/attachment unreadable. Pre-mix
+  file `build/hustler_final_NO_MUSIC_do_not_upload.mp4`; superseded previews in build/. Intermediates kept until
+  Shoaib says the episode is done (his rule).
+- **Packaging drafted (2026-10-26):** `edit/packaging.md`: 6 titles (recommended "If You're a Hustler, You Need to Watch
+  This"; Shoaib's "If You Feel Like a Hustler…" lints clean too), 3 thumbnails built locally from the 4K stills
+  (`build/thumbnails.py`): A THEY GAVE YOU HALF. (red cinematic, HALF sliced; recommended), B IT HAS A NAME., C THEY TRICKED
+  YOU. (the script's brief, flagged: the video says "they did not lie to you"). Description with chapters checked
+  against YouTube's rules by hand (the plugin's chapters.py builds chapters from a transcript, it doesn't validate a
+  list). Thumbnail lesson re-confirmed: the subject must never cover the key word; on a wide pose (hands on head),
+  widen the crop and drop the subject below the title rather than overlap.
+
+## 2026-10-28 — Episode handoff for switching accounts mid-edit
+
+- Shoaib works from two Claude accounts on this Mac and switches when one hits its limit, possibly mid-episode.
+  Disk state survives; the conversation (approvals, open notes, next step) may not. Added `kb/handoff.md` (format and
+  rules), a `CLAUDE.md` rule (read `<edit>/HANDOFF.md` first when an episode is named; keep it current), and an index
+  line. First instance: `feel-like-hustler/edit/HANDOFF.md`. Not yet tested by an actual account switch.
