@@ -5,12 +5,48 @@ re-derive it or mistake a deliberate change for a bug.
 
 ---
 
-## 2026-10-30 — Reviewed upstream's 166 PRs against `main` (nothing changed in the tool yet)
+## 2026-10-30 — Built the useful ideas from upstream's PRs, on our fork only
+
+Shoaib said to build what helps and send nothing upstream. Code written fresh against our `main`, not
+merged: our render.py has moved too far. 427 tests pass, 86 of them new.
+
+- **render.py:** preflight (`--check`, runs before every render); segment reuse (`clips_cache/`); `--jobs`; apostrophes
+  and other awkward characters in paths; digital silence through loudnorm; missing subtitles now stops the
+  render; unique concat list; each source probed once; ffmpeg's error printed instead of a traceback.
+- **New helpers:** `notes.py` + `notes.html` (timecoded notes, driven in the app's browser), `sync_cameras.py`.
+- **Transcripts:** same-stem refusal, source-changed warning, Deepgram `--keyterms`.
+- **review.py:** T9 stray single frame; T8 flags a missing subtitles file. **timeline_view.py:** ranges to the clip's end.
+- **KB:** `index.md` 36 KB → 10 KB; the stage-specific facts moved word for word to `facts.md`, except two
+  updated bullets (stale `clips_*`, killed renders).
+
+**Measured, 8 ranges of real 4K HLG with captions, 24 s out:** 1 job 73 s, 4 jobs 68 s, then one range changed
+39 s. Frame-identical. Parallel is worth ~13% here, not the 2.2x recorded on 2026-10-04; x264 already threads,
+so do not quote that figure. Reuse is the win, and the composite is now most of what remains. Real-scale evidence for reuse:
+Episode 5's one-off script reused 248 of 250 segments.
+
+**T9 found real defects in a delivered video:** six one-frame slivers in the Hustler final, where an overlay edge sits a
+frame off a cut (M061). 407 cuts over three delivered videos; all six confirmed by eye, none in Episodes 3 and 5. The first
+version of the rule found only one, because it required the frames either side to resemble each other. A sliver between two
+different pictures fails that, so the rule now compares against the window's own motion.
+
+**sync_cameras.py on podcast Episode 1's 45 real clips, 25 s:** all 39 kept offsets reproduced within 20 ms, plus C0461,
+which the original marked invalid. Unread by eye.
+
+**Tested and dropped:** #192 HDR from the decoded frame: 400 real clips sampled of 1902, stream and frame tags never
+disagreed. #212, #123, and the audio-drift PRs do not apply.
+
+**Not verified:** `--keyterms` on real audio (the request is tested, a paid call is not made as a test); the
+microphone in `notes.py` with a live voice. `--check` flags episode 4's old EDL (`have not taken it`): a real mismatch with
+today's half-word rule, not a false alarm.
+
+---
+
+## 2026-10-30 — Reviewed upstream's 166 PRs against `main`
 
 Listed all PRs on browser-use/video-use, read ~50 descriptions and the #178/#156 diffs, then tested
 the claims on `main` with synthetic clips in the session scratchpad. Suite was 341 passed.
 
-**Reproduced on `main`, not fixed:**
+**Reproduced on `main`:**
 - Apostrophe in the edit path crashes the concat (`_concat.txt`, exit 254, after every segment is
   extracted; #54). The subtitle escape is also wrong: libass opened `Its a test/` for `It's a test/`.
   No such folder exists today (searched `~` to depth 6, minus hidden folders and Library).
@@ -26,14 +62,7 @@ the claims on `main` with synthetic clips in the session scratchpad. Suite was 3
 token with no speaker, read as not arising from diarized Deepgram (code read, not run).
 Audio-drift PRs (#163/#226/#221): `main` already re-encodes audio once at the concat.
 
-**Worth building, not built:** segment reuse (#201's idea), parallel extraction (#63; our own
-measurement: 2.3 → 5 segments/min on 4K HLG, only ever a monkeypatch in an episode wrapper),
-notes page (#178), Deepgram `keyterm` (#47's idea; docs confirm Nova-3 multilingual support, untested on
-Hinglish), `render.py --check` (#202), flash-frame check (#230).
-
-**Unproven:** the speed-up from segment reuse is not measured, and `is_hdr_source` missing
-SEI-only HLG (#192) was not tested on real footage. Probe caching (#150) costs ~0.14 s per range
-here, ~40 s on a 300-range cut.
+All of the above were then fixed or built; see the entry above.
 
 ---
 

@@ -20,10 +20,18 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from transcribe import load_api_key, transcribe_one, transcript_path
+from transcribe import load_api_key, transcribe_one, transcript_path, warn_if_source_changed
 
 
 VIDEO_EXTS = {".mp4", ".MP4", ".mov", ".MOV", ".mkv", ".MKV", ".avi", ".AVI", ".m4v"}
+
+
+def same_stem_groups(videos: list[Path]) -> list[list[Path]]:
+    """Videos that would share one transcript: it is named by stem, ignoring case on APFS."""
+    groups: dict[str, list[Path]] = {}
+    for v in videos:
+        groups.setdefault(v.stem.lower(), []).append(v)
+    return [g for g in groups.values() if len(g) > 1]
 
 
 def find_videos(videos_dir: Path) -> list[Path]:
@@ -31,6 +39,11 @@ def find_videos(videos_dir: Path) -> list[Path]:
         p for p in videos_dir.iterdir()
         if p.is_file() and p.suffix in VIDEO_EXTS
     )
+    clashes = same_stem_groups(videos)
+    if clashes:
+        names = "; ".join(" + ".join(p.name for p in g) for g in clashes)
+        sys.exit(f"these videos would share one transcript, because transcripts are named by "
+                 f"stem: {names}. Rename or move one. Nothing was transcribed.")
     return videos
 
 
@@ -77,6 +90,8 @@ def main() -> None:
 
     already_cached = [v for v in videos
                       if transcript_path(edit_dir, v, args.audio_track).exists()]
+    for v in already_cached:
+        warn_if_source_changed(transcript_path(edit_dir, v, args.audio_track), v)
     pending = [v for v in videos if v not in already_cached]
 
     print(f"found {len(videos)} videos ({len(already_cached)} cached, {len(pending)} to transcribe)")

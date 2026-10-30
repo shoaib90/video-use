@@ -46,7 +46,9 @@ from transcribe import (  # noqa: E402
     count_audio_tracks,
     extract_audio,
     peak_dbfs,
+    source_stamp,
     transcript_path,
+    warn_if_source_changed,
 )
 
 DEEPGRAM_URL = "https://api.deepgram.com/v1/listen"
@@ -55,6 +57,7 @@ DEEPGRAM_URL = "https://api.deepgram.com/v1/listen"
 # with transcribe.py (downstream expects exactly one transcripts/<stem>.json per
 # source), so the provider has to live in the file rather than the filename.
 PROVIDER = "deepgram"
+MAX_KEYTERMS = 100  # developers.deepgram.com/docs/keyterm, checked 2026-10-30
 
 
 def load_api_key() -> str:
@@ -79,8 +82,9 @@ def call_deepgram(
     api_key: str,
     model: str = "nova-3",
     language: str | None = None,
+    keyterms: list[str] | None = None,
 ) -> dict:
-    params: dict[str, str] = {
+    params: dict[str, str | list[str]] = {
         "model": model,
         "diarize": "true",
         "punctuate": "true",
@@ -92,6 +96,9 @@ def call_deepgram(
         # The CLI documents auto-detection when --language is omitted; without
         # this Deepgram just applies its default language instead of detecting.
         params["detect_language"] = "true"
+    if keyterms:
+        # One `keyterm=` per term. Commas would silently become one long literal term.
+        params["keyterm"] = keyterms
 
     with open(audio_path, "rb") as f:
         resp = requests.post(
@@ -181,8 +188,18 @@ def describe_provider(payload: dict) -> str:
     return f"{provider} ({model})" if model else str(provider)
 
 
+def load_keyterms(path: Path) -> list[str]:
+    """Names and terms to bias the transcript: one per line, `#` comments, no blanks."""
+    terms = [line.strip() for line in path.read_text().splitlines()]
+    terms = list(dict.fromkeys(t for t in terms if t and not t.startswith("#")))
+    if len(terms) > MAX_KEYTERMS:
+        raise RuntimeError(f"{path} has {len(terms)} keyterms; Deepgram takes {MAX_KEYTERMS} at most")
+    return terms
+
+
 def check_cached(out_path: Path, model: str, spacing_threshold: float,
-                 language: str | None, force: bool, verbose: bool) -> bool:
+                 language: str | None, force: bool, verbose: bool,
+                 keyterms: list[str] | None = None) -> bool:
     """Decide whether an existing transcript can be reused.
 
     The on-disk path is shared with transcribe.py, because everything
@@ -224,6 +241,9 @@ def check_cached(out_path: Path, model: str, spacing_threshold: float,
             mismatches.append(
                 f"spacing-threshold {cached_threshold} != requested {spacing_threshold}"
             )
+        # Biased by different names, the transcript is a different result.
+        if sorted(payload.get("_keyterms") or []) != sorted(keyterms or []):
+            mismatches.append("keyterms differ from the ones requested")
 
     if not mismatches:
         if verbose:
@@ -250,6 +270,7 @@ def transcribe_one(
     audio_track: int = 0,
     spacing_threshold: float = 0.05,
     force: bool = False,
+    keyterms: list[str] | None = None,
 ) -> Path:
     """Transcribe a single video. Returns path to transcript JSON.
 
@@ -261,7 +282,8 @@ def transcribe_one(
     out_path = transcript_path(edit_dir, video, audio_track)
 
     if out_path.exists() and check_cached(out_path, model, spacing_threshold,
-                                          language, force, verbose):
+                                          language, force, verbose, keyterms):
+        warn_if_source_changed(out_path, video)
         return out_path
 
     if verbose:
@@ -290,13 +312,16 @@ def transcribe_one(
         size_mb = audio.stat().st_size / (1024 * 1024)
         if verbose:
             print(f"  uploading {video.stem}.wav ({size_mb:.1f} MB) to Deepgram {model}", flush=True)
-        raw = call_deepgram(audio, api_key, model=model, language=language)
+        raw = call_deepgram(audio, api_key, model=model, language=language, keyterms=keyterms)
 
     payload = to_scribe_schema(raw, spacing_threshold)
     # Stamp the identity of this result so the cache can be validated on reuse.
     payload["_model"] = model
     payload["_spacing_threshold"] = spacing_threshold
     payload["_language"] = language
+    if keyterms:
+        payload["_keyterms"] = keyterms
+    payload.update(source_stamp(video))
     out_path.write_text(json.dumps(payload, indent=2))
     dt = time.time() - t0
 
@@ -326,6 +351,9 @@ def main() -> None:
                     help="Zero-based audio track to transcribe.")
     ap.add_argument("--spacing-threshold", type=float, default=0.05,
                     help="Synthesize a 'spacing' token for inter-word gaps >= this. Default 0.05.")
+    ap.add_argument("--keyterms", type=Path, default=None,
+                    help="Text file of names and terms to bias Nova-3 toward, one per line "
+                         f"(max {MAX_KEYTERMS}). Keep it in the episode's edit folder.")
     ap.add_argument("--force", action="store_true",
                     help="Always re-transcribe and overwrite any existing transcript, "
                          "including one written by another provider or with different "
@@ -362,6 +390,7 @@ def main() -> None:
             audio_track=args.audio_track,
             spacing_threshold=args.spacing_threshold,
             force=args.force,
+            keyterms=load_keyterms(args.keyterms) if args.keyterms else None,
         )
     except RuntimeError as exc:
         # Cache mismatches and API/silent-track failures are expected operator

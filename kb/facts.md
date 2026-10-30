@@ -1,0 +1,359 @@
+# video-use facts, by stage
+
+Hard-won specifics that used to load into every session from `index.md`. **Read the section for the stage you are in.**
+Longer accounts are in [gotchas.md](gotchas.md). Same rules as the index: verified only, and correct rather than stack caveats.
+
+## Transcribing and inventory
+
+*Before transcribing, or looking through new footage.*
+
+- **Check what language is actually spoken before transcribing a batch.** `--language en` on
+  code-switched (e.g. Hinglish) audio returns confident English gibberish and drops ~a third of
+  the words — and since the cut is reasoned from the transcript, it corrupts the *edit*, not just
+  the captions. Use `--language multi`; `detect_language` picks one language and fails at this.
+  **Shoaib's "English" episodes carry Hindi asides**, which `en` drops silently (Episode 4: 20
+  holes in 8 of 36 clips). A whisper `-l en` pass reading fluent English proves nothing, because
+  it translates. Scan the loudness of every pause of 1.5 s or more after transcribing. See gotchas.md.
+- **On a first transcription, run the free whisper pass alongside the paid one.** It has caught
+  real errors (names, opening lines) that would otherwise be burned into captions. On Hinglish
+  use multilingual `ggml-small.bin` with **`-l en`** (it renders Hindi into English and can be
+  compared for meaning); `-l hi`/`-l auto` garble it, and word-level `-ml 1` output is unusable
+  for Devanagari, so whisper checks *wording only* — never timings. See gotchas.md.
+- **On a long Hinglish conversation, Deepgram `multi` DROPS speech**: 6-18% per clip on podcast
+  Episode 1, in gaps up to 46s. List the gaps of 5s or more and measure their RMS. If they sit
+  at speech level, fill them with whisper `-l hi -tr` to read them. See gotchas.md.
+- **Grep a `--language multi` transcript for Spanish before burning captions**
+  (`grep -nE '[¿¡áéíóúñ]' <edit>/takes_packed.md` — **not** the JSON, which stores `\u00bf` escapes and silently matches nothing) — Deepgram drifts into Spanish on short
+  or low-content clips. Hit 3 of 38 on Detour-2, one of them 47% of the clip (re-verified 2026-09-30 with the
+  `takes_packed.md` command above: exactly those 3).
+- **iPhone Cinematic clips come as pairs** (`IMG_n` sharp + depth track, `IMG_En` blur baked
+  in). Keep one variant in the batch folder or transcription pays twice. See gotchas.md.
+- **Don't transcribe clips under ~1s** — both engines return pure hallucination for them.
+- **A 0-word transcript is not evidence of silence.** Check with whisper before writing a clip
+  off; loud music reads as "empty" and the −60 dBFS silence guard never trips. See gotchas.md.
+- **Capture time is `com.apple.quicktime.creationdate`, never `creation_time`** — the latter is
+  the file-write time and was wrong by up to 2h24m on Detour-2, on *some* clips only. A wrong
+  file start puts every dashcam cutaway on the wrong minute. See gotchas.md.
+- **Deepgram word spans are ~87% contiguous**, so snap-to-word-boundary usually cannot apply the
+  Rule 4 pad, and a naive neighbour clamp pushes the cut *into* the word. See gotchas.md.
+- **Dashcam OSD burns in GPS** — crop it before publishing; its speed readout is also free
+  ground truth for locating a traffic jam.
+- **Look at one frame from every clip during inventory — and again from every clip you PREPPED.**
+  Catches upside-down rotation metadata, mixed orientations, and clips that are sideways with *no*
+  rotation metadata at all, none of which show up in `ffprobe` dimensions. Sideways content wants
+  a `transpose`, upright portrait wants a pillarbox; `ffprobe` reports both as 1080x1920 and the
+  uniform-dimension check passes either way, so only a frame tells you which you have.
+- **Deepgram can return ONE spoken phrase as TWO copies** (the first squeezed, with ~0.08 s
+  words). A text anchor then lands on the ghost and clips the real word. It dropped "designer"
+  at podcast Episode 1's Microsoft reveal. Check RMS on any repeated phrase. See gotchas.md.
+
+## Cutting and story
+
+*Before planning or changing a cut.*
+
+- **Carving camera angles out of one take? Cut only in a quiet fade zone**: the loudest 10 ms
+  within ±30 ms of the cut at −32 dB or lower, otherwise no cut. render.py's fades on continuous
+  speech put 50 of 308 podcast cuts on a word. Merge story ranges that are back-to-back in the
+  source. And pass `--fps 30` for iPhone footage. See gotchas.md.
+- **Round range ENDS down and STARTS up to the millisecond.** Deepgram spans are contiguous, so
+  a normally-rounded end can land microseconds past the next word's start — and captions are
+  selected by *overlap*, so that word is burned in while none of it is spoken. The user hears a
+  skip. See gotchas.md.
+- **On a conversation, audit every story edge for CONTEXT, against the WHOLE preceding turn.**
+  Flagging INs after a non-sentence-final word is not enough: a question whose opening
+  sentences were cut starts cleanly after a full stop and passes (podcast Episode 1 v6, 7:20:
+  "what I have seen for you was sports" without "growing up every kid has something special").
+  Print each IN with the turn back to a 2 s pause and each OUT with what follows, and read all
+  of them. The v2 pass found 29 more fixes and took 82 → 89 min. Cut whole exchanges, never
+  the setup of a question. See gotchas.md.
+- **Read the assembled cut back as continuous prose before rendering.** It is the only thing that
+  catches an OUT point taken from a word's *start* (drops the sentence's last word) or a join
+  that skips the words carrying the meaning. Found 5 broken joins in a *delivered* cut.
+- **Name the ZENITH before cutting** — the one moment the whole episode builds to — and then
+  leave it undecorated: no graphic, no music swell, no cutaway across it. In HillierSmith's
+  breakdown of a 75%-retention cut, the highest-retention moment in the video is the one where
+  the editor does nothing and lets it play. Decorating the peak is backwards; decoration belongs
+  on the build. See [storytelling.md](storytelling.md).
+- **Decide the ONE image of the story and withhold its clear reveal.** Anticipation is the
+  retention mechanism, not payoff — show it partial, obscured or brief early, and give the full
+  frame only when the story turns. Ep2's picture lock spent its cricket photograph at 1:00; the
+  delivered cut holds it to 5:03, on "So I just quit quietly". Same file.
+  **But withhold the REVEAL, never the SUBJECT**: the title's promise must
+  land in the first ~10 s, visually if possible. The delivered Ep2 overcorrected — 22 s of black,
+  a brand card, first words "Last time I told you…", and "cricket" not said until 0:28.6.
+  See [storytelling.md](storytelling.md) §7.
+- **Never open an episode on a reference to the previous one.** Nearly every viewer the algorithm
+  brings a small channel is new; a series episode must stand alone. Seed the context inside
+  the action instead ("Katie, I know you're my girlfriend, but…"). Same section.
+- **A list the speaker would recite is a graphic's job — cut the words it carries**, don't
+  stretch the graphic to fit the speech. And keep the viewer's **eye in the same place across a
+  cut** (eye trace); nothing checks this yet, and `matte.py` gives most of what a check needs.
+  Same section.
+- **A same-niche talking-head channel's hits and flops are edited IDENTICALLY** (1M vs 6K), so
+  the variance is topic, angle, title and first two sentences. Winners are daily, self-diagnosable
+  struggles (sleep, scrolling, procrastination, fear of failure), never abstract ones. The 1M shape:
+  mirror the viewer, then one mechanism, against-the-grain thesis, a mind-read, one action tonight,
+  and a punchline. See [storytelling.md](storytelling.md) §9.
+- **Silence first, then the hit.** In two 17–19 min essays that hold to the end (James Jani),
+  the bed runs under all narration, so every drop-out is an event. At each reversal the bed
+  drops out, the shot goes dark, one line lands, and the impact and a new cue come **on the
+  next cut**. The cut rate follows the emotion (0.4 s median for compulsion, 3.5 s for the
+  confession). The opening's own shots come back at the end with new words. The real pace is
+  one edit per ~3 s: raw `scene>` counts overstated it ~2× (24 fps cadence and particles, see
+  gotchas.md). See [storytelling.md](storytelling.md) §10.
+- **For a face-led cut: the face asks, the b-roll answers.** A face-heavy documentary (21% face,
+  Saqlain Khan) cuts to the face on every question or pivot and away on every noun or number. It
+  slow-pushes every face take of 4 s or more at ~1%/s (×1.07–1.20; static for the reframe line),
+  saves 3 hard ~1.2× punch-ins for punchlines, and gets to a visual change every 2.6 s with only
+  one cut per 5.5 s: stamps, insets and tints inside the shot. The push is `ranges[].zoom_to`
+  (animated, built 2026-10-03). See [storytelling.md](storytelling.md) §11.
+- **A long podcast spends its production on the INTRO, not the body** (Figuring Out FO556):
+  the 2:53 intro cuts every 2.5 s under a bed, with kinetic red-keyword captions and explainers.
+  The 2h44m body is plain multicam: ~4.5 cuts/min, no music, no captions, no sound effects. Its
+  only extras are name-drop photos in the empty frame, host reaction cutaways and a wide on
+  laughs. And `scene>` UNDERcounts on a dark set. See [storytelling.md](storytelling.md) §12.
+- **Leaning in front of locked focus makes soft takes** (face sharpness 13–20 against 40–86), and
+  a push or crop magnifies it. Measure per take, `cas` at output size, cap the push. **And
+  never hold a take's LAST word past ~0.4 s without a motion check**: the speaker reaches for
+  the mic. Take the silent beat from the next take's pre-roll instead. Both in gotchas.md.
+- **Check every B-roll cutaway against the line it sits under.** The dashcam OSD speed readout
+  makes this free; it killed 2 of 7 planned cutaways on Detour-2.
+- **B-roll tiers: literal when the line is concrete, texture when it is abstract** — and the
+  texture tier is only licensed when the footage is **you**. Footage of your own life is
+  *evidence* for the claim; anything else in that slot is wallpaper, and 12 cuts/min of
+  wallpaper reads as panic. The transferable lesson is upstream of the edit: **keep a standing
+  library of yourself doing ordinary things**, so abstract lines have somewhere to go. Measured
+  on a 16:31 reference cut in [storytelling.md](storytelling.md) §6.
+- **Generated b-roll: watermark, burned captions, 720p/24fps — and an editorial line.**
+  Environments and objects, not people who could read as the subject or their family; the real
+  photographs carry the people. Scan supplied clips densely, a "reference" montage may hold
+  shots that exist nowhere else. See [gotchas.md](gotchas.md).
+- **Selective speed-up must be a prepped SOURCE with a rescaled transcript**, never a
+  per-range `setpts` — captions inside a sped range drift by the rate (2.6s on a 26s
+  segment) and the frame-count check fails. Keep the SPEC in ORIGINAL times and convert at
+  emit; anything resolving anchors by source name needs the same rename. See gotchas.md.
+- **Frame-scan anything with a label at DELIVERY resolution** — a cut spoken serial number was
+  still readable on the box label in two shots on Detour-3, one only at 4K. And where Deepgram
+  tokens touch, move the cut to the quietest 10 ms nearby or it clips the next word's onset
+  (a click at 10.9x its neighbours). Both in gotchas.md.
+
+## Rendering
+
+*Before changing render.py, or when a render looks wrong.*
+
+- **The concat must stream-copy VIDEO but re-encode audio once** (`-c:v copy` + one continuous
+  AAC pass, `-ac 2`). A blanket `-c copy` inserts ~30 ms of AAC priming at every cut; a lone
+  mono source corrupts everything after it. Both in gotchas.md, both pinned by tests.
+- **Segment durations must be snapped to whole output frames**, or audio and video drift apart
+  by ~13 ms per segment and it accumulates. See gotchas.md.
+- **Where dual-capture is the default look, build it as a prepped SOURCE** (under the original
+  source key) rather than as overlays — captions and audio then resolve for free.
+- **Verify every rendered segment has the same dimensions before compositing.** A portrait
+  source that slipped the prep does NOT fail the `-c:v copy` concat — it plays stretched.
+- **Clamp EDL range ends to `source_duration - 0.05`** (>1 frame): the frame-snap rounds the
+  duration up, and a range flush with the source then overruns its audio.
+- **PiP inset dimensions must be even** — `force_original_aspect_ratio` rounds to even and
+  `alphamerge` then fails on the 1px mismatch.
+- **Re-encode, don't `-c copy`, when joining clips that feed another filtergraph** — a
+  stream-copied join reports a mid-stream property change and the graph fails to reinitialise.
+- **Place overlays with `-itsoffset`, never `setpts`, and always `repeatlast=0`** — over a long
+  render a `setpts`-placed overlay drains ahead of the timeline, runs out early and then freezes
+  the picture on its last frame. It hit 4 of 5 overlays on Detour-2 and reproduces only against
+  the real base decoded from t=0. Scan every delivery with `freezedetect`. See gotchas.md.
+- **Anything positional in the output timeline must be measured from a real render**, never
+  summed from EDL floats — extracts are frame-quantised. This bit both caption offsets
+  (0.6s drift by the end of a 30-segment cut) and an overlay's `start_in_output`. A cheap
+  `--draft` pass measures boundaries valid at any output resolution.
+- **ffmpeg 9 ignores `-color_trc` / `-color_primaries`** — output colour flags silently don't stick
+  (only `-colorspace` does). Tag with `setparams` in the filter chain or `h264_metadata`. The concat
+  takes segment 0's tags, so one untagged card left Episode 2's whole final `transfer=unknown`.
+  Check all three fields on segment 0 and the final. render.py now stamps bt709 itself
+  (2026-10-11). See gotchas.md.
+- **Piping frames through Python? Read and write `yuv420p` and tag the rawvideo
+  INPUT with `-color_range tv -colorspace bt709`.** A bgr24 round trip costs ~20 dB,
+  and an untagged input costs another ~19 dB, both silently. Measure any Python video
+  stage against a plain re-encode of the same file. See gotchas.md.
+- **`zoompan`'s `d` is output-frames-per-INPUT-frame**, so under `-loop 1` every looped frame
+  gets expanded — a 3.6s Ken Burns still came out **389s / 382MB**. Cap with `-frames:v`, and
+  probe the duration of anything built with it. See gotchas.md.
+- **A grade belongs to a lighting setup, not a channel — indoor talking heads default to NO
+  grade** (2026-10-11). The Episode 2 grade took p5 to 5 on a new setup, and its t-shirt white
+  balance cooled skin. Guardrails: p5 >= 20, white balance from skin or wall (never clothing),
+  saturation <= 1.0, red clothing clips < 0.5%. `helpers/exposure.py` checks them on the first
+  face segment of every render. HLG tone-map is now `npl=203` + mobius (`npl=100` + hable ran
+  ~10-15 luma dark), so **never resume a render across that change**. See gotchas.md.
+- **Overlays are resolution-specific: render.py composites them at 0:0 with no scaling.**
+  A 4K overlay on a 1080p base shows its top-left quarter, which reads as bad framing rather
+  than a bug. QC overlay geometry at the DELIVERY height, and name the file with its height
+  the way Ep1's `TEASER_BROLL_2160.mp4` does. `ranges[].zoom` is resolution-independent;
+  overlays are not.
+- **render.py still never cleans `clips_*`, so stale `seg_NN` files can outlive a changed EDL.** Build
+  expected filenames from the EDL, never glob. Same for any cached derived file: check
+  freshness (mtime vs source), not just dimensions.
+- **A killed render now resumes by itself** (2026-10-30): finished segments live in `clips_cache/` and are
+  reused on the next run, keyed on sources, settings, render.py, grade.py and the ffmpeg build. Only a
+  partial output mp4 is lost (no moov atom). `episode2/edit/build/resume_render.py` is obsolete.
+
+## Sound
+
+*Before denoising or mixing.*
+
+- **Measure a denoise chain on your own footage** — the aggressive chain recorded here is 3 dB
+  *worse* on an outdoor monologue than a gentler one.
+- **For speech under broadband noise use `arnndn`, not `afftdn`** — 12-24 dB better on real
+  footage. Models: `~/.cache/rnnoise-models/`. And judge the result by the **absolute noise floor
+  of the render**, not by separation: loudnorm puts ~4 dB straight back. See gotchas.md.
+- **But for WIND use `helpers/denoise.py` (DeepFilterNet3), not `arnndn`** — wind is
+  low-frequency and it *gusts*, which is `arnndn`'s weak case: 8 dB vs **23 dB** on the same
+  clip, beating a commercial cloud service by 1 dB at 24x realtime, locally. Both SpeechBrain
+  enhancement models were *worse than `arnndn`* here, and are 16 kHz. It builds a prepped
+  source; set `audio_filter: ""` on those ranges. See gotchas.md.
+- **To restore "outdoors" after denoising, blend back the residual high-passed at ~500 Hz**
+  (`--ambience`), never the raw signal: 84% of what the model removes is wind below 300 Hz, so
+  a 10% raw blend hands back the entire gain.
+- **Noise is per-location, so denoise is per-segment** — `ranges[].audio_filter` overrides the
+  EDL-level one.
+- **Set music levels per cue against the programme in THAT window** — on Detour-2 the
+  windows spanned 84 dB, so one global target left two cues inaudible and one clipping.
+  Where a window has no headroom, duck the programme with the ramps outside the cue.
+  Mix before loudnorm, never after. See gotchas.md.
+- **Bed under talking: ~27 dB below the voice, measured (Kallaway, 2026-10-13).** Episode 4 sat at 16 dB and Shoaib heard it
+  as too loud. Lift music to ~10 dB under only at hooks and transitions. Method and numbers in
+  [storytelling.md](storytelling.md) §8b.
+- **Wall-to-wall music has no meaning.** Contrast is what creates focus: a naked talking head
+  next to a scored one. If the bed never leaves, its arrival and departure stop being signals.
+  A sudden stop spotlights a moment; a mid-video **fade reads as "this is ending"**, so land the
+  next hook before it finishes. And **pin bed entries/exits to spoken words, like spot effects**:
+  Ep2's beds were hardcoded times and needed a manual −1.40 s shift after a recut; the
+  word-anchored effects moved by themselves. See [storytelling.md](storytelling.md) §8.
+- **To prove a window is unscored, diff against a no-music control** — never read an absolute
+  floor. Room tone varies up to 17 dB between takes and swamps a ducked bed. And read the
+  **magnitude, not the sign**: a SCORED window lands ~1 dB *below* a known-naked reference,
+  because a bed gives the limiter more to take back. The obvious reading inverts the verdict.
+- **An effect 9 dB under the programme raises a window's RMS by 0.5 dB**, so "adds nothing"
+  proves nothing — and subtracting two renders leaves a uniform ~2.5 dB limiter/codec
+  residual everywhere. Floor-against-a-control works for beds; peak is useless once a
+  limiter pins every window. Short effects are a mix decision, not a measurement.
+
+## Graphics and pacing
+
+*Before building graphics or judging pace.*
+
+- **Motion graphics are three layers**: `motion.py` (curves + per-role WEIGHTS + stagger),
+  `brand.py` (a palette derived from delivered work), `components.py` (the archetypes).
+  Author a **role**, never a duration — a hero landing and an aside fading must not match.
+- **Speaker demotion** (`demotions` in the EDL) shrinks the talking head so a graphic owns the
+  frame. `pad` cannot place it — its x/y evaluate once and the picture collapses to the
+  top-left; use `overlay` with `eval=frame` on both the scale and the overlay. It is a
+  *pairing*: the graphic must move into the vacated area or it lands on the card.
+- **UI motion numbers are wrong for video.** Web guidance (150 ms default, <500 ms) exists
+  because the user is *waiting*; a video viewer is not. `motion.WEIGHTS` is deliberately 2-4x
+  slower. What does transfer: curve for opacity, spring for transforms — a spring on alpha
+  overshoots past opaque and dips back, which pulses. See gotchas.md.
+- **Subject masking** (`helpers/matte.py` + `behind_subject` on an overlay) lets a graphic pass
+  behind the speaker. Only the MATTE is computed in Python — the picture stays in ffmpeg, so the
+  colour round-trip tax does not apply. A centred graphic behind a centred subject vanishes
+  entirely; that is the feature working, not a bug.
+- **PIL's ImageDraw replaces, it does not blend.** A 9%-alpha element previewed on an opaque
+  background looks 100% opaque. Preview via `Image.alpha_composite`, as ffmpeg does.
+- **On-screen text goes in the EDL's `graphics` block** (`helpers/graphics.py`), anchored to a
+  source, segment or spoken phrase rather than a timestamp, and sized as a fraction of the output
+  height. Anchored entries survive a re-cut; hardcoded times do not.
+- **`drawtext` does NOT fall back to another font** the way libass does for subtitles — a missing
+  glyph is drawn as a blank box, silently. `Kohinoor.ttc` covers Latin + Devanagari (but not `→`).
+  See gotchas.md.
+- **Anchor graphics to spoken words and RAISE when the word was cut.** A resolver that clamps
+  to the nearest survivor puts the graphic on a silent frame and nothing looks wrong in the
+  render. Print the words each overlay actually covers, and read them.
+- **`drawtext` cannot take an apostrophe in `text=`** at all — use `textfile=`.
+- **`coverage.py` counts 75 jump cuts on one locked-off frame as 5 visual events — correctly.**
+  Push-ins below ~1.1x stop a splice reading as a glitch but are invisible as *events*; only
+  something that replaces the frame moves the number. Run it on the picture lock, before
+  building graphics.
+- **Run `helpers/coverage.py` on any finished cut.** It reports visual events/min, median hold,
+  and every stretch with nothing changing — with what is said there, the unused b-roll you own,
+  and insertion points on sentence boundaries. A delivered 3m34s episode had **124.9s (58%)**
+  with no visual change while 9 b-roll assets sat unused.
+- **Pacing is a ceiling, not a target.** Format decides pace — do not copy an explainer's
+  8.6 events/min onto a personal essay. The rule is: no stretch beyond ~25-30s without
+  something changing, unless the hold is deliberate. And this measures CHANGE, not INTEREST;
+  a retention export replaces the whole guess.
+- **Graphics-heavy talking heads (Aprilynne 22 changes/min, Kallaway 5.9/min) never mark cuts with
+  effects** (no lift over random moments). The music is continuous, and its ABSENCES are placed: at
+  section cards (her) or under long pure-talk stretches (him). Their shared grammar: one recurring
+  metaphor per idea, a chapter deck that returns at every seam, emphasis words instead of
+  sentence captions, annotated real images, and the face owning the emotional close. **Kallaway's
+  look is the house graphics language (2026-10-06)**: glass `keyline` / `deck` / `annotate` cards
+  and EDL `silhouettes`, all in the brand's `glow`. A keyline sits ABOVE house captions (they
+  occupy y~856-968). See [storytelling.md](storytelling.md) §13 and `SKILL.md`.
+
+## Self-evaluation
+
+*Before writing a one-off QC probe.*
+
+- **Self-eval audio numerically**, not by eye: compare the max sample-to-sample step at each cut
+  boundary against a continuous-speech reference. A pop shows as a step well above it.
+- **Parse `ffprobe -show_entries` output by KEY, never by position** — it prints `sample_rate`
+  before `channels` whatever order you ask for, so a stereo clip reads as 48000 channels.
+- **`freezedetect d=0.4` false-positives on a locked-off talking head** — use `d=1.0`. And a
+  dashcam clip at the end of a drive is probably a *parked* car; validate any motion metric on a
+  known-moving control first. It logs at **INFO**, so a hand-rolled check with `-v error`
+  reports zero freezes — a false negative. Back-to-back spans (each end == the next start)
+  over a static background are **caption changes**, not a stuck picture.
+- **Never hardcode a timestamp in a self-eval probe.** When the cut shortens, the probe lands
+  past the end of the file and reports `-999 dB` in the same column as every real level —
+  indistinguishable from a scene that lost its audio. Anchor to the end card or a spoken word,
+  like graphics and overlays. Cost us a scare on episode2's delivery.
+
+## Ideas and packaging
+
+*Before an idea, a title or a thumbnail.*
+
+- **Creativity is recombination, not talent** — and style is `A + B = C`: A your niche, B
+  something from outside it, C your identity. B is the real decision and it is made once for a
+  channel, not per video. **Repetition is what builds identity**, so consistency across episodes
+  beats novelty within one — `brand.json` is a commitment, not a starting point.
+  See [ideation.md](ideation.md).
+- **Steal the method, never the artifact.** The reconciliation of "don't copy" and "every artist
+  is a thief": lift the methodology and tweak it, not the finished piece. Same file.
+- **Blocked on ideas is usually information OVERLOAD, not a shortage** — the fix is an artificial
+  constraint that shrinks the option space, which is also why our decision table works. Same file.
+- **Packaging before production.** Title first (≥10), a thumbnail brief *before* the shoot,
+  ≥3 differentiated thumbnails, and the expected result written down before publishing.
+  Outliers are ≥3× a channel's *average views*, not measured against its subscribers.
+  See [distribution.md](distribution.md) §10.
+- **Outliers bring views; formats bring people back** (The Studio). Adapt an outlier by
+  inverting it or using it as a hook genre, never 1:1. Design Shorts in the script, never clip
+  them out after. Batch 3–4 before launching a format. On a decline, ask "did I just try
+  something new?" before suspecting the platform. See [distribution.md](distribution.md) §12.
+
+## After publishing
+
+*Before judging how a video did.*
+
+- **`views` and `CTR` are not two views of one funnel — feed autoplay is a view but not a click.**
+  Reconcile `watch time / AVD` against `impressions x CTR` (they share a denominator), never
+  against the headline view count. On Detour-2 those two agreed at ~19 while the dashboard said
+  ~157; the gap is autoplay, not an error. **The autoplay-view rate vs the click rate is the real
+  packaging signal**: 15.0% vs 2.06% means the footage sells ~7x better than the thumbnail.
+  See [distribution.md](distribution.md) §11.
+- **Diff YouTube's auto-feedback against the actual EDL before acting on it.** It told us to add
+  chapters we had already written, and put the turn two minutes from where it is.
+- **The turn must arrive before the average viewer leaves.** Detour-2's AVD was 4:10 with the turn at
+  16:46 — 12.6 minutes past the exit. Runtime had grown 17:20 -> 27:14 to keep content. Build the
+  next one turn-first rather than re-cutting the last (§5).
+- **Impressions are the system's confidence, not a reward withheld.** A video is served in
+  widening waves — loyal audience first, then riskier — and impressions stop when a wave stops
+  converting. So **good CTR + good retention + low impressions usually means the video never
+  left the loyal base**: check new-vs-returning per video before blaming the cut.
+  See [distribution.md](distribution.md).
+- **Ignore the first 24-48 hours** (YouTube labels early figures estimates), compare like with
+  like **in the same window** (first week vs first week, same content pillar — "velocity", not
+  totals), and **put the energy into the next episode rather than rescuing the last**. Our
+  pipeline makes re-rendering cheap, which makes that trap easier to fall into here.
+- **Community posts are the most underused surface** — reportedly ~10% of one channel's
+  impressions. Never "here's my video"; post the value that did not fit in the thumbnail.
+  And a subscriber who never watches costs nothing, so do not optimise subscriber "quality".
+- **Using new features does not buy impressions**, and tags are low-leverage whatever a vendor
+  video claims. Metadata helps the system CLASSIFY a video; viewer behaviour decides how far it
+  TRAVELS. Same file.

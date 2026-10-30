@@ -665,7 +665,7 @@ def cmd_mux(ctx, a):
     if missing:
         sys.exit(f"missing chunks: {missing[:5]}")
     with open(ctx.w("chunks", "concat.txt"), "w") as fh:
-        fh.writelines(f"file '{f}'\n" for f in files)
+        fh.writelines("file '" + str(f).replace("'", "'\\''") + "'\n" for f in files)
     # keep the master's A/V offset (its video starts a frame after its audio)
     off = start_time(ctx.master, "v") - start_time(ctx.master, "a")
     out = ctx.path(ctx.cfg("OUTPUT", "final_mgx.mp4"))

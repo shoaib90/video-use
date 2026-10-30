@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cut Notes</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b0b0c; --panel: #151517; --line: #2a2a2e; --text: #ececee; --dim: #9a9aa2;
+    --accent: #e8c15a; --cut: #ef6a5e; --shorten: #e8a35a; --lengthen: #5fb6e8; --wrong: #c98be8; --note: #8fd18a;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; height: 100%; }
+  .stage { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 12px 16px; gap: 10px; }
+  .frame { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: #000; border-radius: 6px; overflow: hidden; }
+  video { display: block; max-width: 100%; max-height: 100%; }
+  .frame.pinning { cursor: crosshair; }
+  .pin { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border: 2px solid var(--accent); border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 2px #0008; }
+  .scrub { position: relative; height: 34px; background: var(--panel); border-radius: 4px; cursor: pointer; overflow: hidden; touch-action: none; }
+  .scrub .fill { position: absolute; inset: 0 auto 0 0; background: #2f2f35; pointer-events: none; }
+  .scrub .tick { position: absolute; top: 0; width: 1px; height: 8px; background: #66666e; pointer-events: none; }
+  .scrub .mark { position: absolute; top: 8px; bottom: 0; width: 3px; margin-left: -1px; pointer-events: none; }
+  .scrub .head { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--text); pointer-events: none; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .time { font-variant-numeric: tabular-nums; font-size: 15px; min-width: 150px; }
+  button, select, textarea { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; }
+  button { padding: 5px 10px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: #55555c; }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #17140a; font-weight: 600; }
+  select { padding: 5px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .hint { color: var(--dim); font-size: 12px; }
+  kbd { font: 11px ui-monospace, Menlo, monospace; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; }
+  aside { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: #101012; }
+  header { padding: 12px 14px 8px; border-bottom: 1px solid var(--line); }
+  h1 { margin: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+  .status { color: var(--dim); font-size: 12px; margin-top: 2px; }
+  .status.bad { color: var(--cut); font-weight: 600; }
+  form { padding: 12px 14px; border-bottom: 1px solid var(--line); display: none; flex-direction: column; gap: 8px; background: var(--panel); }
+  form.open { display: flex; }
+  .kinds { display: flex; flex-wrap: wrap; gap: 4px; }
+  .kinds button { padding: 3px 8px; font-size: 12px; }
+  .kinds button[aria-pressed="true"] { color: #111; font-weight: 600; }
+  textarea { width: 100%; min-height: 72px; padding: 8px; resize: vertical; background: var(--bg); }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .spacer { flex: 1; }
+  ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+  li { padding: 9px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  li:hover { background: var(--panel); }
+  li .top { display: flex; align-items: center; gap: 8px; }
+  li .t { font-variant-numeric: tabular-nums; font-weight: 600; }
+  li .k { font-size: 11px; font-weight: 600; }
+  li .x { margin-left: auto; padding: 0 6px; background: none; border: 0; color: var(--dim); }
+  li .x:hover { color: var(--cut); }
+  li p { margin: 3px 0 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .empty { padding: 18px 14px; color: var(--dim); }
+  @media (max-width: 820px) {
+    main { display: block; height: auto; }
+    .stage { padding: 12px 16px; }
+    .frame { flex: none; }
+    video { width: 100%; }
+    aside { border-left: 0; border-top: 1px solid var(--line); }
+    ul { overflow: visible; }
+    .desktop { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <section class="stage">
+    <div class="frame" id="frame">
+      <video id="video" src="/video" preload="metadata" playsinline></video>
+      <div class="pin" id="pin" hidden></div>
+    </div>
+    <div class="scrub" id="scrub" role="slider" aria-label="Position in the video" tabindex="0">
+      <div class="fill" id="fill"></div><div id="marks"></div><div class="head" id="head"></div>
+    </div>
+    <div class="bar">
+      <button id="play" type="button">Play</button>
+      <span class="time" id="time">0:00.00</span>
+      <select id="speed" aria-label="Playback speed">
+        <option value="1">1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option>
+      </select>
+      <button id="add" class="primary" type="button">Add note</button>
+      <span class="hint desktop"><kbd>Space</kbd> play <kbd>←</kbd><kbd>→</kbd> 1 s <kbd>,</kbd><kbd>.</kbd> 1 frame <kbd>N</kbd> note <kbd>[</kbd><kbd>]</kbd> previous or next cut</span>
+    </div>
+  </section>
+  <aside>
+    <header>
+      <h1 id="name"></h1>
+      <div class="status" id="status" role="status">Loading notes</div>
+    </header>
+    <form id="form">
+      <div class="row"><strong id="formtime"></strong><span class="spacer"></span><span class="hint">Click the picture to pin a spot</span></div>
+      <div class="kinds" id="kinds"></div>
+      <textarea id="text" placeholder="What is wrong here?" aria-label="Note"></textarea>
+      <div class="row">
+        <button id="save" class="primary" type="submit">Save</button>
+        <button id="cancel" type="button">Cancel</button>
+        <span class="spacer"></span>
+        <button id="record" type="button">Record voice</button>
+      </div>
+      <div class="hint" id="voicehint"></div>
+    </form>
+    <ul id="list"></ul>
+  </aside>
+</main>
+<script>
+const CONFIG = /*__CONFIG__*/null || {name: "", fps: 30, cuts: []};
+const COLORS = {cut: "--cut", shorten: "--shorten", lengthen: "--lengthen", wrong: "--wrong", note: "--note"};
+const $ = id => document.getElementById(id);
+const video = $("video");
+let notes = [];
+let draft = null;      // the note being written: {t, kind, pin, voice, editing}
+let recorder = null;
+let saveChain = Promise.resolve();
+const draftKey = "cut-notes:" + CONFIG.name;
+
+const fmt = t => {
+  const m = Math.floor(t / 60);
+  return m + ":" + (t - m * 60).toFixed(2).padStart(5, "0");
+};
+const newId = () => Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+
+function status(text, bad) {
+  const el = $("status");
+  el.textContent = text;
+  el.classList.toggle("bad", !!bad);
+}
+
+function counted() {
+  return notes.length + (notes.length === 1 ? " note" : " notes");
+}
+
+// Saves run one at a time so an older list can never land after a newer one.
+function save() {
+  const body = JSON.stringify(notes);
+  try { localStorage.setItem(draftKey, body); } catch (e) {}
+  saveChain = saveChain.then(async () => {
+    try {
+      const r = await fetch("/notes", {method: "POST", headers: {"Content-Type": "application/json"}, body});
+      if (!r.ok) throw new Error(await r.text());
+      status(counted() + ", saved");
+    } catch (e) {
+      status("NOT SAVED. Keep this tab open: " + e.message, true);
+    }
+  });
+  return saveChain;
+}
+
+function renderMarks() {
+  const d = video.duration || 0;
+  const box = $("marks");
+  box.textContent = "";
+  if (!d) return;
+  for (const c of CONFIG.cuts) {
+    const el = document.createElement("div");
+    el.className = "tick";
+    el.style.left = (c / d * 100) + "%";
+    box.append(el);
+  }
+  for (const n of notes) {
+    const el = document.createElement("div");
+    el.className = "mark";
+    el.style.left = (n.t / d * 100) + "%";
+    el.style.background = `var(${COLORS[n.kind]})`;
+    box.append(el);
+  }
+}
+
+function renderList() {
+  const list = $("list");
+  list.textContent = "";
+  if (!notes.length) {
+    const li = document.createElement("li");
+    li.className = "empty";
+    li.textContent = "No notes yet. Press N at any moment you want changed.";
+    li.style.cursor = "default";
+    list.append(li);
+  }
+  for (const n of notes) {
+    const li = document.createElement("li");
+    const top = document.createElement("div");
+    top.className = "top";
+    const t = document.createElement("span");
+    t.className = "t";
+    t.textContent = fmt(n.t);
+    const k = document.createElement("span");
+    k.className = "k";
+    k.textContent = n.kind + (n.voice ? " + voice" : "") + (n.pin ? " + pin" : "");
+    k.style.color = `var(${COLORS[n.kind]})`;
+    const x = document.createElement("button");
+    x.className = "x";
+    x.type = "button";
+    x.textContent = "✕";
+    x.setAttribute("aria-label", "Delete the note at " + fmt(n.t));
+    x.onclick = e => {
+      e.stopPropagation();
+      notes = notes.filter(o => o.id !== n.id);
+      refresh();
+      save();
+    };
+    top.append(t, k, x);
+    li.append(top);
+    if (n.text) {
+      const p = document.createElement("p");
+      p.textContent = n.text;
+      li.append(p);
+    }
+    li.onclick = () => {
+      video.pause();
+      video.currentTime = n.t;
+      showPin(n.pin);
+    };
+    li.ondblclick = () => openForm(n);
+    list.append(li);
+  }
+}
+
+function refresh() {
+  notes.sort((a, b) => a.t - b.t);
+  renderList();
+  renderMarks();
+}
+
+// Where the picture really is inside the element: clicks on letterbox bars are not on the picture.
+function pictureBox() {
+  const r = video.getBoundingClientRect();
+  const vw = video.videoWidth || 16, vh = video.videoHeight || 9;
+  const scale = Math.min(r.width / vw, r.height / vh);
+  const w = vw * scale, h = vh * scale;
+  return {x: r.left + (r.width - w) / 2, y: r.top + (r.height - h) / 2, w, h};
+}
+
+function showPin(pin) {
+  const el = $("pin");
+  el.hidden = !pin;
+  if (!pin) return;
+  const b = pictureBox(), f = $("frame").getBoundingClientRect();
+  el.style.left = (b.x - f.left + pin[0] * b.w) + "px";
+  el.style.top = (b.y - f.top + pin[1] * b.h) + "px";
+}
+
+function setKind(kind) {
+  draft.kind = kind;
+  for (const b of $("kinds").children) {
+    const on = b.dataset.kind === kind;
+    b.setAttribute("aria-pressed", on);
+    b.style.background = on ? `var(${COLORS[kind]})` : "";
+    b.style.borderColor = on ? `var(${COLORS[kind]})` : "";
+  }
+}
+
+function openForm(existing) {
+  video.pause();
+  draft = existing
+    ? {...existing, editing: existing.id}
+    : {id: newId(), t: Math.round(video.currentTime * 1000) / 1000, kind: "note"};
+  $("form").classList.add("open");
+  $("frame").classList.add("pinning");
+  $("formtime").textContent = fmt(draft.t);
+  $("text").value = draft.text || "";
+  $("voicehint").textContent = draft.voice ? "Voice note attached." : "";
+  setKind(draft.kind);
+  showPin(draft.pin);
+  $("text").focus();
+}
+
+function closeForm() {
+  if (recorder) recorder.stop();
+  draft = null;
+  $("form").classList.remove("open");
+  $("frame").classList.remove("pinning");
+  showPin(null);
+}
+
+async function commit() {
+  if (!draft) return;
+  const n = {id: draft.id, t: draft.t, kind: draft.kind, text: $("text").value.trim()};
+  if (draft.pin) n.pin = draft.pin;
+  if (draft.voice) n.voice = draft.voice;
+  if (draft.transcript) n.transcript = draft.transcript;
+  if (!n.text && !n.voice && n.kind === "note") {
+    $("text").focus();
+    $("voicehint").textContent = "Write something, record a voice note, or pick a kind.";
+    return;
+  }
+  notes = notes.filter(o => o.id !== draft.editing);
+  notes.push(n);
+  closeForm();
+  refresh();
+  await save();
+}
+
+function setupKinds() {
+  for (const kind of Object.keys(COLORS)) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = kind;
+    b.dataset.kind = kind;
+    b.onclick = () => setKind(kind);
+    $("kinds").append(b);
+  }
+}
+
+function setupVoice() {
+  const btn = $("record");
+  if (!navigator.mediaDevices || !window.MediaRecorder) {
+    btn.disabled = true;
+    btn.title = "This browser cannot record audio";
+    return;
+  }
+  btn.onclick = async () => {
+    if (recorder) { recorder.stop(); return; }
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({audio: true});
+    } catch (e) {
+      $("voicehint").textContent = "Microphone not available: " + e.message;
+      return;
+    }
+    const chunks = [];
+    const type = ["audio/webm", "audio/mp4", "audio/ogg"].find(t => MediaRecorder.isTypeSupported(t));
+    recorder = new MediaRecorder(stream, type ? {mimeType: type} : {});
+    const owner = draft;
+    recorder.ondataavailable = e => chunks.push(e.data);
+    recorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      btn.textContent = "Record voice";
+      recorder = null;
+      const blob = new Blob(chunks);
+      const mime = (type || "audio/webm").split(";")[0];
+      const id = newId();
+      const r = await fetch("/voice/" + id, {method: "POST", headers: {"Content-Type": mime}, body: blob}).catch(() => null);
+      if (r && r.ok) {
+        owner.voice = id;
+        if (draft === owner) $("voicehint").textContent = "Voice note attached.";
+      } else if (draft === owner) {
+        $("voicehint").textContent = "The voice note did not save.";
+      }
+    };
+    recorder.start();
+    btn.textContent = "Stop recording";
+  };
+}
+
+function seekTo(clientX) {
+  const r = $("scrub").getBoundingClientRect();
+  if (video.duration) video.currentTime = Math.max(0, Math.min(1, (clientX - r.left) / r.width)) * video.duration;
+}
+
+function jumpCut(dir) {
+  const now = video.currentTime;
+  const next = dir > 0
+    ? CONFIG.cuts.find(c => c > now + 0.02)
+    : [...CONFIG.cuts].reverse().find(c => c < now - 0.25);
+  if (next !== undefined) video.currentTime = next;
+}
+
+function tick() {
+  const d = video.duration || 0, t = video.currentTime;
+  $("time").textContent = fmt(t) + " / " + fmt(d);
+  $("fill").style.width = d ? (t / d * 100) + "%" : "0";
+  $("head").style.left = d ? (t / d * 100) + "%" : "0";
+  $("scrub").setAttribute("aria-valuenow", Math.round(t));
+  $("scrub").setAttribute("aria-valuetext", fmt(t));
+  requestAnimationFrame(tick);
+}
+
+function setup() {
+  $("name").textContent = CONFIG.name;
+  document.title = "Notes: " + CONFIG.name;
+  setupKinds();
+  setupVoice();
+  $("play").onclick = () => video.paused ? video.play() : video.pause();
+  video.onplay = () => { $("play").textContent = "Pause"; showPin(draft && draft.pin); };
+  video.onpause = () => { $("play").textContent = "Play"; };
+  video.onloadedmetadata = () => {
+    $("scrub").setAttribute("aria-valuemax", Math.round(video.duration));
+    renderMarks();
+  };
+  video.onerror = () => status("The video did not load. Is notes.py still running?", true);
+  $("speed").onchange = e => { video.playbackRate = +e.target.value; };
+  $("add").onclick = () => openForm();
+  $("cancel").onclick = closeForm;
+  $("form").onsubmit = e => { e.preventDefault(); commit(); };
+  $("frame").onclick = e => {
+    if (!draft) {
+      video.paused ? video.play() : video.pause();
+      return;
+    }
+    const b = pictureBox();
+    const x = (e.clientX - b.x) / b.w, y = (e.clientY - b.y) / b.h;
+    if (x < 0 || x > 1 || y < 0 || y > 1) return;
+    draft.pin = [Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000];
+    showPin(draft.pin);
+  };
+  const scrub = $("scrub");
+  scrub.onpointerdown = e => {
+    scrub.setPointerCapture(e.pointerId);
+    seekTo(e.clientX);
+    scrub.onpointermove = m => seekTo(m.clientX);
+  };
+  scrub.onpointerup = () => { scrub.onpointermove = null; };
+  window.onresize = () => showPin(draft && draft.pin);
+  document.addEventListener("keydown", e => {
+    const typing = /TEXTAREA|SELECT/.test(e.target.tagName);
+    if (e.key === "Escape" && draft) { closeForm(); return; }
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && draft) { e.preventDefault(); commit(); return; }
+    if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === " " && e.target.tagName === "BUTTON") return;  // the button's own click
+    const frame = 1 / CONFIG.fps;
+    const act = {
+      " ": () => video.paused ? video.play() : video.pause(),
+      ArrowLeft: () => { video.currentTime -= e.shiftKey ? 5 : 1; },
+      ArrowRight: () => { video.currentTime += e.shiftKey ? 5 : 1; },
+      ",": () => { video.pause(); video.currentTime -= frame; },
+      ".": () => { video.pause(); video.currentTime += frame; },
+      "[": () => jumpCut(-1),
+      "]": () => jumpCut(1),
+      n: () => openForm(),
+      N: () => openForm(),
+    }[e.key];
+    if (act) {
+      e.preventDefault();
+      act();
+    }
+  });
+  window.addEventListener("beforeunload", e => {
+    if (draft) { e.preventDefault(); e.returnValue = ""; }
+  });
+}
+
+async function load() {
+  try {
+    const r = await fetch("/notes");
+    if (!r.ok) throw new Error(r.status);
+    notes = await r.json();
+    status(notes.length ? counted() + ", saved" : "Notes save as you make them");
+  } catch (e) {
+    status("Could not load saved notes: " + e.message, true);
+  }
+  refresh();
+}
+
+setup();
+load();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

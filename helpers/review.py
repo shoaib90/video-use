@@ -456,6 +456,37 @@ def word_checks(stories, words_of, starts_of_story):
 
 
 # ------------------------------------------------------------------- render checks
+FLASH_DIFF = 12.0   # mean grey-level change, of 255, that counts as a different picture
+
+
+def is_flash(steps, i: int) -> bool:
+    """Steps i-1 and i are both big: the picture changed twice, one frame apart.
+
+    A clean cut changes it once. The bar rises with how much the rest of this window moves,
+    so a whip pan or a strobe, where every step is big, does not read as a stray frame.
+    The two neighbours need not match: a stray frame between two different shots is the usual case.
+    """
+    rest = [s for k, s in enumerate(steps) if k not in (i - 1, i)]
+    bar = FLASH_DIFF + 2 * (float(np.median(rest)) if rest else 0.0)
+    return steps[i - 1] > bar and steps[i] > bar
+
+
+def flash_frames(render: Path, cuts, fps: float, w: int = 64, h: int = 36) -> list[float]:
+    """Output times of cuts with a single stray frame beside them."""
+    found = []
+    n = w * h
+    for t in cuts:
+        start = max(0.0, float(t) - 4 / fps)
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{start:.3f}", "-i", str(render), "-t", f"{8 / fps:.3f}",
+                              "-vf", f"scale={w}:{h},format=gray", "-an", "-f", "rawvideo", "-"],
+                             capture_output=True).stdout
+        frames = np.frombuffer(raw, np.uint8)[: len(raw) // n * n].reshape(-1, n).astype(np.float32)
+        steps = [float(np.abs(b - a).mean()) for a, b in zip(frames, frames[1:])]
+        if any(is_flash(steps, i) for i in range(1, len(steps))):
+            found.append(float(t))
+    return found
+
+
 def render_checks(edit: Path, edl: dict, render: Path, durs, fps):
     res = []
     R = edl["ranges"]
@@ -498,6 +529,11 @@ def render_checks(edit: Path, edl: dict, render: Path, durs, fps):
             if step > 2.5 * base and step > 0.02:
                 clicks.append(fmt(t))
     res.append(("T4", not clicks, f"{len(clicks)} cut(s) with a step spike {clicks[:12]}"))
+    # Overlay edges too: one ending a frame before a cut shows the shot under it for one frame.
+    ov_edges = [e for o in edl.get("overlays") or [] if "start_in_output" in o
+                for e in (float(o["start_in_output"]), float(o["start_in_output"]) + float(o["duration"]))]
+    flashes = flash_frames(render, sorted({round(float(t), 3) for t in [*seg_bounds, *ov_edges]}), fps)
+    res.append(("T9", not flashes, f"{len(flashes)} cut(s) with a stray single frame {[fmt(t) for t in flashes[:12]]}"))
     err = run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(render), "-af", "ebur128=peak=true:framelog=quiet",
                "-f", "null", "-"]).stderr
     I = [float(l.split("I:")[1].split("LUFS")[0]) for l in err.splitlines() if "I:" in l and "LUFS" in l]
@@ -511,6 +547,8 @@ def render_checks(edit: Path, edl: dict, render: Path, durs, fps):
     black = [l for l in err.splitlines() if "black_start" in l]
     res.append(("T6", not black and rms > -45, f"first 2 s: {'black ' if black else ''}audio {rms:.1f} dBFS"))
     srt = edit / str(edl.get("subtitles") or "master.srt")
+    if edl.get("subtitles") and not srt.exists():
+        res.append(("T8", False, f"the EDL names {edl['subtitles']} but it does not exist: captions missing?"))
     if srt.exists():
         n, short, ex = caption_fragments(srt.read_text())
         res.append(("T8", n == 0 or short / n <= FRAGMENT_SHARE,
@@ -713,7 +751,7 @@ def make_reel(render: Path, marks, out: Path, pre=7.0, post=7.0):
                     ":x=16:y=16:fontsize=26:fontcolor=white:box=1:boxcolor=black@0.65,fps=30",
              "-c:v", "libx264", "-preset", "veryfast", "-crf", "24", "-c:a", "aac", "-b:a", "160k", "-ar", "48000",
              "-ac", "2", str(seg)])
-        lst.append(f"file '{seg}'")
+        lst.append("file '" + str(seg).replace("'", "'\\''") + "'")
     (tmp / "list.txt").write_text("\n".join(lst))
     run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(tmp / "list.txt"), "-c", "copy", str(out)])
     shutil.rmtree(tmp)

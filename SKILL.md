@@ -142,7 +142,7 @@ For animations, create `<edit>/animations/slot_<id>/` with `Bash` and spawn a su
 3. **Converse.** Describe what you see in plain English. Ask questions *shaped by the material*. Collect: content type, target length/aspect, aesthetic/brand direction, pacing feel, must-preserve moments, must-cut moments, animation and grade preferences, subtitle needs. Do not use a fixed checklist — the right questions are different every time.
 4. **Propose strategy.** 4–8 sentences: shape, take choices, cut direction, animation plan, grade direction, subtitle style, length estimate. **Wait for confirmation.**
 5. **Execute.** Produce `edl.json` via the editor sub-agent brief. Drill into `timeline_view` at ambiguous moments. Build animations in parallel sub-agents. Apply grade per-segment. Compose via `render.py`.
-6. **Preview.** `render.py --preview`.
+6. **Preview.** `render.py --preview`. It validates the edit first and rebuilds only the segments that changed. Hand it over with `notes.py <render>`, so feedback arrives on exact frames; `notes.py --dump` reads it back.
 7. **Self-eval (before showing the user).** First run `helpers/review.py` (story-edge context, captions, freezes, clicks, loudness, music windows, graphics; ledger: `kb/mistakes.md`) and clear its HIGH flags. Run `timeline_view` on the **rendered output** (not the sources) at every cut boundary (±1.5s window). Check each image for:
    - Visual discontinuity / flash / jump at the cut
    - Waveform spike at the boundary (audio pop that slipped past the 30ms fade)

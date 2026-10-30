@@ -195,15 +195,23 @@ def resolve_anchors(graphics: list[dict], edl: dict, edit_dir: Path,
 # -------- filter construction ------------------------------------------------
 
 
-def _escape_path(p: Path | str) -> str:
-    """Escape a path for use inside an ffmpeg filter option value."""
-    return str(p).replace("\\", "\\\\").replace(":", r"\:").replace("'", r"\'")
+def escape_filter_path(p: Path | str) -> str:
+    """Escape a path as an UNQUOTED ffmpeg filter option value.
+
+    Single quotes cannot hold an apostrophe at all, and the value is parsed twice:
+    once as a filter option, then as part of the graph. Both levels need escaping.
+    """
+    s = str(p).replace("\\", "\\\\").replace(":", r"\:").replace("'", r"\'")
+    s = s.replace("\\", "\\\\").replace("'", r"\'")
+    for ch in "[],;":
+        s = s.replace(ch, "\\" + ch)
+    return s
 
 
 def _font_opt(font: str) -> str:
     """`fontfile=` for a path, `font=` for a fontconfig family name."""
     if "/" in font or font.endswith((".ttf", ".ttc", ".otf")):
-        return f"fontfile='{_escape_path(font)}'"
+        return f"fontfile={escape_filter_path(font)}"
     return f"font='{font}'"
 
 
@@ -257,7 +265,7 @@ def _drawtext(textfile: Path, font: str, size: int, color: str, x: str, y: str,
               start: float, end: float, fade: float,
               box: bool, box_color: str, box_pad: int) -> str:
     parts = [
-        f"drawtext=textfile='{_escape_path(textfile)}'",
+        f"drawtext=textfile={escape_filter_path(textfile)}",
         _font_opt(font),
         f"fontsize={size}",
         f"fontcolor={color}",

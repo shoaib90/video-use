@@ -3406,10 +3406,9 @@ about a minute each. Short units and tags fit ("14 hours" / "a day").
 ## Re-extract only the ranges that changed
 
 Every segment is a pure function of its range, so a small fix need not re-extract a 4K cut
-(~40 min for 250 segments). `episode5/edit/build/rerender_changed.py <old ranges.json>
-<render args>` moves the old clips to `clips_*_prev/`, copies every identical range, and
-extracts only the rest. Episode 5 v1: 248 of 250 reused, minutes instead of ~40. Write the
-new ranges snapshot after it (the script does) so `recomposite.py` accepts the cut.
+(~40 min for 250 segments). Episode 5 v1, with a one-off `build/rerender_changed.py`: 248 of 250
+reused, minutes instead of ~40. **Built into render.py since 2026-10-30** (`clips_cache/`, see
+helpers.md), so that script is obsolete.
 
 ## SendUserFile reaches the phone only under 30 MiB
 

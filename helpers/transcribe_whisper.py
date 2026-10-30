@@ -41,7 +41,9 @@ from transcribe import (  # noqa: E402
     count_audio_tracks,
     extract_audio,
     peak_dbfs,
+    source_stamp,
     transcript_path,
+    warn_if_source_changed,
 )
 
 DEFAULT_MODEL = Path.home() / ".cache" / "whisper-models" / "ggml-small.en.bin"
@@ -231,6 +233,7 @@ def transcribe_one(
     out_path = transcript_path(edit_dir, video, audio_track)
 
     if out_path.exists() and check_cached(out_path, model.stem, force, verbose):
+        warn_if_source_changed(out_path, video)
         return out_path
 
     if verbose:
@@ -264,6 +267,7 @@ def transcribe_one(
     # Stamp identity so the cache can be validated on reuse.
     payload["_model"] = model.stem
     payload["_spacing_threshold"] = spacing_threshold
+    payload.update(source_stamp(video))
     out_path.write_text(json.dumps(payload, indent=2))
 
     if verbose:

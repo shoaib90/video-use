@@ -34,6 +34,17 @@ from PIL import Image, ImageDraw, ImageFont
 # -------- Frame extraction ---------------------------------------------------
 
 
+def probe_duration(video: Path) -> float | None:
+    """Container duration in seconds, or None when ffprobe cannot tell."""
+    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                          "-of", "default=noprint_wrappers=1:nokey=1", str(video)],
+                         capture_output=True, text=True)
+    try:
+        return float(out.stdout.strip())
+    except ValueError:
+        return None
+
+
 def extract_frames(video: Path, start: float, end: float, n: int, dest_dir: Path) -> list[Path]:
     """Extract N frames evenly spaced across [start, end]. Returns paths in order."""
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -44,6 +55,13 @@ def extract_frames(video: Path, start: float, end: float, n: int, dest_dir: Path
     else:
         step = (end - start) / (n - 1)
         times = [start + i * step for i in range(n)]
+
+    # Seeking at or past the last frame gives no frame at all, and ffmpeg's exit
+    # code for that varies by version. Keep every timestamp inside the clip.
+    duration = probe_duration(video)
+    if duration is not None:
+        latest = max(0.0, duration - 0.05)
+        times = [min(t, latest) for t in times]
 
     paths: list[Path] = []
     for i, t in enumerate(times):

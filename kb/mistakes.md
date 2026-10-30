@@ -251,6 +251,12 @@ again; and the reaction shot spent the realisation 3 minutes before the zenith i
 now also asks, for every cutaway, "what does this line MEAN, and does the shot show that?" A shot that only
 matches a noun is filler; if nothing shows the meaning, keep the face.
 
+**M061** · 2026-10-30 · stance-04-hustle final · *Found by the new check, not by eye: six one-frame slivers of the wrong
+shot, at 0:26.4, 0:30.8, 1:08.7, 1:17.5, 2:04.1 and 3:27.1.* Cause: an overlay edge one frame off the cut it should meet.
+At 1:17.5 the CAMEUP overlay ran 6.4 s from 71.093, ending at 77.493, one frame before the cut at 77.5. Check:
+`AUTO T9` (a stray single frame at any cut or overlay edge). Three delivered videos, 407 cuts: these six, each
+confirmed by eye; none in Episodes 3 and 5.
+
 ## Sound
 
 **M052** · 2026-10-05 · Episode 3 v4 (logged 2026-10-12) · *Sound effects 17 LU under the voice were

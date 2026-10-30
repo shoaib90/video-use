@@ -75,7 +75,7 @@ the reasoning behind each cut.
 rsync -av ~/Documents/Ambitious/Editing/Detour-1/ newmachine:~/Documents/Ambitious/Editing/Detour-1/
 ```
 
-The big intermediates (`clips_graded/`, `base*.mp4`, `*.prenorm.mp4`) are regenerable — skip them
+The big intermediates (`clips_cache/`, `clips_graded/`, `base*.mp4`, `*.prenorm.mp4`) are regenerable — skip them
 if space matters. `edl.json`, `transcripts/`, `project.md` and `prepped/` are the ones worth moving.
 
 ## Verifying the two machines match

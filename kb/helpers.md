@@ -15,7 +15,17 @@ word granularity) → writes `<edit>/transcripts/<stem>.json`.
 - `--audio-track` matters for OBS captures: game on track 0, mic on track 1. Track 0 keeps the
   plain filename; others get a `.trackN` suffix.
 
+## Transcript guards (all three transcribers, 2026-10-30)
+New transcripts carry `_source_name` and `_source_size`. A cached transcript whose source differs prints a
+WARNING and is still returned: it never re-bills, and prepped sources keep their original's transcript on
+purpose. Size rather than mtime, because copying footage changes mtime. `transcribe_batch.py` refuses a
+folder where two videos share a stem (`intro.mp4` + `intro.MOV`). Tests: `test_transcript_guards.py`.
+
 ## transcribe_deepgram.py — Deepgram nova-3  *(local addition)*
+`--keyterms <file>`: names and terms to bias Nova-3 toward, one per line, `#` comments, max 100. Sent as one
+`keyterm=` per term (Deepgram treats commas as one literal term, silently). Part of the cache identity.
+Deepgram's docs say it works on multilingual. **Not yet tried on real Hinglish**: the unit test checks the
+request, not the transcript. Compare one clip on the next new episode.
 ```
 transcribe_deepgram.py <video> [--model nova-3] [--language en] [--spacing-threshold 0.05]
 transcribe_deepgram.py --convert <deepgram_response.json>
@@ -79,7 +89,22 @@ emits a subtle per-clip correction. `--analyze` prints what it *would* do withou
 ```
 render.py <edl.json> -o <out> [--preview] [--draft] [--build-subtitles]
                               [--no-subtitles] [--no-loudnorm] [--fps 30]
+                              [--check] [--skip-check] [--jobs 4] [--no-reuse]
 ```
+- **`--check`** validates and exits; every render runs the same checks first (`--skip-check` to bypass).
+  Errors: missing source, bad or past-the-end range, sources that would come out at different sizes (they
+  play stretched, the concat does not fail), missing subtitles file, missing overlay, a card or graphic
+  anchor phrase that was cut, a missing ffmpeg filter. Warnings: a range within 50 ms of its source's end,
+  an overlay bigger than the frame, no transcript or no audio. Pass the same `--height` as the real
+  render or the overlay warning is meaningless. Costs ~1 s per source. Tests: `test_render_preflight.py`.
+- **A missing `subtitles` file now stops the render** (it used to warn, exit 0 and ship no captions).
+- **Segment reuse** is on by default: `clips_cache/<hash>.mp4`, hard-linked to `clips_*/seg_NN_<src>.mp4`.
+  The key covers source name + size + mtime, range, all settings, any file a filter names, render.py,
+  grade.py and the ffmpeg version, so editing render.py rebuilds everything, on purpose. The composite and
+  loudnorm always run. Deleting `clips_cache/` is always safe. Tests: `test_render_reuse.py`.
+- **`--jobs`** default 4; frame-identical to 1. Measured on 8 ranges of 4K HLG with captions, 24 s out:
+  1 job 73 s, 4 jobs 68 s, then one range changed 39 s (~35 s of that is composite + loudnorm).
+- **ffmpeg's own error is printed** on failure, no traceback.
 - `--draft` 720p ultrafast CRF28 (cut-point checking) · `--preview` 1080p CRF22 (QC-able)
 - **`--height`** output height (2160/1440/1080…); default 1080, 720 with `--draft`
 - **`--crf`** x264 CRF for the *extract*, i.e. the quality ceiling. Default 16 final / 22 preview
@@ -191,6 +216,28 @@ These three fields are local extensions (not upstream). All optional and backwar
 - `force_style`'s `MarginV` is relative to `PlayResY=288`. The shipped default of 90 is tuned
   for **vertical** video; for 16:9 landscape ~28 sits the caption about 10% up from the bottom.
 
+## notes.py — timecoded notes on a cut *(local addition, 2026-10-30)*
+```
+notes.py <render> [--port N] [--idle-exit-min 240]      # prints the page's URL; run it in the background
+notes.py --dump <edit>/notes/<render stem>/notes.json   # markdown, also saved as notes.md
+```
+Shoaib scrubs, presses N, picks cut / shorten / lengthen / wrong / note, types or records voice, and can click
+the picture to pin a spot. Each note saves at once. `[` `]` jump between cuts. The dump adds the source file,
+source time and words spoken at each note, and transcribes voice with whisper (free, `ggml-small.bin -l en`, so
+Hindi reads as English), once. It gives no source times if `edl.json` is newer than the render. Notes are never applied
+automatically. Binds 127.0.0.1, refuses other hosts and origins. Mic untested with a real voice: playback, save,
+pin and reload were driven in the app's browser, and voice transcription was run on an audio file.
+Tests: `test_notes.py`. Idea from upstream #178; written fresh, with a server so saving needs no folder picker.
+
+## sync_cameras.py — second camera to a master, by audio *(local addition, 2026-10-30)*
+```
+sync_cameras.py --master IMG_1.MOV IMG_2.MOV --clips dslr/ -o <edit>/build/sync.json
+```
+Per clip: master, offset (`master_time = clip_time + offset`), confidence, drift, implied clock difference, and
+status `synced` / `relocked` / `outside` (b-roll) / `unmatched` / `no_clock`. Run on podcast Episode 1's real 45
+clips in 25 s: reproduced all 39 offsets that episode kept, within 20 ms, and also relocked C0461, which it
+had marked invalid. Read that one by eye. Tests: `test_sync_cameras.py`.
+
 ## exposure.py — talking-head exposure check *(local addition, 2026-10-11)*
 ```
 exposure.py <video> [--at SECONDS] [--grade '<filter>'] [--json]      # exit 1 on any warning
@@ -256,6 +303,10 @@ Pinned by `tests/test_review_edges.py` (13 tests). Render checks reuse the episo
 - step spikes at the cuts
 - ebur128 loudness
 - music presence measured in pauses against the aligned no-music render
+
+**T9 (2026-10-30): a stray single frame** at any cut or overlay edge: two big picture changes one frame apart, against
+how much that window otherwise moves. Compares brightness only, on a 64x36 grey copy, so a sliver matching its neighbours'
+brightness can hide, and a two-frame sliver is not flagged. ~0.3 s per cut. **T8 now also flags** an EDL naming a subtitles file that does not exist. Tests: `test_review_flash.py`.
 
 ## apple_sdr.swift — iPhone HLG / Dolby Vision to SDR with Apple's pipeline *(local addition, 2026-10-21)*
 ```

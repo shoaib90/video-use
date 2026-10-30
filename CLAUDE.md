@@ -42,7 +42,8 @@ mistakes is a failed delivery. So:
    Shoaib has caught on any video.
 3. **Deliver the watch-list, not just the file.** When there is a previous version, deliver the
    changes reel (`review/<label>/reel.mp4`): only what changed, ~14 s each. He should not need
-   to rewatch the whole video.
+   to rewatch the whole video. Start `helpers/notes.py <render>` in the background and give him its
+   URL too, so his notes land on exact frames; read them with `--dump`.
 4. **When Shoaib reports a mistake, add it to kb/mistakes.md the same day.** If it can be
    checked automatically, add the check to review.py in the same change, with a test, so it
    can never reach him twice.

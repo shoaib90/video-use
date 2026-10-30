@@ -130,7 +130,7 @@ class RenderingTests(unittest.TestCase):
         # double quote, backslash, percent
         g["text"] = "it's 5:30, 100% \"go\" \\ done"
         f = graphics.build_filters([g], 1080, self.work)[0]
-        self.assertIn("drawtext=textfile='", f)
+        self.assertIn("drawtext=textfile=", f)
         # the `text=` OPTION must never be used; note "drawtext=" itself
         # contains "text=" as a substring, so match the option form
         self.assertNotIn(":text=", f)

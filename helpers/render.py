@@ -22,12 +22,20 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
+import copy
 import functools
+import hashlib
 import json
+import math
+import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from fractions import Fraction
 from pathlib import Path
 
@@ -470,6 +478,8 @@ def extract_segment(
     zoom_y: float = 0.5,
     video_source: Path | None = None,
     video_start: float | None = None,
+    portrait: bool | None = None,
+    hdr: bool | None = None,
 ) -> None:
     """Extract a cut range as its own MP4 with grade + 30ms audio fades baked in.
 
@@ -480,8 +490,14 @@ def extract_segment(
       - final (default): 1080p libx264 fast CRF 20
       - preview:         1080p libx264 medium CRF 22 (evaluable for QC)
       - draft:           720p libx264 ultrafast CRF 28 (cut-point check only)
+
+    `portrait` and `hdr` are facts about the file: extract_all_segments probes
+    each source once and passes them in. None probes here.
     """
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    # A previous render may have left this name hard-linked to clips_cache/.
+    # `ffmpeg -y` truncates the inode, which would corrupt the cached copy too.
+    out_path.unlink(missing_ok=True)
 
     # A range may take its PICTURE from a second, synced file (another camera)
     # while its audio stays on `source`: audio, transcript and captions all key
@@ -489,7 +505,8 @@ def extract_segment(
     # detection, crop geometry) is computed against the picture file; the output
     # size is still measured from `source`, so every segment matches (Rule 2).
     picture = video_source or source
-    portrait = is_portrait_source(source)
+    if portrait is None:
+        portrait = is_portrait_source(source)
     # Explicit height wins; otherwise the mode default (720p draft, else 1080p).
     target_h = height if height is not None else (720 if draft else 1080)
     # Scale to explicitly measured dimensions rather than letting `-2` derive the
@@ -540,7 +557,7 @@ def extract_segment(
         # Resample to the output rate FIRST: zoompan emits one frame per input
         # frame, so a 25 fps picture under a 30 fps push would otherwise play fast.
         vf_parts.append(f"fps={out_rate.replace(':', '/')}")
-    if is_hdr_source(picture):
+    if (is_hdr_source(picture) if hdr is None else hdr):
         vf_parts.append(TONEMAP_CHAIN)
     if animated:
         # Animated push-in (or pull-out): the zoom moves linearly from `zoom` on
@@ -636,9 +653,15 @@ def extract_all_segments(
     height: int | None = None,
     crf: str | None = None,
     exposure_check: bool = True,
+    jobs: int = 1,
+    reuse: bool = False,
 ) -> list[Path]:
     """Extract every EDL range into edit_dir/clips_graded/seg_NN.mp4.
     Returns the ordered list of segment paths.
+
+    `jobs` extracts that many segments at once. `reuse` keeps every finished
+    segment in edit_dir/clips_cache/, keyed by what went into it (see
+    segment_key), so a re-render only builds the ranges that changed.
 
     After the first segment that shows a face, prints an exposure report (see
     exposure.py) so a crushed or under-lit grade surfaces minutes into a render.
@@ -673,8 +696,15 @@ def extract_all_segments(
     else:
         out_rate = "24"
 
+    cache_dir = edit_dir / "clips_cache" if reuse else None
+    if cache_dir is not None:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        clear_stale_parts(cache_dir)
+
     seg_paths: list[Path] = []
-    exposure_tries = 0
+    tasks: list[tuple] = []
+    portrait_of: dict[Path, bool] = {}
+    hdr_of: dict[Path, bool] = {}
     print(f"extracting {len(ranges)} segment(s) → {clips_dir.name}/  @ {out_rate} fps"
           f"{' (forced)' if fps is not None else ' (from source)'}")
     if is_auto:
@@ -728,18 +758,134 @@ def extract_all_segments(
             if video_start < 0:
                 raise ValueError(f"range {i}: picture starts before {v['source']} does")
             print(f"        video: {v['source']} @ {video_start:.3f}s (audio stays on {r['source']})")
-        extract_segment(src_path, start, duration, seg_filter, out_path,
-                        preview=preview, draft=draft, rate=out_rate,
-                        extra_vf=seg_vf, audio_prefilter=seg_audio,
-                        height=height, crf=crf, zoom=seg_zoom, zoom_x=seg_zoom_x, zoom_y=seg_zoom_y,
-                        zoom_to=seg_zoom_to, video_source=video_src, video_start=video_start)
+        picture = video_src or src_path
+        if src_path not in portrait_of:
+            portrait_of[src_path] = is_portrait_source(src_path)
+        if picture not in hdr_of:
+            hdr_of[picture] = is_hdr_source(picture)
+        kwargs = dict(preview=preview, draft=draft, rate=out_rate,
+                      extra_vf=seg_vf, audio_prefilter=seg_audio,
+                      height=height, crf=crf, zoom=seg_zoom, zoom_x=seg_zoom_x, zoom_y=seg_zoom_y,
+                      zoom_to=seg_zoom_to, video_source=video_src, video_start=video_start,
+                      portrait=portrait_of[src_path], hdr=hdr_of[picture])
+        tasks.append((src_path, start, duration, seg_filter, out_path, kwargs, cache_dir))
         seg_paths.append(out_path)
 
-        if exposure_check and exposure_tries < EXPOSURE_MAX_TRIES:
-            exposure_tries += 1
-            exposure_tries = run_exposure_check(out_path, seg_filter, exposure_tries)
+    # Futures are read in EDL order, so the exposure report still surfaces as
+    # soon as the first segments land, not after the whole extract.
+    t0 = time.time()
+    exposure_tries = 0
+    reused = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
+        futures = [pool.submit(produce_segment, *t) for t in tasks]
+        try:
+            for fut, task in zip(futures, tasks):
+                reused += bool(fut.result())
+                if exposure_check and exposure_tries < EXPOSURE_MAX_TRIES:
+                    exposure_tries += 1
+                    exposure_tries = run_exposure_check(task[4], task[3], exposure_tries)
+        except BaseException:
+            for fut in futures:
+                fut.cancel()
+            raise
+    if cache_dir is not None:
+        print(f"  segments: {len(tasks) - reused} built, {reused} reused "
+              f"({time.time() - t0:.1f}s, {max(1, jobs)} at a time)")
+        report_cache(cache_dir)
 
     return seg_paths
+
+
+# -------- Segment reuse ------------------------------------------------------
+#
+# Every notes round used to re-extract every segment, and on 4K that is most of a
+# render. A finished segment is a pure function of its inputs, so it is kept under
+# a hash of them and hard-linked to seg_NN (the names review.py and cards.py read).
+# Hard links mean a segment still in the cut costs no extra disk, and deleting
+# clips_cache/ is always safe. A killed render resumes by itself.
+
+
+def _file_identity(path: Path) -> str:
+    st = path.stat()
+    return f"{path.name}:{st.st_size}:{st.st_mtime_ns}"
+
+
+@functools.lru_cache(maxsize=1)
+def tool_fingerprint() -> str:
+    """render.py, grade.py and the ffmpeg build: change any and old segments are stale.
+
+    Deliberately the whole of both files, not the extract path. A segment reused
+    across a tone-map or colour change would silently mix two looks in one cut.
+    """
+    h = hashlib.sha256()
+    here = Path(__file__).resolve().parent
+    for name in ("render.py", "grade.py"):
+        h.update((here / name).read_bytes())
+    out = subprocess.run(["ffmpeg", "-version"], capture_output=True, text=True)
+    h.update(out.stdout.split("\n", 1)[0].encode())
+    return h.hexdigest()
+
+
+def segment_key(source: Path, start: float, duration: float, grade_filter: str,
+                kwargs: dict) -> str:
+    """Hash of everything that decides a segment's bytes."""
+    settings = {k: (_file_identity(v) if isinstance(v, Path) else v) for k, v in kwargs.items()}
+    # A filter can read a file (arnndn m=, lut3d file=), so its content counts too.
+    filters = " ".join(str(f) for f in (grade_filter, kwargs.get("extra_vf"), kwargs.get("audio_prefilter")) if f)
+    referenced = sorted({_file_identity(Path(m)) for m in re.findall(r"/[^:,'\s]+", filters)
+                         if Path(m).is_file()})
+    payload = json.dumps({
+        "tool": tool_fingerprint(),
+        "source": _file_identity(source),
+        "start": start, "duration": duration, "grade": grade_filter,
+        "settings": settings, "referenced": referenced,
+    }, sort_keys=True)
+    return hashlib.sha256(payload.encode()).hexdigest()[:32]
+
+
+def produce_segment(source: Path, start: float, duration: float, grade_filter: str,
+                    out_path: Path, kwargs: dict, cache_dir: Path | None) -> bool:
+    """Make one segment. Returns True if it came from the cache."""
+    if cache_dir is None:
+        extract_segment(source, start, duration, grade_filter, out_path, **kwargs)
+        return False
+    entry = cache_dir / f"{segment_key(source, start, duration, grade_filter, kwargs)}.mp4"
+    hit = entry.exists() and entry.stat().st_size > 0
+    if not hit:
+        # Published only once complete, so a killed render can never leave a
+        # truncated segment that a later run would trust.
+        part = cache_dir / f"{entry.stem}.{os.getpid()}.{threading.get_ident()}.part.mp4"
+        try:
+            extract_segment(source, start, duration, grade_filter, part, **kwargs)
+            os.replace(part, entry)
+        finally:
+            part.unlink(missing_ok=True)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.unlink(missing_ok=True)
+    try:
+        os.link(entry, out_path)
+    except OSError:  # exFAT and friends have no hard links
+        shutil.copy2(entry, out_path)
+    # review.py picks the newest clips_* folder by mtime; this render made this one.
+    os.utime(out_path)
+    return hit
+
+
+def clear_stale_parts(cache_dir: Path, older_than_s: float = 86400.0) -> None:
+    """Remove what a killed render left behind, never a running render's work."""
+    now = time.time()
+    for part in cache_dir.glob("*.part.mp4"):
+        if now - part.stat().st_mtime > older_than_s:
+            part.unlink(missing_ok=True)
+
+
+def report_cache(cache_dir: Path) -> None:
+    entries = list(cache_dir.glob("*.mp4"))
+    total = sum(e.stat().st_size for e in entries)
+    unused = [e for e in entries if e.stat().st_nlink == 1]
+    print(f"  clips_cache: {total / 1e9:.2f} GB in {len(entries)} segments, {len(unused)} no longer "
+          f"linked to a cut ({sum(e.stat().st_size for e in unused) / 1e9:.2f} GB; "
+          "safe to delete clips_cache/ once the cut is approved)")
 
 
 def run_exposure_check(segment: Path, grade: str, tries: int) -> int:
@@ -766,6 +912,11 @@ def run_exposure_check(segment: Path, grade: str, tries: int) -> int:
 # -------- Lossless concat ----------------------------------------------------
 
 
+def concat_list_path(path: Path) -> str:
+    """A path for a concat-demuxer list: an apostrophe closes the single quotes."""
+    return str(path.resolve()).replace("'", "'\\''")
+
+
 def concat_segments(segment_paths: list[Path], out_path: Path, edit_dir: Path) -> None:
     """Concat via the concat demuxer: video stream-copied, audio re-encoded once.
 
@@ -784,8 +935,11 @@ def concat_segments(segment_paths: list[Path], out_path: Path, edit_dir: Path) -
     it is inaudible.
     """
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    concat_list = edit_dir / "_concat.txt"
-    concat_list.write_text("".join(f"file '{p.resolve()}'\n" for p in segment_paths))
+    # One list per call: two renders in one edit folder must not share a file.
+    fd, list_name = tempfile.mkstemp(prefix="_concat_", suffix=".txt", dir=edit_dir)
+    os.close(fd)
+    concat_list = Path(list_name)
+    concat_list.write_text("".join(f"file '{concat_list_path(p)}'\n" for p in segment_paths))
 
     cmd = [
         "ffmpeg", "-y",
@@ -798,8 +952,10 @@ def concat_segments(segment_paths: list[Path], out_path: Path, edit_dir: Path) -
         str(out_path),
     ]
     print(f"concat → {out_path.name}")
-    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-    concat_list.unlink(missing_ok=True)
+    try:
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    finally:
+        concat_list.unlink(missing_ok=True)
 
 
 # -------- Master SRT (Rule 5) ------------------------------------------------
@@ -1118,6 +1274,21 @@ def measure_loudness(video_path: Path) -> dict[str, str] | None:
     return data
 
 
+def loudness_is_measurable(measurement: dict[str, str]) -> bool:
+    """False for digital silence, which measures -inf and has no gain to compute."""
+    try:
+        return all(math.isfinite(float(measurement[k]))
+                   for k in ("input_i", "input_tp", "input_lra", "input_thresh", "target_offset"))
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def keep_silent_audio(input_path: Path, output_path: Path) -> bool:
+    print("  loudnorm skipped: the programme is digital silence, keeping it as is")
+    shutil.copyfile(input_path, output_path)
+    return True
+
+
 def apply_loudnorm_two_pass(
     input_path: Path,
     output_path: Path,
@@ -1144,7 +1315,15 @@ def apply_loudnorm_two_pass(
             str(output_path),
         ]
         print(f"  loudnorm (1-pass preview) → {output_path.name}")
-        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        try:
+            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError:
+            # Measured only on failure, so drafts stay fast. A silent programme
+            # feeds NaN to the AAC encoder here; anything else is a real error.
+            m = measure_loudness(input_path)
+            if m is None or loudness_is_measurable(m):
+                raise
+            return keep_silent_audio(input_path, output_path)
         return True
 
     # Full two-pass
@@ -1153,6 +1332,8 @@ def apply_loudnorm_two_pass(
     if measurement is None:
         print("  loudnorm measurement failed — falling back to 1-pass")
         return apply_loudnorm_two_pass(input_path, output_path, preview=True)
+    if not loudness_is_measurable(measurement):
+        return keep_silent_audio(input_path, output_path)
 
     print(f"    measured: I={measurement['input_i']} LUFS  "
           f"TP={measurement['input_tp']}  LRA={measurement['input_lra']}")
@@ -1554,9 +1735,9 @@ def build_final_composite(
     # tags, never pixels, so it does not break the rule; it is what keeps an
     # untagged first segment from stripping the final's tags (BT709_SETPARAMS).
     if has_subs:
-        subs_abs = str(subtitles_path.resolve()).replace(":", r"\:").replace("'", r"\'")
+        subs_abs = graphics_mod.escape_filter_path(subtitles_path.resolve())
         filter_parts.append(
-            f"{current}subtitles='{subs_abs}':force_style='{force_style}',{BT709_SETPARAMS}[outv]"
+            f"{current}subtitles={subs_abs}:force_style='{force_style}',{BT709_SETPARAMS}[outv]"
         )
     else:
         filter_parts.append(f"{current}{BT709_SETPARAMS}[outv]")
@@ -1582,6 +1763,161 @@ def build_final_composite(
 
 
 # -------- Main ---------------------------------------------------------------
+
+
+# -------- Preflight ----------------------------------------------------------
+#
+# Every check here guards against something that used to surface only after the
+# extract, or not at all. A wrong EDL should cost seconds, not a 4K render.
+
+
+def _ffmpeg_has_filter(name: str) -> bool:
+    out = subprocess.run(["ffmpeg", "-hide_banner", "-filters"], capture_output=True, text=True).stdout
+    return any(len(parts) > 1 and parts[1] == name
+               for parts in (line.split() for line in out.splitlines()))
+
+
+def _has_audio(path: Path) -> bool:
+    out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries",
+                          "stream=index", "-of", "csv=p=0", str(path)],
+                         capture_output=True, text=True)
+    return bool(out.stdout.strip())
+
+
+def preflight(edl: dict, edit_dir: Path, out_path: Path, *, height: int | None = None,
+              draft: bool = False, build_subtitles: bool = False,
+              no_subtitles: bool = False) -> tuple[list[str], list[str]]:
+    """Validate an edit before any encoding. Returns (errors, warnings)."""
+    errors: list[str] = []
+    warnings: list[str] = []
+    ranges = edl.get("ranges") or []
+    sources = edl.get("sources") or {}
+    if not ranges:
+        errors.append("the EDL has no ranges")
+
+    files: dict[str, Path] = {}
+    for key in {r.get("source") for r in ranges} | {(r.get("video") or {}).get("source") for r in ranges}:
+        if key is None:
+            continue
+        if key not in sources:
+            errors.append(f"source {key!r} is used by a range but missing from `sources`")
+            continue
+        path = resolve_path(sources[key], edit_dir)
+        if path.exists():
+            files[key] = path
+        else:
+            errors.append(f"source {key!r} not found: {path}")
+
+    lengths: dict[str, float] = {}
+    for key, path in files.items():
+        try:
+            lengths[key] = probe_duration(path)
+        except (subprocess.CalledProcessError, ValueError):
+            errors.append(f"source {key!r} is not readable: {path}")
+
+    for i, r in enumerate(ranges):
+        key = r.get("source")
+        start, end = float(r.get("start", 0)), float(r.get("end", 0))
+        if end <= start:
+            errors.append(f"range {i}: end {end} is not after start {start}")
+        if key in lengths:
+            if end > lengths[key] + 0.05:
+                errors.append(f"range {i}: ends at {end:.3f}s but {key} is {lengths[key]:.3f}s long")
+            elif end > lengths[key] - 0.05:
+                warnings.append(f"range {i}: ends within 50 ms of the end of {key}; the frame "
+                                "snap can overrun its audio, clamp to duration - 0.05")
+        for field in ("zoom", "zoom_to"):
+            if r.get(field) is not None and float(r[field]) < 1.0:
+                errors.append(f"range {i}: {field} {r[field]} is below 1.0; it crops in, never out")
+        if r.get("video"):
+            v = r["video"]
+            picture_start = start - float(v.get("offset", 0))
+            if picture_start < 0:
+                errors.append(f"range {i}: picture starts before {v.get('source')} does")
+            elif v.get("source") in lengths and picture_start + end - start > lengths[v["source"]] + 0.05:
+                errors.append(f"range {i}: picture runs past the end of {v['source']}")
+
+    used_audio = {r.get("source") for r in ranges}
+    for key in sorted(k for k in files if k in used_audio):
+        if not _has_audio(files[key]):
+            warnings.append(f"source {key!r} has no audio stream")
+
+    # Every segment must come out the same size: a mismatch does not fail the
+    # `-c:v copy` concat, it plays stretched.
+    target_h = height if height is not None else (720 if draft else 1080)
+    dims: dict[str, tuple[int, int]] = {}
+    for key in sorted(k for k in files if k in used_audio and k in lengths):
+        try:
+            dims[key] = probe_scaled_dims(files[key], target_h, is_portrait_source(files[key]))
+        except (subprocess.CalledProcessError, ValueError, OSError) as e:
+            errors.append(f"source {key!r}: could not measure its frame size ({type(e).__name__})")
+    if len(set(dims.values())) > 1:
+        errors.append("sources come out at different sizes and would play stretched: "
+                      + ", ".join(f"{k} {w}x{h}" for k, (w, h) in dims.items()))
+    out_size = next(iter(dims.values()), None)
+
+    captions = False
+    if not no_subtitles:
+        if build_subtitles:
+            captions = True
+            for key in sorted(k for k in files if k in used_audio):
+                if not (edit_dir / "transcripts" / f"{key}.json").exists():
+                    warnings.append(f"source {key!r} has no transcript, so no captions")
+        elif edl.get("subtitles"):
+            captions = True
+            subs = resolve_path(edl["subtitles"], edit_dir)
+            if not subs.exists():
+                errors.append(f"subtitles file not found: {subs}. A render without captions must "
+                              "be asked for with --no-subtitles")
+
+    for n, ov in enumerate(edl.get("overlays") or []):
+        ov_path = resolve_path(ov["file"], edit_dir)
+        if not ov_path.exists():
+            errors.append(f"overlays[{n}] not found: {ov_path}")
+        elif out_size is not None:
+            try:
+                ow, oh = display_dims(ov_path)
+            except (subprocess.CalledProcessError, ValueError, KeyError, IndexError):
+                errors.append(f"overlays[{n}] is not readable: {ov_path}")
+                continue
+            if ow > out_size[0] or oh > out_size[1]:
+                warnings.append(f"overlays[{n}] {ov_path.name} is {ow}x{oh} on a {out_size[0]}x{out_size[1]} "
+                                "frame; overlays are not scaled, so it shows its top-left corner")
+    if edl.get("matte") and not resolve_path(edl["matte"], edit_dir).exists():
+        warnings.append(f"matte not found: {edl['matte']}")
+
+    # A phrase that was cut raises in the resolvers. Durations here are EDL floats,
+    # which is fine for finding a word; the render still measures real ones.
+    estimated = [float(r.get("end", 0)) - float(r.get("start", 0)) for r in ranges]
+    if not any(key not in lengths for key in used_audio):
+        resolvers = []
+        if edl.get("graphics"):
+            resolvers.append(("graphics", lambda: graphics_mod.resolve_anchors(
+                copy.deepcopy(edl["graphics"]), edl, edit_dir, estimated)))
+        if edl.get("cards") and out_size is not None:
+            resolvers.append(("cards", lambda: cards_mod.resolve(
+                copy.deepcopy(edl["cards"]), edl, edit_dir, estimated, *out_size)))
+        if edl.get("silhouettes"):
+            resolvers.append(("silhouettes", lambda: resolve_silhouettes(
+                copy.deepcopy(edl["silhouettes"]), edl, edit_dir, estimated)))
+        for name, resolve in resolvers:
+            try:
+                resolve()
+            except (Exception, SystemExit) as e:  # noqa: BLE001 - reported, not swallowed
+                errors.append(f"{name}: {e}")
+
+    # What the composite and the tone-map need from this ffmpeg build.
+    needs = {"subtitles": captions, "drawtext": bool(edl.get("graphics")),
+             "zscale": any(is_hdr_source(p) for p in files.values())}
+    for name, needed in needs.items():
+        if needed and not _ffmpeg_has_filter(name):
+            errors.append(f"this ffmpeg has no `{name}` filter; plain `brew install ffmpeg` lacks "
+                          "it, use ffmpeg-full")
+
+    parent = out_path.parent
+    if parent.exists() and not os.access(parent, os.W_OK):
+        errors.append(f"output folder is not writable: {parent}")
+    return errors, warnings
 
 
 def main() -> None:
@@ -1644,6 +1980,29 @@ def main() -> None:
              "(falls back to 24 if it can't be probed). Pass e.g. --fps 30 or "
              "--fps 30000/1001 to force.",
     )
+    ap.add_argument(
+        "--check",
+        action="store_true",
+        help="Validate the edit (sources, ranges, sizes, captions, overlays, anchors, "
+             "ffmpeg filters) and exit without rendering. Every render runs this first.",
+    )
+    ap.add_argument(
+        "--skip-check",
+        action="store_true",
+        help="Skip the validation that runs before a render.",
+    )
+    ap.add_argument(
+        "--jobs",
+        type=int,
+        default=4,
+        help="Segments to extract at once. Default 4. Output is identical to 1; "
+             "x264 already threads, so the gain is modest (13%% on 4K HLG on this Mac).",
+    )
+    ap.add_argument(
+        "--no-reuse",
+        action="store_true",
+        help="Rebuild every segment instead of reusing unchanged ones from clips_cache/.",
+    )
     args = ap.parse_args()
 
     edl_path = args.edl.resolve()
@@ -1654,10 +2013,25 @@ def main() -> None:
     edit_dir = edl_path.parent
     out_path = args.output.resolve()
 
+    if args.check or not args.skip_check:
+        errors, warnings = preflight(edl, edit_dir, out_path, height=args.height, draft=args.draft,
+                                     build_subtitles=args.build_subtitles,
+                                     no_subtitles=args.no_subtitles)
+        for w in warnings:
+            print(f"warning: {w}")
+        for e in errors:
+            print(f"error: {e}")
+        if errors:
+            sys.exit(f"{len(errors)} problem(s) in {edl_path.name}; nothing rendered")
+        if args.check:
+            print(f"check passed: {edl_path.name} ({len(warnings)} warning(s))")
+            return
+
     # 1. Extract per-segment (auto-grade per range if EDL grade is "auto")
     segment_paths = extract_all_segments(
         edl, edit_dir, preview=args.preview, draft=args.draft, fps=args.fps,
         height=args.height, crf=args.crf, exposure_check=not args.no_exposure_check,
+        jobs=args.jobs, reuse=not args.no_reuse,
     )
     # The composite is a SECOND video generation on top of the extract. Keep its
     # CRF below the extract's so it adds as little further loss as possible.
@@ -1686,8 +2060,9 @@ def main() -> None:
         elif edl.get("subtitles"):
             subs_path = resolve_path(edl["subtitles"], edit_dir)
             if not subs_path.exists():
-                print(f"warning: subtitles path in EDL does not exist: {subs_path}")
-                subs_path = None
+                # Applies with --skip-check too: a silently caption-less cut is worse than a stop.
+                sys.exit(f"subtitles file not found: {subs_path}. "
+                         "Pass --no-subtitles for a render without captions.")
 
     # 4. Composite (overlays + subtitles LAST) → intermediate (pre-loudnorm) path
     overlays = edl.get("overlays") or []
@@ -1764,4 +2139,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except subprocess.CalledProcessError as e:
+        # The command alone says nothing; ffmpeg's reason is in the stderr we captured.
+        tail = (e.stderr.decode(errors="replace") if isinstance(e.stderr, bytes) else (e.stderr or ""))[-1500:]
+        sys.exit(f"ffmpeg failed (exit {e.returncode}):\n{tail}\ncommand: {' '.join(map(str, e.cmd))[:600]}")

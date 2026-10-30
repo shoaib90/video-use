@@ -125,6 +125,35 @@ def transcript_path(edit_dir: Path, video: Path, audio_track: int = 0) -> Path:
     return edit_dir / "transcripts" / f"{video.stem}{suffix}.json"
 
 
+def source_stamp(video: Path) -> dict:
+    """What a transcript records about the file it came from."""
+    return {"_source_name": video.name, "_source_size": video.stat().st_size}
+
+
+def warn_if_source_changed(out_path: Path, video: Path) -> bool:
+    """Warn when a cached transcript was made from a different file. True if it was.
+
+    Never re-transcribes (that costs money) and never refuses: a prepped source
+    keeps its original's transcript on purpose. Size, not mtime, because copying
+    footage between drives changes mtime and nothing else. Transcripts from before
+    the stamp carry nothing to compare, so they stay silent.
+    """
+    try:
+        payload = json.loads(out_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return False
+    if not isinstance(payload, dict) or "_source_size" not in payload:
+        return False
+    was = (payload.get("_source_name"), payload.get("_source_size"))
+    now = (video.name, video.stat().st_size)
+    if was == now:
+        return False
+    print(f"WARNING: {out_path.name} was made from {was[0]} ({was[1]} bytes), but the source is now "
+          f"{now[0]} ({now[1]} bytes). Captions and cuts read from it may not match this file.",
+          file=sys.stderr)
+    return True
+
+
 def transcribe_one(
     video: Path,
     edit_dir: Path,
@@ -145,6 +174,7 @@ def transcribe_one(
     if out_path.exists():
         if verbose:
             print(f"cached: {out_path.name}")
+        warn_if_source_changed(out_path, video)
         return out_path
 
     if verbose:
@@ -177,6 +207,8 @@ def transcribe_one(
             print(f"  uploading {video.stem}.wav ({size_mb:.1f} MB)", flush=True)
         payload = call_scribe(audio, api_key, language, num_speakers)
 
+    if isinstance(payload, dict):
+        payload.update(source_stamp(video))
     out_path.write_text(json.dumps(payload, indent=2))
     dt = time.time() - t0
 
