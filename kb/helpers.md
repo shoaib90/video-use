@@ -102,6 +102,9 @@ render.py <edl.json> -o <out> [--preview] [--draft] [--build-subtitles]
   The key covers source name + size + mtime, range, all settings, any file a filter names, render.py,
   grade.py and the ffmpeg version, so editing render.py rebuilds everything, on purpose. The composite and
   loudnorm always run. Deleting `clips_cache/` is always safe. Tests: `test_render_reuse.py`.
+- **Overlays are placed in whole frames (M061):** `start_in_output` and `duration` round to the frame grid, and an edge within 3
+  frames of a cut moves to it, unless another opaque overlay hides that edge or it has alpha. Each move is printed. An end moved
+  later holds the overlay's last frame for those few frames. Tests: `test_render_overlay_frames.py`.
 - **`--jobs`** default 4; frame-identical to 1. Measured on 8 ranges of 4K HLG with captions, 24 s out:
   1 job 73 s, 4 jobs 68 s, then one range changed 39 s (~35 s of that is composite + loudnorm).
 - **ffmpeg's own error is printed** on failure, no traceback.
@@ -304,9 +307,9 @@ Pinned by `tests/test_review_edges.py` (13 tests). Render checks reuse the episo
 - ebur128 loudness
 - music presence measured in pauses against the aligned no-music render
 
-**T9 (2026-10-30): a stray single frame** at any cut or overlay edge: two big picture changes one frame apart, against
+**T9 (2026-10-30): a stray shot of 1-3 frames** at any cut or overlay edge: two big picture changes that close, against
 how much that window otherwise moves. Compares brightness only, on a 64x36 grey copy, so a sliver matching its neighbours'
-brightness can hide, and a two-frame sliver is not flagged. ~0.3 s per cut. **T8 now also flags** an EDL naming a subtitles file that does not exist. Tests: `test_review_flash.py`.
+brightness can hide, and a fast handheld move just before a cut can trip it: look at the frames. ~0.3 s per cut. **T8 now also flags** an EDL naming a subtitles file that does not exist. Tests: `test_review_flash.py`.
 
 ## apple_sdr.swift — iPhone HLG / Dolby Vision to SDR with Apple's pipeline *(local addition, 2026-10-21)*
 ```

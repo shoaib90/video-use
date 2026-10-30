@@ -5,6 +5,22 @@ re-derive it or mistake a deliberate change for a bug.
 
 ---
 
+## 2026-10-30 — Hustler slivers fixed at the root, with a before/after reel (M061)
+
+Shoaib asked for the slivers T9 found to be fixed, and for a reel showing old against new. T9 had found 6; a full-decode scan
+found 9 (three were 2 frames, which the single-frame rule missed, so T9 now covers 1-3). Fixed in render.py, not the EDL.
+
+**The first v2 render was wrong** and was deleted: cuts were counted in frames, but overlays are placed by time and this base has
+a timestamp hole, so later edges landed a frame early. Caught by comparing old, new and base frame by frame. See gotchas.md.
+
+**Verified on the v2 render, by full decode:** all 9 sliver frames now show the right shot; 8328 frames as before; audio
+bit-identical; other edges moved by at most 3 frames, by design. review.py: HIGH 0, T3 and T8 as before (already accepted), T9
+one flag at 0:06.2, which is Raj's handheld move and is in the old final too. So T9 is not free of false alarms, as first written.
+
+Old final kept. New: `If-you-feel-like-a-hustler_final_v2.mp4`, reel `review/slivers/before_after_reel.mp4`, `build/sliver_reel.py`.
+
+---
+
 ## 2026-10-30 — Built the useful ideas from upstream's PRs, on our fork only
 
 Shoaib said to build what helps and send nothing upstream. Code written fresh against our `main`, not
@@ -24,10 +40,9 @@ merged: our render.py has moved too far. 427 tests pass, 86 of them new.
 so do not quote that figure. Reuse is the win, and the composite is now most of what remains. Real-scale evidence for reuse:
 Episode 5's one-off script reused 248 of 250 segments.
 
-**T9 found real defects in a delivered video:** six one-frame slivers in the Hustler final, where an overlay edge sits a
-frame off a cut (M061). 407 cuts over three delivered videos; all six confirmed by eye, none in Episodes 3 and 5. The first
-version of the rule found only one, because it required the frames either side to resemble each other. A sliver between two
-different pictures fails that, so the rule now compares against the window's own motion.
+**T9 found real defects in a delivered video:** slivers in the Hustler final (M061; see the entry above). None in Episodes 3
+and 5 with the single-frame rule. The first version found only one, because it required the frames either side to resemble each
+other. A sliver between two different pictures fails that, so the rule now compares against the window's own motion.
 
 **sync_cameras.py on podcast Episode 1's 45 real clips, 25 s:** all 39 kept offsets reproduced within 20 ms, plus C0461,
 which the original marked invalid. Unread by eye.

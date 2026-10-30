@@ -320,7 +320,7 @@ class FilterTests(unittest.TestCase):
                     subs, edit / "out.mp4", edit, cards=[ENTRY])
             cmd = list(run.call_args.args[0])
         graph = cmd[cmd.index("-filter_complex") + 1]
-        self.assertLess(graph.index("[1:v]overlay"), graph.index("ck_toblur"))
+        self.assertLess(graph.index("[ovp1]overlay"), graph.index("ck_toblur"))
         self.assertLess(graph.index("[ck_o0]"), graph.index("subtitles="))
         # input numbering: base 0, overlay 1, mask 2, card 3
         self.assertIn("[2:v]alphaextract", graph)

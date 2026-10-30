@@ -313,8 +313,8 @@ class SubjectMaskingTests(unittest.TestCase):
             matte=self.d / "m.mp4")
         self.assertIn("alphamerge", fc)
         # the behind overlay is chained first, then the subject goes back on top
-        self.assertLess(fc.index("[b_main][1:v]overlay"), fc.index("alphamerge"))
-        self.assertLess(fc.index("alphamerge"), fc.index("[2:v]overlay"))
+        self.assertLess(fc.index("[b_main][ovp1]overlay"), fc.index("alphamerge"))
+        self.assertLess(fc.index("alphamerge"), fc.index("[ovp2]overlay"))
 
     def test_scale2ref_is_given_both_inputs(self):
         """scale2ref scales its FIRST input to match its SECOND and returns

@@ -104,6 +104,9 @@ class CompositeTests(unittest.TestCase):
             with patch.object(render.subprocess, "run", side_effect=lambda c, **k: cmds.append(c)), \
                  patch.object(render.cards_mod, "_dims", return_value=(1920, 1080)), \
                  patch.object(render, "probe_duration", return_value=24.0), \
+                 patch.object(render, "_video_start_time", return_value=0.0), \
+                 patch.object(render, "_nominal_rate", return_value=30.0), \
+                 patch.object(render, "_has_alpha", return_value=False), \
                  patch.object(render, "probe_source_fps", return_value="24000/1001"):
                 render.build_final_composite(edit / "base.mp4", kw.pop("overlays", []), None,
                                              edit / "out.mp4", edit, **kw)

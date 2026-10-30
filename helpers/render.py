@@ -26,6 +26,7 @@ import concurrent.futures
 import copy
 import functools
 import hashlib
+from itertools import accumulate as itertools_accumulate
 import json
 import math
 import os
@@ -1556,6 +1557,105 @@ def build_silhouette_filter(sils: list[dict], current: str, matte_label: str, gl
 # -------- Final compositing (Rule 1 + Rule 4) -------------------------------
 
 
+# -------- Overlay placement --------------------------------------------------
+#
+# An overlay used to be placed at its EDL seconds. Three things put its edges on the
+# wrong frame, and at a cut one wrong frame is a visible flash of the shot underneath
+# (M061: eight of them in one delivered video):
+#   - the base does not start at 0: the video stream starts ~21 ms in;
+#   - its timestamps can have a hole, so frame number and time disagree (see cut_slots);
+#   - `overlay` lets go as soon as the last overlay frame's timestamp has passed, so an
+#     overlay off the frame grid loses its final frame;
+#   - EDL times come from spoken words, so an edge can land just beside a cut.
+# So every overlay gets a window in whole output frames, with exposed edges pulled to a
+# cut they nearly meet. Frames are matched half a frame early, which puts them
+# unambiguously before the main frame they belong to, whatever the timebases.
+
+OVERLAY_SNAP_FRAMES = 3  # a shot this short between an overlay and a cut is never intended
+
+
+def _video_start_time(path: Path) -> float:
+    out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                          "stream=start_time", "-of", "csv=p=0", str(path)],
+                         capture_output=True, text=True).stdout.strip().rstrip(",")
+    try:
+        return float(out)
+    except ValueError:
+        return 0.0
+
+
+def _nominal_rate(path: Path, fallback: str) -> float:
+    """The frame grid, from r_frame_rate. Not probe_source_fps: that prefers the average, and a
+    timestamp hole makes the average lie (29.996 for a 30 fps base, most of a frame by 3 minutes)."""
+    out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                          "stream=r_frame_rate", "-of", "csv=p=0", str(path)],
+                         capture_output=True, text=True).stdout.strip().rstrip(",")
+    try:
+        return _rate_to_float(parse_fps(out)) or _rate_to_float(fallback) or 30.0
+    except argparse.ArgumentTypeError:
+        return _rate_to_float(fallback) or 30.0
+
+
+def _has_alpha(path: Path) -> bool:
+    out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                          "stream=pix_fmt", "-of", "csv=p=0", str(path)],
+                         capture_output=True, text=True).stdout
+    return any(tag in out for tag in ("yuva", "rgba", "argb", "bgra", "abgr", "gbrap"))
+
+
+def count_video_frames(path: Path) -> int:
+    out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_packets",
+                          "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", str(path)],
+                         capture_output=True, text=True, check=True).stdout
+    return int(out.strip().rstrip(",").split(",")[0])
+
+
+def cut_slots(base_path: Path, segment_paths: list[Path], rate: float) -> list[int]:
+    """Where each cut really is on the base's clock, in frame slots from its first frame.
+
+    Read from the base's timestamps. Neither counting frames nor summing durations will do: a
+    segment whose audio outlasts its video leaves a hole in the video's timestamps (measured:
+    8328 frames across 8329 slots), and overlays are placed by time, so counting frames puts
+    every later cut one frame early.
+    """
+    out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                          "packet=pts_time", "-of", "csv=p=0", str(base_path)],
+                         capture_output=True, text=True, check=True).stdout
+    pts = sorted(float(line.strip().rstrip(",")) for line in out.splitlines() if line.strip().rstrip(","))
+    starts = list(itertools_accumulate(count_video_frames(p) for p in segment_paths))[:-1]
+    return [round((pts[i] - pts[0]) * rate) for i in starts if i < len(pts)]
+
+
+def overlay_windows(frames: list[tuple[int, int]], see_through: list[bool],
+                    cuts: list[int]) -> list[tuple[int, int]]:
+    """Whole-frame (first, past-last) windows, with exposed edges moved to a cut they nearly meet.
+
+    An edge under another opaque overlay is left alone: nothing shows there, and moving it
+    could open a gap. A see-through overlay (a card, a title) shows the cut anyway, so it
+    never snaps. The edges move independently, so the other end of the overlay stays put.
+    """
+    def hidden(a: int, b: int, me: int) -> bool:
+        return any(not see_through[k] and fs < b and fe > a
+                   for k, (fs, fe) in enumerate(frames) if k != me)
+
+    def snapped(edge: int, me: int) -> int:
+        if not cuts:
+            return edge
+        cut = min(cuts, key=lambda c: abs(c - edge))
+        if 0 < abs(cut - edge) <= OVERLAY_SNAP_FRAMES and not hidden(min(cut, edge), max(cut, edge), me):
+            return cut
+        return edge
+
+    out = []
+    for i, (first, last) in enumerate(frames):
+        if see_through[i]:
+            out.append((first, last))
+            continue
+        a, b = snapped(first, i), snapped(last, i)
+        out.append((a, b) if a < b else (first, last))
+    return out
+
+
 def build_final_composite(
     base_path: Path,
     overlays: list[dict],
@@ -1573,6 +1673,7 @@ def build_final_composite(
     cards: list[dict] | None = None,
     silhouettes: list[dict] | None = None,
     glow: str = "#8B5CF6",
+    cuts: list[int] | None = None,
 ) -> None:
     """Final pass: base → overlays → glass cards → text graphics → subtitles LAST → out.
 
@@ -1635,10 +1736,25 @@ def build_final_composite(
               "the matte describes the full-frame subject")
     overlays = behind + front          # chain order: behind first
 
+    # `cuts` holds every cut's frame slot, so edges can meet them (see "Overlay placement").
+    rate = _nominal_rate(base_path, fps) if overlays else 30.0
+    base_start = _video_start_time(base_path) if overlays else 0.0
+    asked = [(round(float(ov["start_in_output"]) * rate),
+              round(float(ov["start_in_output"]) * rate) + max(1, round(float(ov["duration"]) * rate)))
+             for ov in overlays]
+    see_through = [_has_alpha(resolve_path(ov["file"], edit_dir)) for ov in overlays]
+    windows = overlay_windows(asked, see_through, cuts or [])
+    for ov, was, now in zip(overlays, asked, windows):
+        if was != now:
+            print(f"  overlay {Path(ov['file']).stem}: start {now[0] - was[0]:+d}, end {now[1] - was[1]:+d} "
+                  "frames, to meet a cut")
+    # The half frame: see "Overlay placement".
+    window_times = [(base_start + (a - 0.5) / rate, base_start + (b - 0.5) / rate) for a, b in windows]
+
     inputs: list[str] = ["-i", str(base_path)]
-    for ov in overlays:
+    for ov, (t0, _) in zip(overlays, window_times):
         ov_path = resolve_path(ov["file"], edit_dir)
-        inputs += ["-itsoffset", f"{float(ov['start_in_output']):.3f}",
+        inputs += ["-itsoffset", f"{t0:.6f}",
                    "-i", str(ov_path)]
     matte_idx = None
     if matte:
@@ -1689,13 +1805,13 @@ def build_final_composite(
             probe_source_fps(base_path) or fps, probe_duration(base_path))
         filter_parts += sl_parts
         print(f"  silhouettes: {len(silhouettes)}")
-    for idx, ov in enumerate(overlays, start=1):
-        t = float(ov["start_in_output"])
-        dur = float(ov["duration"])
-        end = t + dur
+    for idx, (ov, (t, end)) in enumerate(zip(overlays, window_times), start=1):
         next_label = f"[v{idx}]"
+        # The padding keeps a final frame on screen until `enable` ends it, including an
+        # end edge that a snap moved a few frames later. Never shows past `enable`.
+        filter_parts.append(f"[{idx}:v]tpad=stop_mode=clone:stop={OVERLAY_SNAP_FRAMES + 1}[ovp{idx}]")
         filter_parts.append(
-            f"{current}[{idx}:v]overlay=enable='between(t,{t:.3f},{end:.3f})'"
+            f"{current}[ovp{idx}]overlay=enable='between(t,{t:.6f},{end:.6f})'"
             f":eof_action=pass:repeatlast=0{next_label}"
         )
         current = next_label
@@ -2092,7 +2208,8 @@ def main() -> None:
     card_specs = edl.get("cards") or []
     sil_specs = edl.get("silhouettes") or []
     durations = ([probe_duration(p) for p in segment_paths]
-                 if (graphics or card_specs or sil_specs) else [])
+                 if (graphics or card_specs or sil_specs or overlays) else [])
+    cuts = cut_slots(base_path, segment_paths, _nominal_rate(base_path, str(args.fps or 30))) if overlays else []
     silhouettes = []
     if sil_specs:
         silhouettes = resolve_silhouettes(sil_specs, edl, edit_dir, durations)
@@ -2120,7 +2237,7 @@ def main() -> None:
                               crf=gen2_crf, preset=gen2_preset, graphics=graphics,
                               demotions=demotions, brand_bg=brand_bg,
                               fps=str(args.fps or 30), matte=matte_path, cards=cards,
-                              silhouettes=silhouettes, glow=glow)
+                              silhouettes=silhouettes, glow=glow, cuts=cuts)
     else:
         # Composite to a temp file, then run loudnorm → final output
         tmp_composite = out_path.with_suffix(".prenorm.mp4")
@@ -2129,7 +2246,7 @@ def main() -> None:
                               crf=gen2_crf, preset=gen2_preset, graphics=graphics,
                               demotions=demotions, brand_bg=brand_bg,
                               fps=str(args.fps or 30), matte=matte_path, cards=cards,
-                              silhouettes=silhouettes, glow=glow)
+                              silhouettes=silhouettes, glow=glow, cuts=cuts)
         print("loudness normalization → social-ready (-14 LUFS / -1 dBTP / LRA 11)")
         apply_loudnorm_two_pass(tmp_composite, out_path, preview=args.draft)
         tmp_composite.unlink(missing_ok=True)

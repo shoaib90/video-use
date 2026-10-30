@@ -3566,3 +3566,16 @@ translucent tint reads as a grey box. Build the frost INTO the overlay: read the
 at the overlay's own times, blur it hard, and paste the crop under each card (`feel-like-hustler/edit/build/
 quotewall.py`). The blur hides resolution, so the 1080 base serves the 4K overlay too. It only holds while the cut
 (the base) is unchanged; rebuild the overlay after any re-cut.
+
+## A base's frame number and its time can disagree
+
+Frame numbers are not times on a concat base. A segment whose audio outlasts its video (Hustler's first: video 6.167 s,
+audio 6.200 s) leaves a hole in the base's video timestamps: 8328 frames across 8329 slots, and every later frame sits one
+slot late. Three traps, all hit fixing M061:
+- Convert a cut to a time through the base's real timestamps (`render.cut_slots`), not by counting frames. Counting put every
+  overlay after the hole one frame early, and shipped one wrong render.
+- `probe_source_fps` prefers the average rate, which the hole drags to 29.996. Use `r_frame_rate` for a grid (`_nominal_rate`).
+- `-ss` then counting frames lands a frame or two off on such a file. To index frames exactly, decode from the start with
+  `-fps_mode passthrough`. Without passthrough ffmpeg pads the hole with extra frames, which also shifts the index.
+Verified by a full decode of old and new against the base: 8328 frames in all three, slivers gone, audio bit-identical.
+

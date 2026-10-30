@@ -251,11 +251,12 @@ again; and the reaction shot spent the realisation 3 minutes before the zenith i
 now also asks, for every cutaway, "what does this line MEAN, and does the shot show that?" A shot that only
 matches a noun is filler; if nothing shows the meaning, keep the face.
 
-**M061** · 2026-10-30 · stance-04-hustle final · *Found by the new check, not by eye: six one-frame slivers of the wrong
-shot, at 0:26.4, 0:30.8, 1:08.7, 1:17.5, 2:04.1 and 3:27.1.* Cause: an overlay edge one frame off the cut it should meet.
-At 1:17.5 the CAMEUP overlay ran 6.4 s from 71.093, ending at 77.493, one frame before the cut at 77.5. Check:
-`AUTO T9` (a stray single frame at any cut or overlay edge). Three delivered videos, 407 cuts: these six, each
-confirmed by eye; none in Episodes 3 and 5.
+**M061** · 2026-10-30 · stance-04-hustle final · *Found by the new check, not by eye, then asked to be fixed: nine slivers of
+1-2 frames of the wrong shot, at 0:26.4, 0:30.8, 0:49.8, 1:00.4, 1:08.7, 1:17.4, 1:43.1, 2:04.1 and 3:27.0.* Cause: where a
+full-frame overlay met a cut, its edge landed a frame or two off. render.py placed overlays at EDL seconds on a base whose video
+starts ~21 ms in and has a timestamp hole, an off-grid overlay loses its last frame, and word-anchored edges land beside cuts.
+Fixed in render.py: overlays get whole-frame windows, and an exposed edge within 3 frames of a cut meets it. Check: `AUTO T9`
+(a stray shot of 1-3 frames at a cut or overlay edge). A very fast camera move can trip T9 (Raj's clip, 0:06.2): look, then accept.
 
 ## Sound
 

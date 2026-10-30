@@ -457,32 +457,35 @@ def word_checks(stories, words_of, starts_of_story):
 
 # ------------------------------------------------------------------- render checks
 FLASH_DIFF = 12.0   # mean grey-level change, of 255, that counts as a different picture
+FLASH_MAX_FRAMES = 3  # a shot this short at a cut or overlay edge is never intended
 
 
-def is_flash(steps, i: int) -> bool:
-    """Steps i-1 and i are both big: the picture changed twice, one frame apart.
+def is_flash(steps, i: int, j: int) -> bool:
+    """Steps i and j are both big: the picture changed twice, a few frames apart.
 
     A clean cut changes it once. The bar rises with how much the rest of this window moves,
-    so a whip pan or a strobe, where every step is big, does not read as a stray frame.
-    The two neighbours need not match: a stray frame between two different shots is the usual case.
+    so a whip pan or a strobe, where every step is big, does not read as a stray shot.
+    The two outer shots need not match: a stray between two different shots is the usual case.
     """
-    rest = [s for k, s in enumerate(steps) if k not in (i - 1, i)]
+    rest = [s for k, s in enumerate(steps) if k not in (i, j)]
     bar = FLASH_DIFF + 2 * (float(np.median(rest)) if rest else 0.0)
-    return steps[i - 1] > bar and steps[i] > bar
+    return steps[i] > bar and steps[j] > bar
 
 
 def flash_frames(render: Path, cuts, fps: float, w: int = 64, h: int = 36) -> list[float]:
-    """Output times of cuts with a single stray frame beside them."""
+    """Output times of cuts or overlay edges with a stray shot of up to FLASH_MAX_FRAMES beside them."""
     found = []
     n = w * h
+    reach = FLASH_MAX_FRAMES + 3
     for t in cuts:
-        start = max(0.0, float(t) - 4 / fps)
-        raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{start:.3f}", "-i", str(render), "-t", f"{8 / fps:.3f}",
+        start = max(0.0, float(t) - reach / fps)
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{start:.3f}", "-i", str(render), "-t", f"{2 * reach / fps:.3f}",
                               "-vf", f"scale={w}:{h},format=gray", "-an", "-f", "rawvideo", "-"],
                              capture_output=True).stdout
         frames = np.frombuffer(raw, np.uint8)[: len(raw) // n * n].reshape(-1, n).astype(np.float32)
         steps = [float(np.abs(b - a).mean()) for a, b in zip(frames, frames[1:])]
-        if any(is_flash(steps, i) for i in range(1, len(steps))):
+        if any(is_flash(steps, i, j) for i in range(len(steps))
+               for j in range(i + 1, min(i + 1 + FLASH_MAX_FRAMES, len(steps)))):
             found.append(float(t))
     return found
 
@@ -533,7 +536,7 @@ def render_checks(edit: Path, edl: dict, render: Path, durs, fps):
     ov_edges = [e for o in edl.get("overlays") or [] if "start_in_output" in o
                 for e in (float(o["start_in_output"]), float(o["start_in_output"]) + float(o["duration"]))]
     flashes = flash_frames(render, sorted({round(float(t), 3) for t in [*seg_bounds, *ov_edges]}), fps)
-    res.append(("T9", not flashes, f"{len(flashes)} cut(s) with a stray single frame {[fmt(t) for t in flashes[:12]]}"))
+    res.append(("T9", not flashes, f"{len(flashes)} cut(s) with a stray shot of 1-{FLASH_MAX_FRAMES} frames {[fmt(t) for t in flashes[:12]]}"))
     err = run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(render), "-af", "ebur128=peak=true:framelog=quiet",
                "-f", "null", "-"]).stderr
     I = [float(l.split("I:")[1].split("LUFS")[0]) for l in err.splitlines() if "I:" in l and "LUFS" in l]

@@ -63,7 +63,8 @@ class InputOffsetTests(unittest.TestCase):
     def test_each_overlay_input_carries_its_own_itsoffset(self):
         cmd = _composite_cmd()
         offsets = [cmd[i + 1] for i, a in enumerate(cmd) if a == "-itsoffset"]
-        self.assertEqual(offsets, ["36.567", "507.367", "1037.513"])
+        # Frame-grid starts, half a frame early (see "Overlay placement" in render.py).
+        self.assertEqual(offsets, [f"{(round(t * 30) - 0.5) / 30:.6f}" for t in (36.567, 507.367, 1037.513)])
 
     def test_itsoffset_precedes_the_input_it_applies_to(self):
         """`-itsoffset` after `-i` would silently apply to the NEXT input."""
@@ -104,15 +105,15 @@ class WindowTests(unittest.TestCase):
         `enable` in favour of the file's own length would run it 0.23 s long.
         """
         graph = _graph(_composite_cmd())
-        self.assertIn("enable='between(t,36.567,43.767)'", graph)
-        self.assertIn("enable='between(t,507.367,514.634)'", graph)
-        self.assertIn("enable='between(t,1037.513,1049.513)'", graph)
+        self.assertIn("enable='between(t,36.550000,43.750000)'", graph)
+        self.assertIn("enable='between(t,507.350000,514.616667)'", graph)
+        self.assertIn("enable='between(t,1037.483333,1049.483333)'", graph)
 
     def test_overlays_are_chained_in_order(self):
         graph = _graph(_composite_cmd())
-        self.assertIn("[0:v][1:v]overlay=", graph)
-        self.assertIn("[v1][2:v]overlay=", graph)
-        self.assertIn("[v2][3:v]overlay=", graph)
+        self.assertIn("[0:v][ovp1]overlay=", graph)
+        self.assertIn("[v1][ovp2]overlay=", graph)
+        self.assertIn("[v2][ovp3]overlay=", graph)
 
     def test_subtitles_are_applied_after_every_overlay(self):
         """Hard Rule 1 — otherwise overlays cover the captions."""

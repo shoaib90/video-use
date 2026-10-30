@@ -60,6 +60,17 @@ class FlashTests(unittest.TestCase):
     def test_black_frame_at_a_jump_cut_is_a_flash(self):
         self.assertEqual(len(self.flashes("black_in.mp4", [self.a, self.black, self.a], [30])), 1)
 
+    def test_two_and_three_frame_strays_are_flashes(self):
+        for n in (2, 3):
+            stray = self.t / f"white{n}.mp4"
+            clip(stray, "color=c=white", n)
+            self.assertEqual(len(self.flashes(f"white_{n}.mp4", [self.a, stray, self.b], [30])), 1, n)
+
+    def test_a_shot_of_a_quarter_second_is_not_a_flash(self):
+        stray = self.t / "white8.mp4"
+        clip(stray, "color=c=white", 8)
+        self.assertEqual(self.flashes("white_8.mp4", [self.a, stray, self.b], [30, 38]), [])
+
     def test_stray_frame_whose_brightness_sits_between_its_neighbours_is_a_flash(self):
         # The neighbours differ more from each other than from it (M061's shape).
         mid = self.t / "mid.mp4"
