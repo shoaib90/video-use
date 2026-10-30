@@ -5,6 +5,38 @@ re-derive it or mistake a deliberate change for a bug.
 
 ---
 
+## 2026-10-30 — Reviewed upstream's 166 PRs against `main` (nothing changed in the tool yet)
+
+Listed all PRs on browser-use/video-use, read ~50 descriptions and the #178/#156 diffs, then tested
+the claims on `main` with synthetic clips in the session scratchpad. Suite was 341 passed.
+
+**Reproduced on `main`, not fixed:**
+- Apostrophe in the edit path crashes the concat (`_concat.txt`, exit 254, after every segment is
+  extracted; #54). The subtitle escape is also wrong: libass opened `Its a test/` for `It's a test/`.
+  No such folder exists today (searched `~` to depth 6, minus hidden folders and Library).
+- A fully silent programme crashes loudnorm pass 2 (`measured_I=-inf`, exit 222, after the composite; #191/#218).
+- `timeline_view.py` crashes on a range that ends at the clip's end (exit 234; #156).
+- A missing EDL `subtitles` file only prints a warning: exit 0, no captions (#183), and review T8
+  skips when the SRT is absent.
+- `intro.mp4` and `intro.MOV` map to one transcript (#207/#210). Neither transcribe path checks that
+  the source is unchanged (#219; Deepgram's cache check covers provider and options only).
+
+**Tested, does not apply:** an overlay outlasting the base does not stretch the render (#123:
+2.02 s base, 2.03 s output, no freeze). `pack_transcripts` speaker bug (#212) needs a leading
+token with no speaker, read as not arising from diarized Deepgram (code read, not run).
+Audio-drift PRs (#163/#226/#221): `main` already re-encodes audio once at the concat.
+
+**Worth building, not built:** segment reuse (#201's idea), parallel extraction (#63; our own
+measurement: 2.3 → 5 segments/min on 4K HLG, only ever a monkeypatch in an episode wrapper),
+notes page (#178), Deepgram `keyterm` (#47's idea; docs confirm Nova-3 multilingual support, untested on
+Hinglish), `render.py --check` (#202), flash-frame check (#230).
+
+**Unproven:** the speed-up from segment reuse is not measured, and `is_hdr_source` missing
+SEI-only HLG (#192) was not tested on real footage. Probe caching (#150) costs ~0.14 s per range
+here, ~40 s on a 300-range cut.
+
+---
+
 ## 2026-10-01 (end) — glass cards wired into the EDL (`cards` block, `helpers/cards.py`)
 
 Shoaib approved the look ("this is just sick") and asked for it in every future video, wired into
@@ -2384,3 +2416,8 @@ titles linted by yt-package `title.py` (80-98).
   Disk state survives; the conversation (approvals, open notes, next step) may not. Added `kb/handoff.md` (format and
   rules), a `CLAUDE.md` rule (read `<edit>/HANDOFF.md` first when an episode is named; keep it current), and an index
   line. First instance: `feel-like-hustler/edit/HANDOFF.md`. Not yet tested by an actual account switch.
+
+## 2026-10-30 — `feel-like-hustler`: thumbnail separated from its background
+
+- Shoaib shared vidIQ's pre-publish feedback on E1. Built F1 (blurred room) and F2 (violet field), same words and pose: a violet
+  glow and a rim light from the mask. Checked at 168 px beside E1. Recorded in the episode's `packaging.md` and `HANDOFF.md`; his pick is pending.

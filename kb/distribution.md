@@ -456,3 +456,8 @@ cinematic "THEY GAVE YOU HALF." to a real frame of the hook's quote wall with th
   mid-gesture frame in front of them covering a non-key part of the word. The thesis is said in the first sentence.
   Its click word is a slur, which our brand would never use; the transferable parts are the pairing, the depth layout
   and the one-idea short length.
+
+**A dark subject on a dark room: add light behind, don't darken** (`feel-like-hustler`, 2026-10-30). vidIQ's forecast flagged
+"separate the subject from the background" (its own estimate: ~7% at 7 days; not measured on our channel). Dimming the room had
+not fixed it: dark hair and a navy shirt merged with a dark monitor and chair at 168 px. Verified by eye at feed size: blur the room
+or replace it with a clean field, put a glow behind the head, and add a thin rim from the cutout mask. Pattern: its `build/thumbnails.py --f`.
