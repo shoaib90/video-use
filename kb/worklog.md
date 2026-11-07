@@ -5,6 +5,13 @@ re-derive it or mistake a deliberate change for a bug.
 
 ---
 
+## 2026-10-31 — Three thumbnail videos reviewed
+
+Shoaib asked what they teach. Lessons in distribution.md; script-stage ones in channel-kb's playbook. Measured our device split with vidIQ
+(TV 1.2% of views), and ran the bottom-half test on the Hustler options. Nothing about the tool changed.
+
+---
+
 ## 2026-10-30 — Hustler slivers fixed at the root, with a before/after reel (M061)
 
 Shoaib asked for the slivers T9 found to be fixed, and for a reel showing old against new. T9 had found 6; a full-decode scan
@@ -2465,3 +2472,123 @@ titles linted by yt-package `title.py` (80-98).
 
 - Shoaib shared vidIQ's pre-publish feedback on E1. Built F1 (blurred room) and F2 (violet field), same words and pose: a violet
   glow and a rim light from the mask. Checked at 168 px beside E1. Recorded in the episode's `packaging.md` and `HANDOFF.md`; his pick is pending.
+
+## 2026-10-31: new stance episode, inventory and plan only
+Transcribed 21 clips with Deepgram `multi` plus `--keyterms` (first use of keyterms on a real shoot), and a whisper `ggml-small.bin -l en` cross-check. Both agreed on almost all wording. Deepgram got the keyterm names right, but "at jobs" for "a job" and "badge" for "batch" are errors only the whisper pass showed. No side-by-side run without keyterms, so this does not prove keyterms helped. Long pauses were measured: none held speech. Plan awaits approval; nothing cut.
+
+## 2026-10-31: stance episode, preview v1
+Plan approved; Hustler's build (cut, visuals, captions, mix) adapted. Preview rendered and reviewed: 0 HIGH after three accepted flags, T3 freezes looked at (a frosted deck and the end card). Not listened to by a person yet.
+
+## 2026-11-01: Feeling Behind, 7 B-roll motion clips (MG1-MG7)
+Shoaib asked for seven short slingshot-lane clips (the look of the claude.ai Motion piece made the same day) as 4K MP4s
+in `feeling-behind/motion/`. The Motion artifact type only exports by hand from its page, one film at a time, so the clips were
+drawn as one deterministic page, `edit/build/motion/clips.html` (each clip = `render(t)`), and captured by
+`edit/build/motion/render.mjs`: puppeteer-core from the HyperFrames npx cache plus system Chrome at deviceScaleFactor 2,
+PNG frames piped to ffmpeg (x264 CRF 14, 30 fps). Barlow Condensed loads from Google Fonts in headless Chrome. The script
+fails if `document.fonts.check` is false. Checked by contact sheets of 8 stills per clip plus mid-flight frames. Captions-safe
+bottom 22% and 60 px edges were set by layout and checked on those stills, not by an automated check.
+Verified each MP4 with ffprobe: H.264, 3840x2160, yuv420p, 30 fps, no audio, durations 3.9/3.5/3.5/4.3/7.1/4.0/4.5 s. Freeze
+check: `freezedetect=n=0.00003:d=0.2` (n=0.0005 flags a ball that is still bobbing). It caught one real near-still in MG3
+(0.33-0.63 s, a bob at the top of its sine with nothing else moving). Fixed with a 10 px lean before the pull, and the recheck is clean.
+
+## 2026-11-01: stance episode, preview v2 with motion clips
+Seven silent full-frame clips placed as overlays under the voice, replacing stamps and a deck; the cut did not change. review.py reports "changed edges 0" for a picture-only round, so it writes no reel: the changes reel was built by hand from the clip windows. Checked by frames at each clip's entry, middle and exit. Not listened to by a person yet.
+
+## 2026-11-01: Should You Resign Without an Offer?, inventory and plan only
+13 clips transcribed with Deepgram `multi` plus `--keyterms`, and a whisper `ggml-small.bin -l en` cross-check. Wording agreed except "my batchmates" (IMG_4223 ~54.4 s), which Deepgram dropped; an isolated whisper pass on 5 s around it heard "batch made". All pauses of 1.5 s or more measured below -38 dB; none held speech. No Spanish drift by the `takes_packed.md` grep. Plan awaits approval; nothing cut.
+
+## 2026-11-01: Should You Resign Without an Offer?, preview v1
+Plan approved; Feeling Behind's build adapted. `resign_preview_v1.mp4`, 1080p, 4:28, -14.0 LUFS. review.py: 0 HIGH; T3 and T7 are the end card, T2 is +36 ms in all; the one MED left is a retake whose question is in the cut from the other take. Whisper on the render caught "yourself" clipped to "yours" (fixed, re-heard whole). *Behave*'s spine blurred in every source with `build/book_blur.py`. Not listened to by a person.
+
+## 2026-11-02: stance episode "resign", two Shorts built (`ill_get_it`, `promises_broke`)
+Built with `skills/shorts/` from the parent's sources (v1 of the long cut is not locked). review.py: HIGH 0 / MED 0 after `accepted.json` on both; whole renders whispered;
+stamps and monitor checked on full-size frames. Not checked by ear. Two clicks' audibility: the `sfx` step still reports the soft impact and the third click in `promises_broke` as buried at the 2-6 kHz measure.
+
+## 2026-11-02: Shorts from a tightened parent, no tightener needed
+
+Two Shorts for the started-late episode. Taking `ranges` straight from the parent's `edl.json` (already pause-tightened) instead of raw takes meant no per-episode tightener; review P1 raised nothing. Symlinking `<short>/transcripts` to the parent's corrected `build/word_src/transcripts` before `build` keeps the builder's own symlink from pointing at the raw ones. Verified: review HIGH 0 / MED 0 after accepted.json on both, whisper of each moved edge alone, frame sheets. Not verified by ear.
+
+## 2026-11-03: Shorts B-roll must fill 9:16 (M062, T10)
+Shoaib rejected "your batch" v1: its journal photos sat in a square band over blurred copies of themselves. Rebuilt both shots as full-frame pans
+(`<edit>/shorts/your_batch/make_journal.py`, same blur boxes as `build/stills.py`, with a feathered mask). Added review T10 (`bar_spans`, portrait renders only) with
+`tests/test_review_bars.py`. Verified: T10 flags v1 at 0:09.5-0:14 and 0:16.75-0:19.75, and nothing on the v2 render or the 14 other Shorts on disk; frames of the new render read at
+start, middle and end of both shots. First threshold (4 levels, 0.5 s) false-flagged blurred ruled paper and a plate animation; 20 levels, opposite signs and 1 s fixed both. Review HIGH 0 / MED 0. Not verified by ear (audio unchanged).
+
+## 2026-11-06: feeling-behind v3 — real room and stairs
+Shoaib added `b-roll/room.MOV` and `stairs.MOV`. All three placeholders replaced in the episode's `build/visuals.py` (moments picked from 0.5 s contact sheets;
+his stairs walk goes up, so "went downstairs" gets the tilt down into the stairwell). Episode `build/mix.py` hits now take a start offset; the Soft Impact plays from 1.1 s and
+measures at its cue (+0.02 s, low-band excess of mix over the no-music render). Review v3: HIGH 0 / MED 0; T3 flags as in v2; T9 at the stairs' opening tilt, read frame by frame and accepted.
+Not verified by ear.
+
+## 2026-11-06: feeling-behind v4 — sound on the motion clips (Shoaib's v3 note)
+Note at 4:58: sound on MG7's underline, and similar on the other motion clips. Beats read from `build/motion/clips.html` timings. Added: marker stroke on the
+underline (Epidemic, filed under `effects/epidemic/marker/` with a sidecar), soft whoosh on the pull-back plus a click on the label landing in MG3 and MG4. MG1, MG2,
+MG5, MG6 already had theirs. Levels measured as v4 minus v3 against the programme: -21 to -13 dB rms, loudest 20 ms -15 to -7 dB. Mix only (picture = v3). Review v4: same
+flags as v3. Not verified by ear.
+
+
+## 2026-11-06: voicebox (jamiepine/voicebox) evaluated, then piloted
+Read its README, `backend/routes/transcription.py` and `app/src/lib/constants/languages.ts` (v0.5.0, MIT). `/transcribe` returns text only, no
+word timings, so it is no Deepgram replacement. Shoaib approved a pilot: installed the notarized app, cloned his voice from 14 s of Episode 5
+IMG_3962 with Chatterbox Multilingual, generated 3 lines he actually said (English + two Hinglish, 2-3 input variants each) and Scene 5 of the
+script, in `Editing/episode5/edit/voicebox-pilot/` with the real takes beside them in `listen.html`. Verified with whisper `small.en` and
+`small -l hi`: all words present on short lines; Devanagari + `hi` gives the cleanest Hindi; 220-290 wpm vs his ~161; the long scene dropped
+its last sentence and a second one repeated a sentence. Results in environment.md. **Voice likeness not judged: needs Shoaib's ear.**
+Follow-up: Shoaib could not play `listen.html`; it linked the WAVs as relative files, which the desktop app's file preview does not load.
+Rebuilt with each clip embedded as an AAC data URI (1.9 MB page); verified all 11 report their durations and play in the built-in browser.
+Any local listening page for him: embed the audio, or serve it over http like `notes.py`.
+Verdict (Shoaib, by ear): the clone does not sound like him; the Devanagari + `hi` take was the closest. Recorded in environment.md.
+Retry (2026-11-07, Shoaib's idea: use final-ready clips): profile from 4.6 min of the Episode 5 final's voice (Scenes 6-7 cut from the EDL, test
+lines left out, 11 samples of <=28 s; voicebox caps a sample at 30 s). Regenerated the three lines and Scene 5, the scene one sentence per call
+with per-sentence language and a tail check (`build/vb_retry.py`, `build/vb_scene_fix.py`). Verified with whisper: all words present; pace
+166-216 wpm; one sentence had run on into ~4 s of mumble that the wording check missed, now caught. Lessons in environment.md. Likeness: Shoaib to judge.
+Verdict on the retry (Shoaib, by ear, 2026-11-07): "Still not me". Recorded in environment.md as don't-retry; local listening server stopped.
+Uninstalled (Shoaib's OK, 2026-11-07): quit the app, killed the `voicebox-server` it left on 17493, moved the app, the 3.0 GB chatterbox HF model
+and its Application Support/Caches/WebKit folders to the Trash (~3.6 GB). Verified: all five paths gone, port 17493 closed. The other HF models
+(HTDemucs, speechbrain) and the shared `blobs/` predate voicebox and were kept. Pilot folder kept in the Episode 5 edit.
+
+## 2026-11-06: feeling-behind 4K final
+Shoaib approved v4 ("looks good to me"). `visuals.py 2160` rebuilt the 28 overlays at 3840x2160 with timings identical to v4. CALL's other participants' name labels
+were near legible at 4K (2x zoom of a pulled frame) and had no box: two boxes added. The episode's boxblur radius cap was 12 px at every height, so the 4K blur on the
+founder's photo was weaker than in v4; the cap now scales with height (crop compared against v4 at the same time) and the final was re-rendered. Mix cues identical
+to v4. Verified on the first 4K render: review HIGH 0 / MED 0 with v4's two accepted flags; freezedetect lists the same six stills as v4; all 138 segments
+3840x2160@30; bt709 on all three colour fields; captions and cards read at 4K. The shadow review dir had no `clips_graded`, so T1/T2 first measured the preview
+(gotchas.md). A review.py change built on a wrong theory (hard-linked cache mtimes) was reverted after `stat` showed the 4K segments were newer. Not watched end to end; not heard.
+
+## 2026-11-07: feeling-behind packaging
+Three thumbnail concepts from the script's brief (SAME ROOM. / 2016 2022 / I SAID NO.) built locally from his HEIC poses and the ROOM shot
+(`<edit>/build/thumbnails.py`); title = the script's lead; description with 13 chapters read off the final's captions. Verified: `title.py`
+80/100 for the lead title with each thumbnail (different words); every chapter >= 11 s and its label checked against the line at that time;
+the 168 px strip read by eye. v1's arm-over-letter and square-shoulder faults fixed (distribution.md). CTR unknown until published.
+
+## 2026-11-07: home tour, background music (personal video, not an episode)
+`~/Downloads/home-tour.mp4` (30:14, 1080p H.264 17 Mbps, 3.96 GB, Android, room sound only, no speech; whisper on three samples).
+Shoaib: music throughout; don't compress if it costs quality. Video stream copied (`-c:v copy`), so the size is unchanged (3.97 GB);
+audio is new. Ten Epidemic acoustic beds (happy/hopeful, no vocals), each levelled to −18 LUFS, trimmed to their audible span, 3 s
+crossfades. The last track enters mid-song so its real ending lands on the last frame. Room sound kept, compressed, ~15 dB under.
+Final −15.9 LUFS, −1.1 dBTP. The phone's wrong `rotation=-90` tag was cleared (gotchas.md, iPhone rotation section).
+Verified: video `-f md5` identical to the source, no rotation side data, an output frame upright; no short-term stretch under −32 LUFS.
+Not heard by anyone yet. Build: `<edit>/build_music.sh`, `<edit>/mux_final.sh`; state in `<edit>/HANDOFF.md`.
+Side findings: `mgx.py fetch` needs a motion-graphics project and `cairo`, so for a plain job curl the signed URL into
+`music/epidemic/beds/` and write the id sidecar by hand. `notes.py` on a render with no `edl.json` beside it writes notes to
+`<render dir>/edit/notes/` (here `edit/edit/notes/`).
+
+## 2026-11-07: feeling-behind title change, thumbnail C re-worded
+
+Shoaib replaced the approved title with "Feeling Behind at 18? Here's What I Learned" and asked for thumbnail C's words to
+match. C went from I SAID NO. to LATE TWICE.: the dropped "started late twice" moved from the title to the thumbnail.
+`thumb_c()` in the episode's `build/thumbnails.py` now takes its two lines as arguments. Verified: the 168 px
+check shows no letter covered; `title.py` scored 98 for every candidate, so it could not choose between word sets (it
+checks overlap and length, not meaning). He approved it ("Yes, keep it").
+
+## 2026-11-07: should-you-resign 4K final
+Shoaib approved v1 with no notes ("looks good to me, we can render 4k"). The episode's `visuals.py` was copied before the
+2026-11-06 blur-cap fix (facts.md, Rendering), so it still had the fixed 12 px cap; changed to `12 * H // 1080` before `visuals.py 2160`.
+Overlay timings came out identical to v1. Render `--height 2160 --fps 30`, then `mix.py` with the same cues as v1. Verified: review HIGH 0
+and the same MED/T2/T3/T7 flags as v1 (cut unchanged; `clips_graded` linked into `build/rv` first, so T1 read 94 segments at 3840x2160@30);
+-14.0 LUFS / -1.9 dBTP; 268.0 s like v1; bt709 on all three fields; offer-email boxes, book spine and monitor text unreadable on native
+4K crops; cards crisp. Not watched end to end; not heard. The copies in episode5 and feel-like-hustler still carry the old cap (finished episodes, left alone).
+Closed out the same day: Shoaib approved the 4K final and both Shorts as delivered ("Everything looks good. I think we can close
+out on everything."). Notes pages stopped. ~12 GB of intermediates left in place pending his OK (memory: keep until approved, then ask).
+On his OK, the 12 GB of intermediates went to `~/.Trash/editing-cleanup-2026-11-07-resign/` (paths kept). Verified: the three upload
+files still probe at full length and size; the edit folder is 2.0 GB.

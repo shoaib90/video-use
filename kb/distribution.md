@@ -461,3 +461,37 @@ cinematic "THEY GAVE YOU HALF." to a real frame of the hook's quote wall with th
 "separate the subject from the background" (its own estimate: ~7% at 7 days; not measured on our channel). Dimming the room had
 not fixed it: dark hair and a navy shirt merged with a dark monitor and chair at 168 px. Verified by eye at feed size: blur the room
 or replace it with a clean field, put a glow behind the head, and add a thin rim from the cutout mask. Pattern: its `build/thumbnails.py --f`.
+
+**Place the words by the mask's outermost column over the text's own rows, not by the head** (feeling-behind, 2026-11-07).
+Measuring the head alone, v1's arm covered the R of "ROOM." and a shoulder would have clipped "NO.". Each line now starts past the
+subject's outermost mask x across the rows it occupies, and the size is re-fitted to that room. Also: crop a thumbnail pose WIDE enough that
+the shoulders are whole, or the cutout ends in straight vertical edges that read as a pasted rectangle. Pattern: `feeling-behind/edit/build/thumbnails.py` (`clear_x`).
+
+## Thumbnail diagnosis: main character, interest, concept-level variants (Aprilynne Alter, 2026-10-31)
+
+From two of her videos ("give me 9 minutes…", 637K views, and "you have thumbnail blindness", 83K). This is one experienced
+reviewer's opinion with no data shown ("81% better" has no source), and both are sponsored by a thumbnail tool. Unproven on our channel.
+- **Find the main character first:** the element that best says why someone should click, which need not be your face because the
+  video is a talking head. A small channel's face alone generates no interest; it needs another driver.
+- **An expression needs something to react to.** A strong face on a person just standing there looks fake, which is why it feels
+  unnatural to pose. Give it a cause: mid-action, a moment of tension, an object. This explains our "paused moment" finding.
+- **Start from what the viewer should wonder and feel, then pick what to show.** Her reason: feeds show bigger thumbnails and smaller
+  titles, so the thumbnail must create interest on its own.
+- **At least one variant must be a different CONCEPT.** Colour, font and layout are design variants, and easy to spend all the time on.
+  Text variants take five minutes and are the cheapest test. Our Hustler E/F/G set is one concept: same pose, same words.
+- **The thumbnail and the intro have different jobs.** The shirt need not match the video. Her example changed it to red purely to pop.
+  For us that answers "dark hair and a navy shirt merge with the room" before the edit: wear the colour on the thumbnail set.
+- **Count elements and trace the eye.** A diagram-style thumbnail wants three (creator, diagram, text), understood in under 2 s, and
+  the diagram bigger than the creator on its own layer, or the two compete.
+- **Text:** at most 5 words on 2 lines by her rule. We keep our stricter ceiling of 3-4.
+- **References: 10-15, from five places:** our own outliers, others' outliers, channels with our format on another subject, a private
+  bookmark playlist, and off-YouTube (film, ads, album covers). For each ask what it makes you wonder or feel, and how.
+- **TV: only a tie-breaker for us.** She says the TV home row shows only the top of a thumbnail (not verified here), so she covers the
+  bottom half and checks it still works, if TV is 10%+ of views. Ours, Jan-Oct 2026 by vidIQ's analytics, Shorts included: TV 1.2% of views,
+  2.2% of engaged views, 6.5% of watch time, mobile 87% of views. So 168 px on a phone still comes first. Applied to Hustler: E1, G1 and G2
+  keep their words above the line, F3 clips them.
+
+**The 97-minute Photoshop course (Lets Uncover, Hindi): one takeaway, mostly a warning.** Read in full: its opening. Otherwise only passages matching
+principle keywords, as the rest is click-by-click. Its finish is an AI enhancer (Remini, Krea, Leonardo) over the whole thumbnail, and it admits the result
+looks "AI-faced". We keep getting sharpness from the source, as above. Real faces suit this channel's honesty, so do not adopt it unasked.
+

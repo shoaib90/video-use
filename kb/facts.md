@@ -141,6 +141,9 @@ Longer accounts are in [gotchas.md](gotchas.md). Same rules as the index: verifi
 
 *Before changing render.py, or when a render looks wrong.*
 
+- **Measure a cutaway against the a-roll beside it, not by eye on a contact sheet** (2026-11-06, feeling-behind v3). His midday room clip
+  (green walls, iPhone HLG) came out of the tone-map at SATAVG 28 / YAVG 151 against the graded a-roll's ~11 / ~105; signalstats on both
+  showed it, the sheet only looked "bright". `eq=saturation=0.7:gamma=0.88` before the a-roll LOOK brought it to ~18 / ~145. Not yet seen by Shoaib.
 - **The concat must stream-copy VIDEO but re-encode audio once** (`-c:v copy` + one continuous
   AAC pass, `-ac 2`). A blanket `-c copy` inserts ~30 ms of AAC priming at every cut; a lone
   mono source corrupts everything after it. Both in gotchas.md, both pinned by tests.
@@ -194,6 +197,11 @@ Longer accounts are in [gotchas.md](gotchas.md). Same rules as the index: verifi
   reused on the next run, keyed on sources, settings, render.py, grade.py and the ffmpeg build. Only a
   partial output mp4 is lost (no moov atom). `episode2/edit/build/resume_render.py` is obsolete.
 
+- **Re-check blur boxes on screen captures at the delivery height, frame by frame zoomed** (2026-11-06, feeling-behind CALL). Names in a call's
+  tile labels, unreadable at 1080, were close to legible at 4K and had no box; two boxes were added. Boxes are fractions of the frame, but a
+  boxblur radius cap in PIXELS (12, from Episode 5's `visuals.py`) halves the blur at 4K: the founder's photo showed a shape. Scale the cap with
+  height (`12 * H // 1080`); compare a 2x-zoomed crop of the 4K frame against the approved preview's at the same time.
+
 ## Sound
 
 *Before denoising or mixing.*
@@ -213,6 +221,12 @@ Longer accounts are in [gotchas.md](gotchas.md). Same rules as the index: verifi
   a 10% raw blend hands back the entire gain.
 - **Noise is per-location, so denoise is per-segment** — `ranges[].audio_filter` overrides the
   EDL-level one.
+- **Chaining library tracks into one long bed: trim every head and tail, and screen for breakdowns** (home tour,
+  2026-11-07). A 4 s crossfade over untrimmed Epidemic tracks left holes down to −41 LUFS at the joins: one track
+  has 14 s of near-silence at its end. Trim each to where momentary loudness last exceeds I−15 (+1 s ring-out).
+  Then scan the joined bed's short-term loudness for stretches under −26 LUFS. Two "happy acoustic" tracks had mid-song
+  breakdowns (−37 to −49) that read as the music cutting out. Swap the track, or end it before the breakdown.
+  Audition a candidate by running the same scan on its `lqmp3Url` preview before downloading it.
 - **Set music levels per cue against the programme in THAT window** — on Detour-2 the
   windows spanned 84 dB, so one global target left two cues inaudible and one clipping.
   Where a window has no headroom, duck the programme with the ramps outside the cue.

@@ -117,6 +117,12 @@ passes; the odd one just comes out **upside down**. Nothing in `ffprobe`'s dimen
 Look at a frame from every clip during inventory. It is the only way to catch this, and it is
 cheap next to discovering it in a finished render.
 
+**Android variant (home tour, 2026-11-07):** a 30-min Android 13 clip was stored 1920x1080 with
+upright landscape pixels but tagged `rotation=-90`, so every player showed it portrait and sideways.
+Spotted only because the auto-rotated contact sheet was sideways and a `-noautorotate` sheet (one frame
+a minute) was upright in all 30 frames. Fix with no re-encode: `-display_rotation:v:0 0` **before** `-i`,
+plus `-c:v copy`. Verified: the side data is gone and the video stream's `-f md5` matches the source.
+
 ---
 
 ## Each ASR provider has a different characteristic flaw
@@ -3533,6 +3539,10 @@ so two anchors that resolved on the copies raised there ("Using purpose as a shi
 end on a stretched word). Test every anchor against both sets and use words they share. For review.py, a shadow
 edit dir of symlinks with `transcripts` pointing at the copies took story flags from HIGH 29 to HIGH 12 real
 ones (`feel-like-hustler/edit/build/rv`).
+**Link `clips_graded` into that shadow dir before reviewing a 4K final** (2026-11-06): review T1/T2 measure whichever segment
+folder the edit dir holds, and a shadow dir made at preview time holds only `clips_preview`. The feeling-behind final's report
+said "T1 PASS: 138 segments in clips_preview 1920x1080" for a 3840x2160 render; after `ln -s <edit>/clips_graded build/rv/` it read
+the 4K segments. Read T1's folder name in every final's report.
 
 ## whisper word-level output: zero-length words and sub-word pieces (2026-10-26)
 
@@ -3579,3 +3589,37 @@ slot late. Three traps, all hit fixing M061:
   `-fps_mode passthrough`. Without passthrough ffmpeg pads the hole with extra frames, which also shifts the index.
 Verified by a full decode of old and new against the base: 8328 frames in all three, slivers gone, audio bit-identical.
 
+
+## BSD `xargs -I` fails on long commands
+`xargs -I{} sh -c "..."` on macOS stops with "command line cannot be assembled, too long" once the replacement string makes the command long, and runs nothing. Seen 2026-10-31 on a batch of `transcribe_deepgram.py` calls with long paths. Use a shell loop with `&` and `wait` instead.
+
+## Card anchors read the paid transcript, not `build/word_src`
+Preflight resolved cards against `<edit>/transcripts`, where stretched Deepgram spans make a word fail the half-word test, so a phrase that reads fine in `cut.py --prose` raises (seen 2026-10-31: "So fast forward", "But I said no", "my seventh semester"). Anchor on words away from a pause or sentence end. Overlays and the mix read `word_src`, so one phrase can pass there and fail here.
+
+## Painting over a screen behind a person: matte.py is not tight enough
+Tried 2026-10-31: replacing a monitor's wallpaper behind the speaker with a plate from another take, using `matte.py --dilate 0 --feather 3` plus erosion. The bright wallpaper left a wide orange halo round the hair, and the alpha ghosted the old picture (not debugged). Blurring the whole take under a full-frame card was the fix. Better on set: check the monitor between takes.
+
+## Generated clips in `episode2/b-roll/b-roll1.mp4` are 1 s-per-shot montages
+A cutaway from it showed a bat grip and a height chart inside 1.5 s, caught only on a sheet of the render (M055). Pull one still from the shot wanted. Their book titles are gibberish, so blur them.
+
+## review.py writes no changes reel for a picture-only round
+Its reel follows changed story edges. New overlays on an unchanged cut give "changed edges 0" and no `reel.mp4`, though CLAUDE.md requires one. Seen 2026-11-01. Build it by hand from the changed overlay windows, 1.5 s either side, until the check covers overlays.
+
+## A sentence-final fricative can be trimmed as dead air
+Found 2026-11-01 on the Resign preview: tighten.py's `BREATH_DB` (-38 dB) treats a quiet final "f" as non-speech, so a trimmed pause cut "yourself" to "yours" (IMG_4228, -42 dB until 14.9 s). review.py rated it LOW C5 ("drops 'yourself.…'"). Whisper on the render heard it; whisper on the same window after `out_at` 15.05 heard the whole word. So read every LOW C5 that says "drops", not just "removed a pause". Also: a full-length whisper pass skips whole lines on its own, so re-hear any gap on a short window before calling it a clipped cut (6 of 7 suspects here were whisper, not the cut).
+
+## An idle Mac stalls HyperFrames
+Same night: the Mac slept during a card render, a browser probe timed out at 120 s, and a one-minute chain took over an hour. `pmset -g log` shows it. A card check failed once with no real error and passed when re-run. Not proven that sleep caused that failure.
+
+## Deepgram can place a stretched word late: only a segment whispered ALONE shows it
+
+Verified on the resign Short `ill_get_it` (2026-11-02). Deepgram listed "shock." at 10.56-11.04, but the word ends before 10.5 s: the piece 8.675-10.635 alone whispers as "They were in complete shock." `tighten_short.py` had cut correctly, and the word list made it look as if "shock" had been dropped. Restoring 10.895-11.35 added the start of the next line: alone it whispered "She's", and in a join with the previous piece whisper still read a clean "shock." Before restoring a word that seems lost, whisper the kept piece alone and read the levels.
+
+## Shorts: effect offsets and very quiet effects (2026-11-02)
+
+- **A `"file"` hit with `"offset": 0` plays the file's lead-in.** The Soft Impact's transient is at 1.196 s (`SFX_LIB`), so it measured BURIED (-6.7 dB) however far its trim was raised. Named `"sfx": "thud_soft"`, it measured +12 to +32 dB over control. Use the `sfx` name when one exists.
+- **`tick_soft` needs +27 dB of gain to reach its target, and then swings:** the same hit and trim read buried over speech in one Short and +44 dB in the low band in another. Dropped from both, since nobody could judge it by ear. Verified with `shorts.py sfx`, not by listening.
+- **Some library effects hold a second take ~1.5 s in** (found 2026-11-06, feeling-behind v4). `Click, Select, Smartphone, Short 01` clicks again at 1.6 s and
+  `Whoosh, Softs` swooshes again at 1.5 s; a 2.5 s hit with a fade from 1.6 s played the second one faded (the email click in Hustler-engine mixes did, at
+  -19 dB under the programme, measured as v4 minus v3). Read an effect's 50 ms envelope before using it, and cap the hit's length at the first take
+  (the episode `mix.py` hit tuple takes `(file, t, trim, offset, length)`).

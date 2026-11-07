@@ -209,3 +209,40 @@ the repo's 3.12 env ever imports torch.
 **SpeechBrain was evaluated and rejected** for this job — `metricgan-plus-voicebank` and
 `mtl-mimic-voicebank` both scored *worse than the existing `arnndn` chain* on real footage, and
 both are 16 kHz models. Numbers in gotchas.md. Not installed.
+
+## Voice cloning — Voicebox (piloted 2026-11-06, uninstalled 2026-11-07)
+
+[jamiepine/voicebox](https://github.com/jamiepine/voicebox) v0.5.0, piloted and then **uninstalled on 2026-11-07** (Shoaib's OK,
+after two failed likeness tries): app, its 3.0 GB Chatterbox model, `~/Library/{Application Support,Caches,WebKit}/sh.voicebox.app`
+all moved to the Trash. The table below is what was there. Even if used, a clone is for table-reads only, never a published cut
+(channel-kb "authentic first"). Quitting the app leaves `voicebox-server` running on 17493; it must be killed separately.
+
+| | |
+|---|---|
+| App | `/Applications/Voicebox.app` (528 MB), notarized Developer ID, James Pine. Must be running for the API |
+| API | `http://127.0.0.1:17493` (`/docs`, `/openapi.json`); MCP at `/mcp`, **not** added to Claude Code |
+| Model | Chatterbox Multilingual only, 3.0 GB in `~/.cache/huggingface/hub/models--ResembleAI--chatterbox` |
+| Profiles | "Shoaib (pilot)": 14 s of Episode 5 IMG_3962. "Shoaib (final cut 4.6 min)": Episode 5 final Scenes 6-7 (EDL ranges 94-191), 11 samples |
+| Pilot | `Editing/episode5/edit/voicebox-pilot/` (`listen.html`, `build/vb_*.py`): kept, 43 MB |
+
+**Shoaib's verdict (by ear): it does not sound like him, twice.** 2026-11-06 from one 14 s sample (closest: Devanagari + `language: "hi"`);
+2026-11-07 again from 4.6 min of the Episode 5 final in 11 samples, which fixed pace and dropped lines but not likeness. A longer reference
+cannot help much (Chatterbox voices from its first 10 s, below), so the engine is the limit. **Don't retry Voicebox/Chatterbox for his voice.**
+
+What the pilot measured (whisper `small.en` + `small -l hi` on every output):
+- **It reads far faster than Shoaib**: 220-290 wpm against his ~161 (the same football line: 5.0 s cloned, 7.8 s real). Don't time a
+  script from a clone; word count / 161 wpm stays the method (channel-kb playbook).
+- **Hinglish works best as Devanagari with `language: "hi"`**: whisper heard "मडलब हो गया यही तो करना था" and "ठीक है दरद होगा तो देख लेंगे".
+  Romanised Hindi with `en` comes out anglicised ("Matlab Hogaia, Yajito, Karnada").
+- **It drops and repeats lines on long text**: a 122-word scene lost its last sentence; another repeated a sentence at 27.5 s (both whisper
+  models agree). Generate one sentence or line per call and whisper-check each.
+- **And a single sentence can run on into mumble**: "I was going to start making videos." spoke 2.4 s, then ~4 s of non-speech at -30 to -20 dB.
+  Whisper's wording was perfect, so check the tail too (clip length minus whisper's last segment end; reseed over 0.6 s).
+  `voicebox-pilot/build/vb_scene_fix.py` does both; 2 of 11 sentences needed a second seed.
+- **Pick the language per sentence**: `hi` on an English sentence gives it a Hindi accent (whisper heard "I" as "he" in 6 of 7).
+  `hi` only where the sentence has Devanagari.
+- **Reference: samples cap at 30 s each, but a profile joins all its samples** (`combine_voice_prompts` concatenates them). Chatterbox then
+  takes only the first **10 s** for the voice itself and 6 s for its prompt (mlx-audio `DEC_COND_LEN`/`ENC_COND_LEN`); the rest feeds only the
+  speaker embedding. So a long reference must open on its cleanest 10 s. The 4.6 min reference brought pace to 166-216 wpm (14 s ref: 220-290).
+  The MLX backend hard-codes `exaggeration` 0.1 (flat delivery); the API cannot change it.
+- `/transcribe` returns text only, no word timings; it cannot replace Deepgram (data-contract.md).

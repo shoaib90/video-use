@@ -228,7 +228,8 @@ Shoaib scrubs, presses N, picks cut / shorten / lengthen / wrong / note, types o
 the picture to pin a spot. Each note saves at once. `[` `]` jump between cuts. The dump adds the source file,
 source time and words spoken at each note, and transcribes voice with whisper (free, `ggml-small.bin -l en`, so
 Hindi reads as English), once. It gives no source times if `edl.json` is newer than the render. Notes are never applied
-automatically. Binds 127.0.0.1, refuses other hosts and origins. Mic untested with a real voice: playback, save,
+automatically. With no `edl.json` beside the render, notes go to `<render dir>/edit/notes/`, so a render in `edit/` gets
+`edit/edit/notes/` (seen 2026-11-07; harmless, the URL still works). Binds 127.0.0.1, refuses other hosts and origins. Mic untested with a real voice: playback, save,
 pin and reload were driven in the app's browser, and voice transcription was run on an audio file.
 Tests: `test_notes.py`. Idea from upstream #178; written fresh, with a server so saving needs no folder picker.
 
@@ -310,6 +311,8 @@ Pinned by `tests/test_review_edges.py` (13 tests). Render checks reuse the episo
 **T9 (2026-10-30): a stray shot of 1-3 frames** at any cut or overlay edge: two big picture changes that close, against
 how much that window otherwise moves. Compares brightness only, on a 64x36 grey copy, so a sliver matching its neighbours'
 brightness can hide, and a fast handheld move just before a cut can trip it: look at the frames. ~0.3 s per cut. **T8 now also flags** an EDL naming a subtitles file that does not exist. Tests: `test_review_flash.py`.
+
+**T10 (2026-11-03): a picture in bars on a portrait render** (M062): mirrored full-width brightness edges with opposite signs, for 1 s or more. Bars close in brightness to the picture get past it.
 
 ## apple_sdr.swift — iPhone HLG / Dolby Vision to SDR with Apple's pipeline *(local addition, 2026-10-21)*
 ```
