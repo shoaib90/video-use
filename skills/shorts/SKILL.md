@@ -99,6 +99,8 @@ Do not duplicate its rules here:
   "vf"}]`, where `x` is the subject's centre (frame fraction). Built full-frame 1080x1920 at build
   time and placed by spoken anchor. Real footage of Shoaib carries a Short; a 720p clip upscales
   ~2.7x, which reads as archival.
+  Every shot fills 9:16: never a landscape picture in bars, black or blurred (M062, review T10). Pan
+  across a landscape photo instead, and keep what must be read above the captions.
 - **plate:** at most 6 words and different from the spoken line, held about 3 s. The thumbnail
   style is a yellow kicker over big white type on a dark plate.
 - **cards:** carry the **parent's cards** for the kept moments; review G4 flags any you drop.

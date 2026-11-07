@@ -490,6 +490,40 @@ def flash_frames(render: Path, cuts, fps: float, w: int = 64, h: int = 36) -> li
     return found
 
 
+def seam_rows(frame: np.ndarray, step: float = 20.0, share: float = 0.8) -> dict[int, int]:
+    """Rows where most of the width jumps in brightness the same way, with the jump's sign: the edge of a bar.
+
+    The step is high because ruled paper, soft shadows and blurred text move ~10 levels across a row.
+    """
+    d = frame[2:].astype(np.int16) - frame[:-2].astype(np.int16)
+    return {y + 1: (1 if (row > 0).sum() > (row < 0).sum() else -1) for y, row in enumerate(d)
+            if max((row > step).mean(), (row < -step).mean()) >= share}
+
+
+def has_bars(frame: np.ndarray) -> bool:
+    """A picture band centred in the frame: an edge up top, and its mirror below stepping the opposite way."""
+    h = frame.shape[0]
+    rows = seam_rows(frame)
+    return any(h * 0.04 < y < h * 0.45 and sign != sign2 and abs(y + y2 - h) <= h * 0.02
+               for y, sign in rows.items() for y2, sign2 in rows.items())
+
+
+def bar_spans(render: Path, rate: int = 4, w: int = 135, h: int = 240, min_s: float = 1.0) -> list[tuple[float, float]]:
+    """Stretches of a portrait render where a landscape picture sits in bars (black, colour or blurred)."""
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(render), "-vf", f"fps={rate},scale={w}:{h},format=gray",
+                          "-an", "-f", "rawvideo", "-"], capture_output=True).stdout
+    n = w * h
+    frames = np.frombuffer(raw, np.uint8)[: len(raw) // n * n].reshape(-1, h, w)
+    hits = [i for i, f in enumerate(frames) if has_bars(f)]
+    spans: list[list[int]] = []
+    for i in hits:
+        if spans and i - spans[-1][1] <= 1:
+            spans[-1][1] = i
+        else:
+            spans.append([i, i])
+    return [(a / rate, (b + 1) / rate) for a, b in spans if (b + 1 - a) / rate >= min_s]
+
+
 def render_checks(edit: Path, edl: dict, render: Path, durs, fps):
     res = []
     R = edl["ranges"]
@@ -537,6 +571,11 @@ def render_checks(edit: Path, edl: dict, render: Path, durs, fps):
                 for e in (float(o["start_in_output"]), float(o["start_in_output"]) + float(o["duration"]))]
     flashes = flash_frames(render, sorted({round(float(t), 3) for t in [*seg_bounds, *ov_edges]}), fps)
     res.append(("T9", not flashes, f"{len(flashes)} cut(s) with a stray shot of 1-{FLASH_MAX_FRAMES} frames {[fmt(t) for t in flashes[:12]]}"))
+    size = run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+                "-of", "csv=p=0", str(render)]).stdout.strip().split(",")
+    if len(size) == 2 and int(size[1]) > int(size[0]):
+        bars = bar_spans(render)
+        res.append(("T10", not bars, f"{len(bars)} stretch(es) with a picture in bars {[fmt(a) + '-' + fmt(b) for a, b in bars[:8]]}"))
     err = run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(render), "-af", "ebur128=peak=true:framelog=quiet",
                "-f", "null", "-"]).stderr
     I = [float(l.split("I:")[1].split("LUFS")[0]) for l in err.splitlines() if "I:" in l and "LUFS" in l]

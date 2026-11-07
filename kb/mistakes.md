@@ -258,6 +258,12 @@ starts ~21 ms in and has a timestamp hole, an off-grid overlay loses its last fr
 Fixed in render.py: overlays get whole-frame windows, and an exposed edge within 3 frames of a cut meets it. Check: `AUTO T9`
 (a stray shot of 1-3 frames at a cut or overlay edge). A very fast camera move can trip T9 (Raj's clip, 0:06.2): look, then accept.
 
+**M062** · 2026-11-03 · feeling-behind Short "your batch" v1 · *"This short uses b-roll images shot in landscape, so the full
+thing is not covered in the phone's portrait view."* Cause: to keep the whole journal line readable, the landscape photo was
+built as a square band over blurred copies of itself, which reads as an unfilled frame. Shorts B-roll fills 9:16 and moves across a
+landscape picture instead, even when only part of the line shows at once. Check: `AUTO T10` (portrait renders only: mirrored
+full-width brightness edges for 1 s or more). It does not see bars close in brightness to the picture, so still look at R3.
+
 ## Sound
 
 **M052** · 2026-10-05 · Episode 3 v4 (logged 2026-10-12) · *Sound effects 17 LU under the voice were
