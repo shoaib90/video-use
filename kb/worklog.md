@@ -2592,3 +2592,6 @@ Closed out the same day: Shoaib approved the 4K final and both Shorts as deliver
 out on everything."). Notes pages stopped. ~12 GB of intermediates left in place pending his OK (memory: keep until approved, then ask).
 On his OK, the 12 GB of intermediates went to `~/.Trash/editing-cleanup-2026-11-07-resign/` (paths kept). Verified: the three upload
 files still probe at full length and size; the edit folder is 2.0 GB.
+Closed out (2026-11-07): Shoaib's final OK ("everything looks good"); on his "Yes, trash them" the 11 GB of feeling-behind intermediates
+(prepped, card renders, segment caches, base, no-music renders, previews v2-v3) went to `~/.Trash/editing-cleanup-2026-11-07-feeling-behind/`
+(paths kept). Verified: the final and both Shorts' upload files still probe at full length and size; the edit folder is 1.8 GB.
