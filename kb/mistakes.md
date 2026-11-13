@@ -307,6 +307,12 @@ from a config with no `MOVIE_LAYERS`. Check: `READ R7` now includes "the badge s
 line after the cold open". Fix: Episode 4's `prepped/ov_2160/GFX_SPEED.mov`, `start=` the first line
 after the cold open, then `layers`, `compose --dirty speed_badge` and `mux` (one chunk, about a minute).
 
+**M063** · 2026-11-13 · should-you-resign thumbnails · *Two of three cut-outs "look very odd"; and were the recent
+thumbnail rules followed?* Cause of the pasted look: not proven (the "warm field" guess was contradicted the same day; the
+soft-edge colour fill also striped edges, found after). Also, the build copied our last episode's builder instead of channel-kb's design-system
+Thumbnail component (2026-11), so A had an open mouth, and B a money flex. (Its orange word was not a fault: shown violet
+beside it, he kept orange.) Check: `READ R11`.
+
 **M040** · Episode 1 (talking-head series) · *95% → 52% retention in 8 s of silent black at the
 open.* Check: `AUTO T6` (black or silence in the first 2 s).
 
@@ -338,6 +344,9 @@ said by ~0:10?).
   message.
 - **R10** Retakes (M045): for every line said more than once, list the candidates, pick the
   best (complete sentence, no restart, fewest fillers, delivery), and write the reason down.
+- **R11** Thumbnails (M063): before building, read channel-kb's `design-system/components/Thumbnail/README.md`, `tokens.json`
+  and the newest `01-roadmap/thumbnail-shoot-*.md`, and tick each rule in `packaging.md`. Before delivering, zoom every cut-out edge at 3x, ears and hair especially: no stripes, no halo, no
+  rim that outlines him like a sticker. Compare it beside his last approved thumbnail at full size and at 168 px.
 - **R11** Every cutaway, photo and card shows or says what the line says (M049); none fills time.
   Ask what the line MEANS: a shot that only matches a noun in it is filler (M060).
 - **R12** Shorts and other derived cuts (M053): list every card, mgx cue, effect and music cue

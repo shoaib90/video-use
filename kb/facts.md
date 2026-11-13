@@ -332,6 +332,14 @@ Longer accounts are in [gotchas.md](gotchas.md). Same rules as the index: verifi
   is a thief": lift the methodology and tweak it, not the finished piece. Same file.
 - **Blocked on ideas is usually information OVERLOAD, not a shortage** — the fix is an artificial
   constraint that shrinks the option space, which is also why our decision table works. Same file.
+- **A thumbnail's spec is channel-kb's design system, not our old builds** (`00-foundation/design-system/components/Thumbnail/README.md`,
+  `tokens.json`, and the newest `01-roadmap/thumbnail-shoot-*.md`). Read them first: closed mouth into the lens, 2–4 white Poppins
+  Black words with one accent word, him right with the left ~45% clear, one proof object, 168 px on white and dark, never a money
+  flex on screen. Missed on 2026-11-13 until Shoaib asked whether we followed the recent rules.
+  **Orange word (`accent` #f25435) on the warm dark field.** Shoaib's pick on 2026-11-13: shown the violet word beside it, he said
+  "Keep orange", then asked for Feeling Behind's warm field (LATE TWICE.'s). The design system says so too since that day: live
+  page v5 and the repo copy, with tokens `thumb-field` #2e1a14, `thumb-glow` #965032 and `thumb-rim` #ffdcc8. Builder:
+  `should-you-resign-without-offer/edit/build/thumbnails.py` (`warm_field`).
 - **Packaging before production.** Title first (≥10), a thumbnail brief *before* the shoot,
   ≥3 differentiated thumbnails, and the expected result written down before publishing.
   Outliers are ≥3× a channel's *average views*, not measured against its subscribers.

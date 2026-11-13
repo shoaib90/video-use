@@ -467,6 +467,22 @@ Measuring the head alone, v1's arm covered the R of "ROOM." and a shoulder would
 subject's outermost mask x across the rows it occupies, and the size is re-fitted to that room. Also: crop a thumbnail pose WIDE enough that
 the shoulders are whole, or the cutout ends in straight vertical edges that read as a pasted rectangle. Pattern: `feeling-behind/edit/build/thumbnails.py` (`clear_x`).
 
+**No photo set? An a-roll frame works, with three fixes to the Vision mask** (should-you-resign, 2026-11-13). With no stills
+shot, the faces came from the 4K a-roll: the Dolby Vision source through `apple_sdr` (whole clips; a `-c copy` trim was not tried,
+so whether it keeps the RPU is unknown) plus the EDL's `grade`. A crop ~1260 px tall scaled to 1080 gives a ~530 px head, sharp
+at full size and at 168 px. The mask needed: (1) **only its largest shape**, as it caught the bonsai behind him at low alpha,
+which showed as a grey smudge on a card; (2) **a steeper alpha ramp** (150-225), as an out-of-focus ear left a 36 px soft band;
+(3) **edge decontamination**: partial-alpha pixels take the nearest solid pixel's colour, or that band carries the pink wall
+onto the field. **Then blur that fill inside the band** (Gaussian 4): the nearest-pixel fill runs in straight lines and left
+visible stripes in the soft ear at 3x zoom. Verified by zooming each edge before and after. Pattern:
+`should-you-resign-without-offer/edit/build/thumbnails.py` (`clean_mask`, `decontaminate`, `place`, `stack`).
+- **Two of that video's three cut-outs "look very odd"** (Shoaib, 2026-11-13): B (a huge mid-word face beside the offer email)
+  and C (dawn field), both built before the stripe fix. The cause is not proven. "A warm field under the set's violet light" was
+  a guess, and A on Feeling Behind's warm field then matched LATE TWICE.'s edges at full size, which contradicts it. Before
+  showing a cut-out, zoom every edge, the ears especially, at 3x.
+- **The a-roll's own pre-roll gives a closed mouth.** The seconds before his first word (IMG_4209 0-2 s) held a calm, closed-mouth
+  look into the lens, which every mid-sentence frame lacked. Check a take's head before settling for a frame mid-word.
+
 ## Thumbnail diagnosis: main character, interest, concept-level variants (Aprilynne Alter, 2026-10-31)
 
 From two of her videos ("give me 9 minutes…", 637K views, and "you have thumbnail blindness", 83K). This is one experienced

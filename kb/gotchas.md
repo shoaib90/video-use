@@ -3623,3 +3623,10 @@ Verified on the resign Short `ill_get_it` (2026-11-02). Deepgram listed "shock."
   `Whoosh, Softs` swooshes again at 1.5 s; a 2.5 s hit with a fade from 1.6 s played the second one faded (the email click in Hustler-engine mixes did, at
   -19 dB under the programme, measured as v4 minus v3). Read an effect's 50 ms envelope before using it, and cap the hit's length at the first take
   (the episode `mix.py` hit tuple takes `(file, t, trim, offset, length)`).
+
+## Publishing to the design-system artifact: "you haven't viewed the latest version" (2026-11-13)
+Observed on the channel's claude.ai design system (a typed Design System artifact). Two publishes of edited `project/` files were refused as
+stale, although a per-file `read` (with `paths`) had just returned the current version id and unchanged hashes. After a plain `read` of
+the artifact's url, a `read` of `project/design-system.json`, and one publish carrying the changed files **and** the index with a new
+`lastChange`, it went through. **Unproven which step mattered** (the plain read, or sending the index). Do all three, in that order,
+the first time; the type's rule allows one retry after a refusal, then stop and tell Shoaib.

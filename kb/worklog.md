@@ -2595,3 +2595,31 @@ files still probe at full length and size; the edit folder is 2.0 GB.
 Closed out (2026-11-07): Shoaib's final OK ("everything looks good"); on his "Yes, trash them" the 11 GB of feeling-behind intermediates
 (prepped, card renders, segment caches, base, no-music renders, previews v2-v3) went to `~/.Trash/editing-cleanup-2026-11-07-feeling-behind/`
 (paths kept). Verified: the final and both Shorts' upload files still probe at full length and size; the edit folder is 1.8 GB.
+
+## 2026-11-13: should-you-resign thumbnails
+Shoaib asked for the thumbnail, from what we learned about thumbnails in recent weeks. Three concepts built locally (`<edit>/build/thumbnails.py`,
+Feeling Behind's engine): A WHY SO SURE? (the question), B 3X over the real offer email (the result; recommended lead), C 5 AM. (the cause).
+Changes from the script's brief: "5 AM, FOR A YEAR" is 5 words (`title.py` 66) so it became "5 AM."; the candid gym photo was dropped (the only
+gym clip shows him from behind and dark, and its metadata says 14 Apr 2022 20:56 IST, so it cannot back 5 AM). No photo set had been shot,
+so faces are a-roll frames (distribution.md, new paragraph on the mask fixes). Verified: `title.py` 80 with each against the lead title;
+every word on them checked against `master.srt` (0:06, 0:48, 1:44); C's gaze read at full size, not off the sheet (M059); each edge zoomed;
+168 px strips on white and dark. His pick pending; `<edit>/packaging.md` and HANDOFF.md updated. CTR unknown until published.
+Follow-up (same day): Shoaib picked A (B's and C's cut-outs "look very odd") and asked whether we follow the recent thumbnail rules.
+We had not read channel-kb's design-system Thumbnail component or the 2026-11-12 shoot plan: A broke two rules (orange word, not
+`glow` violet; mid-word mouth) and B a third (money flex on screen). Fixed A: violet word, closed-mouth pre-roll frame (IMG_4209
+1.17 s). Re-checked 168 px on white and dark, and edges zoomed. A still has no proof object (deliberate, recorded) and no photo-set
+photo (none shot). The earlier "test all three" advice contradicted playbook §1.6 and was withdrawn. Chapters (11, all >= 10 s, each
+start checked against `master.srt`) and a description drafted in `<edit>/packaging.md`. Lessons: facts.md (read the design system
+first), distribution.md (match the field to the set's light; the pre-roll's closed mouth).
+Decision (same day): shown A in violet and orange, Shoaib said "Keep orange". `thumb_A_why_so_sure.*` is now the orange build (pixel-identical
+to the copy he saw; ink measured #f25435); the violet one is kept as `_violet`, the duplicate `_orange` files removed. facts.md and M063
+corrected: orange is his pick over the design system's violet. Title and description/chapters await his OK.
+Then (same day): Shoaib asked for Feeling Behind's warm field, as on LATE TWICE. A rebuilt with `warm_field` and LATE TWICE.'s glow and
+rim; violet-field copy kept as `_violetbg`. A 3x zoom showed stripes in the soft ear from the nearest-pixel edge fill; the fill is now
+blurred inside the band and the stripes are gone. Verified by edge zooms beside LATE TWICE.'s and 168/300 px strips on white and dark.
+The "warm field made B/C look pasted" reading is withdrawn from distribution.md and M063 (contradicted by this build). Not yet seen by him.
+Design system updated (same day, Shoaib's "Yes, update it"): thumbnails are now one word in `accent` on the warm field, in the live
+claude.ai design system (published as v5, read back and checked) and its channel-kb repo copy (README, tokens.json with new `thumb-field`,
+`thumb-glow`, `thumb-rim`, bundle.css, the Thumbnail and Examples READMEs, frame.md), plus channel-kb's playbook §26, shoot plan and
+brand-personality. Two publishes were refused as stale until a plain `read` of the artifact (a per-file read alone did not count),
+then went through with the index's `lastChange` in the same call. channel-kb committed as `ca35307` on his OK (not pushed).
