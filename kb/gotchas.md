@@ -3624,6 +3624,23 @@ Verified on the resign Short `ill_get_it` (2026-11-02). Deepgram listed "shock."
   -19 dB under the programme, measured as v4 minus v3). Read an effect's 50 ms envelope before using it, and cap the hit's length at the first take
   (the episode `mix.py` hit tuple takes `(file, t, trim, offset, length)`).
 
+## Kokoro (Voicebox) silently truncates a long Hindi request (2026-11-09)
+One `/generate` call with a 546-character Devanagari script (9 sentences) returned 27-31 s of audio; the same text one sentence per
+call came to 47-53 s. Whisper `small -l hi` on the long takes lost everything after sentence 2, and "नहीं" was missing from all four
+voices, which would flip a "Can they charge you? NO" Short. Per sentence, whisper heard every sentence, "नहीं" and "एक नौ एक पाँच"
+included. **Always generate Kokoro one sentence per call and whisper-check each one.** Kokoro's per-pass token limit is the likely cause
+(unproven). Separately, whisper hears consistent de-aspiration ("खाता" → "काता", "बिल" → "भिल") in all four Hindi voices: possibly the
+engine's pronunciation, possibly whisper. Not yet judged by ear.
+
+## A mono voiceover measures about 3 LU louder once rendered to stereo (2026-11-09)
+A voice normalised to -15.3 LUFS as a mono WAV measured -12.3 LUFS in the HyperFrames stereo render (mono duplicated to both channels).
+Set the voice clip's `data-volume` to about 0.8, or normalise to about -17 LUFS mono, to land at -14. Measured with `npx hyperframes audio`.
+
+## letter-spacing splits Devanagari apart (2026-11-10)
+A kicker style with `letter-spacing: 8px` rendered "शिकायत" as "शि का य त": the spacing breaks the joined letters (matras and
+conjuncts). Seen in HyperFrames snapshots of the Haq Jaano Shorts. Keep tracked/spaced labels Latin-only, or set letter-spacing 0 on
+Devanagari.
+
 ## Publishing to the design-system artifact: "you haven't viewed the latest version" (2026-11-13)
 Observed on the channel's claude.ai design system (a typed Design System artifact). Two publishes of edited `project/` files were refused as
 stale, although a per-file `read` (with `paths`) had just returned the current version id and unchanged hashes. After a plain `read` of

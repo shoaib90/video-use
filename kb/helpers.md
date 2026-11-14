@@ -328,3 +328,32 @@ baked in, so a portrait clip comes out 2160x3840. Use the output as a PREPPED SO
   match the source to within a frame (12 Episode 5 takes).
 - **A still from `AVAssetImageGenerator` tone-maps slightly flatter than this export path.**
   Judge the look on the exported file.
+
+## Publishing: `edit/publish.json` for One-Place Publisher *(outside this repo, 2026-11-13)*
+
+Finished videos leave through **One-Place Publisher**, a private app in `~/Documents/GitHub/one-place-publisher`
+(repo `shoaib90/one-place-publisher`, private). Nothing in video-use uploads anything. Our only job is to write the
+`publish.json` for an approved edit; the format and every field are in that repo's `docs/handoff.md`. Read it there.
+
+- **Write it only after Shoaib approves the cut and the packaging**, then show it to him in chat before he runs it.
+- **Long video:** `edit/publish.json`, `kind: "long"`. Video `<name>_final.mp4`; title, description and the chosen
+  thumbnail from `edit/packaging.md` (it names the chosen one) and `edit/thumbnails/`; captions `master.srt`.
+- **Each Short:** its own `edit/shorts/<name>/publish.json`, `kind: "short"`, text from that folder's `description.txt`.
+  Leave `at` out until Shoaib sets the timing.
+- **Paths are relative to the `publish.json` file.** Times are ISO with `+05:30`.
+- **Accounts** are `youtube:<channel name>` / `instagram:@handle` as shown on the app's Accounts page. Don't guess one:
+  a wrong name makes the command list the connected accounts.
+- **Never point it at a `*do_not_upload*` file.** The command refuses them anyway (verified 2026-11-13).
+- **Sending:** from the publisher repo, `npm run handoff -- <publish.json> --dry-run`, then without `--dry-run`. It only
+  makes drafts; Shoaib approves in the app. `--results` later writes `<name>.published.json` with the live links.
+- **Instagram copy:** if the video is over 1920 px, 300 MB or not H.264/AAC, the command writes
+  `edit/.handoff/<name>_instagram.mp4` with ffmpeg; YouTube still gets the original.
+- **Hinglish descriptions:** YouTube's 5,000 limit is in bytes, and Devanagari is 3 bytes a character. The app counts bytes and
+  blocks Approve when over.
+- **Haq Jaano Shorts** don't use this: `npm run handoff:haqjaano -- <N> --send` builds theirs from the COPY files.
+- **Reels publish from Cloudflare, not the Mac**, once the publisher's cloud Reel publisher is deployed (its
+  `docs/cloud-reels.md`): approving hands the Reel over and the Mac can sleep at the publish time. YouTube never needed
+  the Mac awake, because YouTube holds the schedule. Until it is deployed, the Mac's worker must run at each Reel's minute.
+
+Verified 2026-11-13 by dry runs on Episode 5 (2.83 GB 4K final: Instagram copy planned) and its `everything_right` Short (sent
+as-is), and by the refusal of its `_NO_MUSIC_do_not_upload.mp4`. Not yet done: a real long episode sent as drafts.

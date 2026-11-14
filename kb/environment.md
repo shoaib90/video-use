@@ -210,7 +210,15 @@ the repo's 3.12 env ever imports torch.
 `mtl-mimic-voicebank` both scored *worse than the existing `arnndn` chain* on real footage, and
 both are 16 kHz models. Numbers in gotchas.md. Not installed.
 
-## Voice cloning — Voicebox (piloted 2026-11-06, uninstalled 2026-11-07)
+## Voice cloning — Voicebox (piloted 2026-11-06, uninstalled 2026-11-07, reinstalled 2026-11-09)
+
+**Reinstalled 2026-11-09 for a faceless channel's narration, not for Shoaib's voice.** v0.5.0 `Voicebox_0.5.0_aarch64.dmg` from GitHub
+releases (538 MB; `spctl`: Notarized Developer ID, James Pine YB4V2VA9YY) → `/Applications/Voicebox.app`. Only **Kokoro 82M** is
+downloaded (312 MB, `hexgrad/Kokoro-82M`); Chatterbox is not. Kokoro has built-in **Hindi presets** with no reference audio needed:
+`hm_omega`, `hm_psi` (male), `hf_alpha`, `hf_beta` (female). Make a profile with `POST /profiles`
+`{"voice_type":"preset","preset_engine":"kokoro","preset_voice_id":"hm_psi","language":"hi","default_engine":"kokoro"}`,
+then `POST /generate` with `"engine":"kokoro","language":"hi"`. **Generate one sentence per call** (gotchas.md). Scripts:
+`<scratchpad>/kokoro_sentences.py` pattern; samples in `~/Documents/Ambitious/Editing/faceless-shorts/voice-samples/`.
 
 [jamiepine/voicebox](https://github.com/jamiepine/voicebox) v0.5.0, piloted and then **uninstalled on 2026-11-07** (Shoaib's OK,
 after two failed likeness tries): app, its 3.0 GB Chatterbox model, `~/Library/{Application Support,Caches,WebKit}/sh.voicebox.app`
@@ -246,3 +254,15 @@ What the pilot measured (whisper `small.en` + `small -l hi` on every output):
   speaker embedding. So a long reference must open on its cleanest 10 s. The 4.6 min reference brought pace to 166-216 wpm (14 s ref: 220-290).
   The MLX backend hard-codes `exaggeration` 0.1 (flat delivery); the API cannot change it.
 - `/transcribe` returns text only, no word timings; it cannot replace Deepgram (data-contract.md).
+
+## Obsidian + kepano/obsidian-skills (installed 2026-11-10)
+- `/Applications/Obsidian.app` v1.15.0, from GitHub `obsidianmd/obsidian-releases` (`Obsidian-1.15.0.dmg`, 233 MB; `spctl`: Notarized
+  Developer ID, Dynalist Inc. 6JSW4SJWN9).
+- Skills copied to `~/.claude/skills/`: obsidian-markdown, obsidian-bases, json-canvas, obsidian-cli, defuddle, knap (repo commit 3ccff53,
+  MIT; Markdown-only, reviewed). defuddle and knap need `npm install -g defuddle|knap` on first use (not installed). obsidian-cli needs the
+  CLI enabled in Obsidian's settings (not done).
+- Vault: `~/Documents/Ambitious/Editing/faceless-shorts/haq-jaano-vault` (registered in `~/Library/Application Support/obsidian/obsidian.json`).
+- Computer-use: Screen Recording granted 2026-11-10. Obsidian (Electron) refuses background clicks while its window is on another Space,
+  and it can't be moved into a full-screen Space, so ask Shoaib to leave full-screen first. Obsidian re-saves `.base` files in its own
+  YAML style (it drops quotes), so re-read before editing. Datetime properties show 12-hour time with AM/PM clipped in narrow columns:
+  use a `format("ddd D MMM, h:mm A")` formula column.
