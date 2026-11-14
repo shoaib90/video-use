@@ -261,7 +261,8 @@ What the pilot measured (whisper `small.en` + `small -l hi` on every output):
 - Skills copied to `~/.claude/skills/`: obsidian-markdown, obsidian-bases, json-canvas, obsidian-cli, defuddle, knap (repo commit 3ccff53,
   MIT; Markdown-only, reviewed). defuddle and knap need `npm install -g defuddle|knap` on first use (not installed). obsidian-cli needs the
   CLI enabled in Obsidian's settings (not done).
-- Vault: `~/Documents/Ambitious/Editing/faceless-shorts/haq-jaano-vault` (registered in `~/Library/Application Support/obsidian/obsidian.json`).
+- Vault: the faceless channel's vault under `~/Documents/Ambitious/Editing/faceless-shorts/` (exact path in Claude's private memory; registered in
+  `~/Library/Application Support/obsidian/obsidian.json`).
 - Computer-use: Screen Recording granted 2026-11-10. Obsidian (Electron) refuses background clicks while its window is on another Space,
   and it can't be moved into a full-screen Space, so ask Shoaib to leave full-screen first. Obsidian re-saves `.base` files in its own
   YAML style (it drops quotes), so re-read before editing. Datetime properties show 12-hour time with AM/PM clipped in narrow columns:

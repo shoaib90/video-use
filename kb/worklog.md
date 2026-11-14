@@ -2597,61 +2597,45 @@ Closed out (2026-11-07): Shoaib's final OK ("everything looks good"); on his "Ye
 (paths kept). Verified: the final and both Shorts' upload files still probe at full length and size; the edit folder is 1.8 GB.
 
 ## 2026-11-09: Voicebox reinstalled, Kokoro Hindi voices tested for a faceless channel
-Shoaib is starting a faceless Hindi know-your-rights Shorts channel (details in the private channel notes, not here). Narration options:
+Shoaib is starting a faceless Hindi Shorts channel (name and details in the private channel notes, not here). Narration options:
 vidIQ voiceover (ElevenLabs stock voices, 28 credits per 1000 chars) gave "Eric" and "Matilda" samples; Shoaib liked Eric but asked to try
 Voicebox for free. Reinstalled v0.5.0 (signature verified), downloaded only Kokoro (312 MB), and made one profile per Kokoro Hindi preset.
 A whole-script call truncated (gotchas.md); per-sentence takes were complete per whisper. Samples are in
 `~/Documents/Ambitious/Editing/faceless-shorts/voice-samples/`; the choice between Eric and Kokoro is Shoaib's, by ear.
 
-## 2026-11-09: Haq Jaano Short template (HyperFrames), first Short rendered
-Built `~/Documents/Ambitious/Editing/faceless-shorts/short-template/` (HyperFrames 0.9.26; the `faceless-explainer` workflow is retired
-and folded into `/hyperframes`). The medium is paper documents and rubber stamps on a navy desk. Scenes: bill / notice / court / helpline / send,
-plus desk and a captions track; SPEC.md holds the numbers. The voice is the clock: Eric's single vidIQ file, timed by `silencedetect`
-(-35 dB, 0.18 s) into 20 phrases, each whisper-checked alone (all 20 matched the script). Captions are Devanagari, at most 5 words a group,
-character-proportional inside a phrase. `check`: 0 errors. Frame QA fixed an overflowing hook line, a stamp covering the court's name and the
-end mark touching a caption. R4 swapped a real-sounding restaurant name for "TAX INVOICE". Render: 44.4 s, -14.3 LUFS, -1.0 dBTP; the stamp
-hits land 1 frame after the picture (measured). `review.py` does not apply (no EDL or source cut). Effects are Epidemic; the licence for the
-new channel is unconfirmed. Output: `faceless-shorts/renders/haqjaano-01-service-charge-v1.mp4`.
+## 2026-11-09: Faceless-channel Short template (HyperFrames), first Short rendered
+Built a HyperFrames Short template under `~/Documents/Ambitious/Editing/faceless-shorts/` (HyperFrames 0.9.26; the `faceless-explainer`
+workflow is retired and folded into `/hyperframes`). The medium is paper documents and rubber stamps on a desk; SPEC.md holds the numbers.
+The voice is the clock: one voiceover file, timed by `silencedetect` (-35 dB, 0.18 s) into phrases, each whisper-checked alone (all
+matched the script). Captions are Devanagari, at most 5 words a group, character-proportional inside a phrase. `check`: 0 errors. Frame QA
+fixed an overflowing hook line, a stamp covering a key name and the end mark touching a caption. A real-sounding business name was swapped
+for a generic label. Render: 44.4 s, -14.3 LUFS, -1.0 dBTP; the stamp hits land 1 frame after the picture (measured). `review.py` does
+not apply (no EDL or source cut). Effects are Epidemic; the licence for the new channel is unconfirmed.
 
-## 2026-11-10: Haq Jaano Shorts #2-#5 via a spec-driven builder (outside this repo)
-`~/Documents/Ambitious/Editing/faceless-shorts/tools/build_short.py` turns a JSON spec into a HyperFrames Short. It speeds Eric's VO to
-1.25x (Shoaib's ask), loudnorms it, finds the silencedetect threshold that matches the spec's phrase count (dropping blips under 0.15 s:
-breath noise that whisper reads as "आप आप आप"), whisper-checks each phrase alone, and writes the scenes, captions and sfx. Four Shorts,
-31-33 s, check passes. Frame QA moved stamps off key lines and fixed Devanagari letter-spacing (gotchas.md). A whisper miss on "RC
-और इंश्योरेंस" was disproved by transcribing that stretch alone (M048 again). Loudness -14.2 to -14.6 LUFS, measured.
+## 2026-11-10: Faceless-channel Shorts #2-#5 via a spec-driven builder (outside this repo)
+A builder script in the faceless-shorts folder turns a JSON spec into a HyperFrames Short. It speeds the VO to 1.25x (Shoaib's ask),
+loudnorms it, finds the silencedetect threshold that matches the spec's phrase count (dropping blips under 0.15 s: breath noise that
+whisper reads as a repeated word), whisper-checks each phrase alone, and writes the scenes, captions and sfx. Four Shorts, 31-33 s, check
+passes. Frame QA moved stamps off key lines and fixed Devanagari letter-spacing (gotchas.md). A whisper miss on a two-word phrase was
+disproved by transcribing that stretch alone (M048 again). Loudness -14.2 to -14.6 LUFS, measured.
 
-## 2026-11-10: Haq Jaano batch 2 in a new format (outside this repo)
-Shoaib pointed at a faceless IG style page whose reels get heavily saved and shared (two named series, the hook names who it's for,
-3 numbered rules, an explicit save ask), and asked for the next Haq Jaano batch in that format. `build_short.py` gained: a desk label
-plus corner marks (`label`), cover classes (`cv-t`/`cv-s`), a `num` block, an end card with a bookmark that fills (`save`, `l2_t`),
-a music bed (`bed`, `bed_db`: looped, loudnorm'd under the VO, faded), and stamps anchored to a band reserved under the text
-(`"bottom"`), which ended the stamp-covers-text problem for good. Five Shorts rendered, 26-34 s; frame QA on every scene end was clean
-after that change. The bed came from vidIQ `generate_music` (royalty-free); measured −42 dB in VO pauses, about 24 dB under; whisper heard
-only "(soft music)" on it, so no vocals. Mix −14.3 to −14.6 LUFS. One whisper "repeat" ("आज भी आज भी") was disproved by transcribing
-each half alone (M048 again).
+## 2026-11-10: Faceless-channel batch 2 in a new format (outside this repo)
+Shoaib pointed at a faceless IG style page whose reels get heavily saved and shared (named series, the hook names who it's for,
+numbered rules, an explicit save ask), and asked for the next batch in that format. The builder gained: a desk label plus corner
+marks, cover classes, a numbered block, an end card with a bookmark that fills, a music bed (looped, loudnorm'd under the VO, faded),
+and stamps anchored to a band reserved under the text, which ended the stamp-covers-text problem for good. Five Shorts rendered,
+26-34 s; frame QA on every scene end was clean after that change. The bed came from vidIQ `generate_music` (royalty-free); measured
+−42 dB in VO pauses, about 24 dB under; whisper heard only "(soft music)" on it, so no vocals. Mix −14.3 to −14.6 LUFS. One whisper
+"repeat" was disproved by transcribing each half alone (M048 again).
 
 ---
 
-## 2026-11-11: Plan drafted for a one-place publisher (no code, nothing in this repo changed)
-
-Shoaib asked for a design document for a private web app that schedules finished videos to his YouTube channels and Instagram,
-later LinkedIn and X. Written as a Claude doc: https://claude.ai/artifact/DaRsjgg4bn5YgpQSLJMoRF ("One-Place Publisher: Plan and Architecture").
-
-The only part that would touch this repo is Phase 3: a `helpers/publish.py` that reads an approved `edit/` folder, writes drafts
-from `edit/publish.json`, and refuses any file named `do_not_upload`. Not built. Nothing is decided yet; the doc lists six open decisions.
-
-**Read on the platforms' own pages on 2026-11-11** (so older guides are wrong on these): YouTube `videos.insert` now has its own
-bucket of 100 calls a day, and uploads from unaudited API projects are no longer forced to private; Instagram allows 100 API posts
-per 24 h, has no native scheduling, and fetches the video from a public URL; LinkedIn refresh tokens are for approved partners only
-(60-day re-login otherwise); X is pay-per-use, $0.015 a post and $0.20 with a link. Lines not read on an official page are marked
-"to confirm" in the doc and are Phase 0's job.
-
-## 2026-11-12: Haq Jaano batch 3 (#11-#20), same builder (outside this repo)
-Ten more Shorts from `tools/specs_batch3.py`, with no builder changes needed. Two whisper doubts were again disproved by transcribing the
-stretch alone: "या प्राइवेट या प्राइवेट" (0.5 s, so it can't hold a repeat), and a "missing" "नंबर एक" that Eric had run into the next phrase
-with no pause (so the #1 card starts on that merged phrase). `hyperframes check` caught one real defect a frame review would have missed:
-the chandrabindu of a 150 px title ("माँ-बाप") reaching into the desk label (content_overlap); fixed with a 22 px margin on that title.
-A 44 px Latin URL overflowed a 640 px phone; it now uses an inline 32 px.
+## 2026-11-12: Faceless-channel batch 3 (#11-#20), same builder (outside this repo)
+Ten more Shorts with no builder changes needed. Two whisper doubts were again disproved by transcribing the stretch alone: an apparent
+repeat in a 0.5 s span (too short to hold one), and a "missing" phrase the VO had run into the next one with no pause (so the card starts
+on that merged phrase). `hyperframes check` caught one real defect a frame review would have missed: the chandrabindu of a 150 px
+Devanagari title reaching into the desk label (content_overlap); fixed with a 22 px margin on that title. A 44 px Latin URL overflowed a
+640 px phone; it now uses an inline 32 px.
 - 2026-11-12, later: scheduled #11-#20 on YouTube through Claude in Chrome. **The vidIQ Chrome extension now injects a hidden
   chrome-extension "Boost checkout" frame into Studio's upload dialog**, and while it is in the page Chrome refuses every action from Claude
   in Chrome (click, type, JS, screenshot: "Cannot access a chrome-extension:// URL of different extension"). A page MutationObserver that
@@ -2660,18 +2644,22 @@ A 44 px Latin URL overflowed a 640 px phone; it now uses an inline 32 px.
 
 ---
 
-## 2026-11-13: One-Place Publisher Phase 3 picked up after an account switch; video-use side written
+## 2026-11-11 to 11-14: a private publishing app (outside this repo)
 
-Phases 0-2 were built on the other account in `~/Documents/GitHub/one-place-publisher` (private repo, PRs #1-#3 merged).
-Phase 3 (the handoff) was left **staged but uncommitted** on branch `phase-3/handoff`. Checked on this account: `tsc` clean,
-`vitest` 31/31 pass; it had already made drafts for Haq Jaano #7 and #8 (records in `faceless-shorts/handoff/`).
+Shoaib asked for a private web app that schedules finished videos to his channels; it was built outside this repo and its
+details are in Claude's private memory (this repo is public). What matters here: video-use's part is only writing
+`edit/publish.json` after approval (helpers.md "Publishing"), verified by dry runs on Episode 5's 4K final (Instagram copy
+planned), its `everything_right` Short (as-is) and a `_do_not_upload` render (refused).
 
-Added the video-use half: helpers.md "Publishing" (how to write `edit/publish.json`) and one line in index.md. Verified by
-dry runs from the scratchpad: Episode 5's 4K final (Instagram copy planned), its `everything_right` Short (as-is), and the
-`_do_not_upload` render refused. Phase 3's "done when" (a real long episode with its Shorts as drafts) is still open.
+**Platform rules read on their official pages, 2026-11-11** (older guides are wrong on these): YouTube `videos.insert` has its own
+bucket of 100 calls a day, and uploads from unaudited API projects are no longer forced to private; `status.publishAt` needs a
+private, never-published video; videos.update resets any field of a part left out, so send the whole `status` back. Instagram
+allows 100 API posts per 24 h, has no native scheduling, and fetches the video from a public URL (or a resumable upload). LinkedIn
+refresh tokens are for approved partners only (60-day re-login otherwise). X is pay-per-use: $0.015 a post, $0.20 with a link.
 
-Lesson for next time: an account switch mid-build of the publisher left no HANDOFF note, only a staged diff. Commit work in
-progress on the branch before a long job, as the episode handoff rule asks for edits.
+**Lessons:** an account switch mid-build left no handoff note, only a staged diff: commit work in progress on its branch before a
+long job. And tests that start a worker must not run its scheduled jobs: one run wrote backups of the test database into the real
+backup folder (found by reading each dump's database name; removed, and the scheduler is now off under `NODE_ENV=test`).
 
 ## 2026-11-13: should-you-resign thumbnails
 Shoaib asked for the thumbnail, from what we learned about thumbnails in recent weeks. Three concepts built locally (`<edit>/build/thumbnails.py`,
@@ -2702,54 +2690,3 @@ brand-personality. Two publishes were refused as stale until a plain `read` of t
 then went through with the index's `lastChange` in the same call. channel-kb committed as `ca35307` on his OK (not pushed).
 
 ---
-
-## 2026-11-13: One-Place Publisher: Phase 3 merged; cloud Reel publisher built (not deployed)
-
-PR #4 (Phase 3 handoff) merged; `db:migrate` already up to date. Shoaib then chose a free Cloudflare Worker for Reels
-over a paid server, because the laptop is open most days but not reliably at 9 pm, and only Instagram needs a live
-call at the minute. Built on branch `feature/cloud-reels` in the publisher repo (`cloud/reel-publisher`, docs
-`docs/cloud-reels.md`): approving a Reel hands it to the Worker (video in R2, under 95 MB), a cron publishes it on the
-minute, and the app reads the result back every 2 minutes.
-
-**Verified:** `tsc` clean; vitest 45/45 (10 new for the Worker against the mock Meta API, 4 for app + Worker together);
-a real 2.75 MB Haq Jaano render published once through `wrangler dev` (Cloudflare's local runtime), hashes matching.
-**Not done:** deploying. Cloudflare is not logged in on this Mac, and auto mode refused to run the setup script
-because it deploys. Shoaib runs `npm run cloud:login` then `npm run cloud:setup` in the publisher folder.
-
-**Deployed 2026-11-14:** Shoaib enabled R2 (it needed the dashboard checkout with a card; the API refused with code
-10042 before that). `npm run cloud:setup` made the bucket, deployed the Worker to its workers.dev address and set
-the secrets; the new workers.dev address took about 70 s to accept connections, so the first health check failed and
-passed on retry. The worker then handed Haq Jaano #7 over; verified in the cloud's own record: queued, Sun 15 Nov 9 pm
-IST, 3,103,936 bytes. Not yet seen: a real Reel published by the cloud (first one is #7).
-
-**Audit 2026-11-14 (after PR #5 merged):** tsc clean, 45/45 tests, `next build` passes. Found by reading the code: the cloud
-drops a finished Reel's record after 7 days while the app marks a Reel with no cloud record as failed, so a Reel published
-during a trip of over a week would show as failed (not fixed yet). Not built (all Phase 4): file cleanup after publishing,
-nightly check against live posts, database backups, changing a time after approval. On this Mac: nothing auto-starts
-(Postgres is not a brew service), `.env` is mode 644, `DEV_LOGIN=true`.
-
-**Fixed the same day (publisher PR #6):** cloud records kept 180 days and videos deleted on publish; the app checks Instagram
-before failing a Reel with no cloud record (2 new tests, 47/47). Postgres is now a brew service (starts at login),
-`.env` is 600, `npm run up` starts worker and web together. Also found and fixed: `next dev` answered on the Wi-Fi
-address (curl 200 at 172.20.10.11:3000) with the dev sign-in on; now bound to 127.0.0.1 (verified 000 from that address,
-200 at localhost). Redeployed the cloud with `--keep-key`; #7 still queued. Still not built: Phase 4's backups, file
-cleanup on the Mac, editing a time after Approve, nightly check against live posts.
-
----
-
-## 2026-11-14: One-Place Publisher Phase 4 (hardening) built and running
-
-Shoaib's decision: **videos stay on the Mac after publishing**; only the cloud deletes its copy once a Reel is out.
-Built on publisher branch `phase-4/hardening`: daily jobs that catch up after the Mac sleeps (`job_run` table, hourly
-check, 20 h due / 6 h retry); daily `pg_dump` backups on the Mac (newest 30) and in the cloud's R2 (newest 30); a daily
-check against live posts; "Change time" after Approve (YouTube via videos.update with the full status sent back, since a
-field left out is reset; Reels via a new PATCH on the cloud publisher).
-
-**Verified:** 54/54 tests (7 new, including a real pg_dump restored into an empty database with row counts compared);
-`tsc` and `next build` clean. On the real setup: migration applied, cloud redeployed, first real run: 3/3 logins work,
-backup 83 KB on the Mac and in the cloud (`pg_restore --list` reads 20 tables), and the live check flagged the Demo video
-on Shoaib Khan as gone from YouTube (expected if he deleted it, as suggested on 13 Nov; not confirmed with him).
-
-**Mistake caught and fixed:** the first full test run wrote two backups of the *test* database into the real backup
-folder, because older test files start the worker without `BACKUP_DIR`. Found by reading each dump's `dbname`, removed
-those two, and the worker no longer schedules daily jobs when `NODE_ENV=test`; a rerun left the real folder unchanged.

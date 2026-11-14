@@ -88,7 +88,7 @@ every session stops paying ~6K tokens for all of them.
   rebuilt from the parent's sources (never a crop of the final), strongest line first, a 3 s thumbnail-style
   plate, the parent's cards and bed (review G4 checks the cards; M053). Episode 4's three are the examples;
   Episodes 2-3 and podcast Episode 1 (two speakers: `"who": "left"|"right"`) followed (2026-10-15). Run `edges` on Hinglish.
-- **Publishing leaves through One-Place Publisher** (private app, `~/Documents/GitHub/one-place-publisher`): we only write
+- **Publishing leaves through a private app** outside this repo (details in Claude's private memory): we only write
   `edit/publish.json` after approval; it makes drafts, Shoaib approves. See helpers.md "Publishing".
 - **The youtube-agent plugin does the writing side** (`/youtube-agent:yt-shorts` picks Shorts, `hookscore.py`
   ranks hooks, `title.py` lints a title against its plate): use it instead of re-deriving. Map in environment.md.

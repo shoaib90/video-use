@@ -3638,7 +3638,7 @@ Set the voice clip's `data-volume` to about 0.8, or normalise to about -17 LUFS 
 
 ## letter-spacing splits Devanagari apart (2026-11-10)
 A kicker style with `letter-spacing: 8px` rendered "शिकायत" as "शि का य त": the spacing breaks the joined letters (matras and
-conjuncts). Seen in HyperFrames snapshots of the Haq Jaano Shorts. Keep tracked/spaced labels Latin-only, or set letter-spacing 0 on
+conjuncts). Seen in HyperFrames snapshots of the faceless channel's Shorts. Keep tracked/spaced labels Latin-only, or set letter-spacing 0 on
 Devanagari.
 
 ## Publishing to the design-system artifact: "you haven't viewed the latest version" (2026-11-13)
