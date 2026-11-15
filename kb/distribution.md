@@ -511,3 +511,17 @@ reviewer's opinion with no data shown ("81% better" has no source), and both are
 principle keywords, as the rest is click-by-click. Its finish is an AI enhancer (Remini, Krea, Leonardo) over the whole thumbnail, and it admits the result
 looks "AI-faced". We keep getting sharpness from the source, as above. Real faces suit this channel's honesty, so do not adopt it unasked.
 
+
+## The hover hook: the opening carries on from the thumbnail (vidIQ, 2026-11-15)
+
+Source: vidIQ, *The New Thumbnail Trick For More Views* (2026-11-02). [outside]
+
+- **Feed autoplay starts the video under the thumbnail** (mobile on pause, desktop on hover), so the first
+  seconds are part of the click decision. Consistent with §11: autoplay views far outnumber clicks.
+- **Their technique:** the video's first frame is a copy of the thumbnail, words included, so the thumbnail
+  seems to come alive. **Their own test** of opening-frame thumbnails on five old videos: one won (53.7% vs
+  46.3% of watch time), one led, the original won three "by pretty convincing margins". A frame rarely makes the
+  better thumbnail unless both were planned together.
+- **How we apply it in the edit (to test):** keep the designed photo as the thumbnail; frame the opening shot
+  like it, carry the thumbnail's words on screen for the first ~2 s in the same position and style, and start
+  on the first spoken line at frame one. No logo, no preamble. Skip it when the video opens on a clip.
