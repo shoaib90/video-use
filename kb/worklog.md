@@ -2698,3 +2698,12 @@ grid of the cut-out frame (`EAR`, `fix_ear`), used it only below the hairline (a
 hair), and gave skin no rim (`no_rim`). Nothing else in the thumbnail moved. Verified by eye: 2x zoom of the ear before and after,
 and the whole thumbnail. Old script and image kept in the episode's `build/` (`*_2026-11-13*`). He replaces it in Studio himself.
 Ledger: M064; the thumbnail READ item was a second R11, now R14.
+
+### 2026-11-17 (later): thumbnail A, a new frame
+Shoaib: the traced ear is "still the same"; then the relit build (same frame, room dimmed, nothing cut out) "still off".
+First survey (whole-frame sheets) wrongly concluded the plant sat behind the ear in every take; zoomed ear-area sheets showed
+it only overlapped in some (IMG_4209 among them). Picked IMG_4210 13.45 s (same look, closed mouth, hand at chin, ear sharp
+against wall) from 4 fps sheets; converted with apple_sdr, graded via `--frames`, built with `thumb_a_relit("lens2")`, head
+matched to the published size and place (`match_box`). Verified at 3x zoom beside the published ear and at full size. Backups
+from IMG_4223 and IMG_4235. He approved it the same day ("Yes, use 4210"); it is now the main file. M064 and distribution.md (4) rewritten again, not stacked.
+Lesson on surveys: judge an edge from a crop at its own scale; whole-frame thumbnails hid that the ear cleared the plant.

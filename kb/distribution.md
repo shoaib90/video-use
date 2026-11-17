@@ -480,13 +480,15 @@ visible stripes in the soft ear at 3x zoom. Verified by zooming each edge before
   and C (dawn field), both built before the stripe fix. The cause is not proven. "A warm field under the set's violet light" was
   a guess, and A on Feeling Behind's warm field then matched LATE TWICE.'s edges at full size, which contradicts it. Before
   showing a cut-out, zoom every edge, the ears especially, at 3x.
-- **(4) Trace an out-of-focus ear by hand** (Shoaib on the published A, 2026-11-17: "that ear is coming off"). Fixes 1-3 cleaned
-  the ear's edge, not its shape: Vision cut the soft ear as a lump with a straight diagonal across its top, and the light rim
-  outlined that lump. Fix: a polygon traced on a 4x grid of the cut-out frame replaces the mask in a box below the hair (start
-  the box below the hairline, or it cuts the hair away), feathered 6 px, and no rim on skin, since only hair needs it.
-  Verified at 2x zoom before and after, and at full size. Pattern: `EAR`, `fix_ear` and `no_rim` in that episode's `build/thumbnails.py`.
+- **(4) A bad ear means a different frame, not a better mask** (Shoaib on the published A, 2026-11-17: "that ear is coming
+  off"). On a frame where the ear was out of focus and in front of a plant, three fixes failed his eye: a cleaner edge, a
+  hand-traced ear, and the frame relit with nothing cut out. What worked: zoomed ear-area sheets of every take (one frame every
+  3 s, then 4 fps on the best stretches) found frames with the same look whose ear stood sharp against plain wall. Verified at
+  3x zoom against the published ear; Shoaib approved it ("Yes, use 4210"). Check every edge of a candidate frame before building on it. The
+  relit build (`thumb_a_relit`: the room dimmed and warmed around the real photo, no outline) is a softer look worth keeping.
 - **The a-roll's own pre-roll gives a closed mouth.** The seconds before his first word (IMG_4209 0-2 s) held a calm, closed-mouth
-  look into the lens, which every mid-sentence frame lacked. Check a take's head before settling for a frame mid-word.
+  look into the lens, which every mid-sentence frame lacked. Check a take's head before settling for a frame mid-word. But the
+  pre-roll can sit oddly too (his ear in front of the plant there, M064): pauses between lines give closed-mouth frames as well.
 
 ## Thumbnail diagnosis: main character, interest, concept-level variants (Aprilynne Alter, 2026-10-31)
 

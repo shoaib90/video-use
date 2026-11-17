@@ -314,11 +314,13 @@ Thumbnail component (2026-11), so A had an open mouth, and B a money flex. (Its 
 beside it, he kept orange.) Check: `READ R14`.
 
 **M064** · 2026-11-17 · should-you-resign thumbnail A, published · *"The masking is a little off. That ear is coming off."*
-Cause: the frame-left ear is out of focus against a pink wall and a brown plant. Vision cut it as a lumpy blob with a
-straight diagonal across its top and a speckled lobe, and the light rim then outlined that shape, so it read as a pasted
-piece. M063's colour fill had fixed the stripes, not the shape. Fix: the ear traced by hand on a 4x grid of the source
-(`EAR` in the episode's `build/thumbnails.py`), replacing Vision's mask only below the hair, and no rim on skin.
-Check: `READ R14` now asks whether each ear's SHAPE is an ear (a helix curve meeting the hair), not only whether its edge is clean.
+Cause: in the chosen frame (the take's pre-roll) the frame-left ear is out of focus and sits right in front of a brown
+plant. Vision cut it as a lump and the light rim outlined it. Two fixes on that frame both read "still off": a hand-traced ear,
+then the frame relit with nothing cut out. What worked was a different frame: in many other takes his head sat further right
+and the same ear was sharp against the plain wall. Fix: same look, pose and words from IMG_4210 (`lens2`, `thumb_a_relit`
+in the episode's `build/thumbnails.py`). Shoaib approved it ("Yes, use 4210", 2026-11-17).
+Check: `READ R14`: before building, zoom the ears of the chosen frame; an ear that is soft or overlaps something behind it
+means pick another frame, not a better mask.
 
 **M040** · Episode 1 (talking-head series) · *95% → 52% retention in 8 s of silent black at the
 open.* Check: `AUTO T6` (black or silence in the first 2 s).
@@ -353,7 +355,8 @@ said by ~0:10?).
   best (complete sentence, no restart, fewest fillers, delivery), and write the reason down.
 - **R14** Thumbnails (M063, M064): before building, read channel-kb's `design-system/components/Thumbnail/README.md`, `tokens.json`
   and the newest `01-roadmap/thumbnail-shoot-*.md`, and tick each rule in `packaging.md`. Before delivering, zoom every cut-out edge at 3x, ears and hair especially: no stripes, no halo, no
-  rim that outlines him like a sticker, and an ear SHAPED like an ear (Vision cuts a soft, out-of-focus ear as a lump: trace it, M064). Compare it beside his last approved thumbnail at full size and at 168 px.
+  rim that outlines him like a sticker, and an ear SHAPED like an ear. Choose the frame by its edges too: an ear that is soft or
+  overlaps a background object cannot be masked or relit into looking right (three tries, M064). Pick a frame where it is sharp. Compare it beside his last approved thumbnail at full size and at 168 px.
 - **R11** Every cutaway, photo and card shows or says what the line says (M049); none fills time.
   Ask what the line MEANS: a shot that only matches a noun in it is filler (M060).
 - **R12** Shorts and other derived cuts (M053): list every card, mgx cue, effect and music cue
