@@ -2690,3 +2690,11 @@ brand-personality. Two publishes were refused as stale until a plain `read` of t
 then went through with the index's `lastChange` in the same call. channel-kb committed as `ca35307` on his OK (not pushed).
 
 ---
+
+## 2026-11-17: should-you-resign thumbnail A, ear re-masked
+Shoaib, on the published thumbnail: the masking is off, "that ear is coming off" (M064). Vision had cut the out-of-focus
+frame-left ear as a lump with a straight top and a speckled lobe, and the light rim outlined it. Traced the ear by hand on a 4x
+grid of the cut-out frame (`EAR`, `fix_ear`), used it only below the hairline (a first try that started higher cut a wedge out of the
+hair), and gave skin no rim (`no_rim`). Nothing else in the thumbnail moved. Verified by eye: 2x zoom of the ear before and after,
+and the whole thumbnail. Old script and image kept in the episode's `build/` (`*_2026-11-13*`). He replaces it in Studio himself.
+Ledger: M064; the thumbnail READ item was a second R11, now R14.

@@ -311,7 +311,14 @@ after the cold open, then `layers`, `compose --dirty speed_badge` and `mux` (one
 thumbnail rules followed?* Cause of the pasted look: not proven (the "warm field" guess was contradicted the same day; the
 soft-edge colour fill also striped edges, found after). Also, the build copied our last episode's builder instead of channel-kb's design-system
 Thumbnail component (2026-11), so A had an open mouth, and B a money flex. (Its orange word was not a fault: shown violet
-beside it, he kept orange.) Check: `READ R11`.
+beside it, he kept orange.) Check: `READ R14`.
+
+**M064** · 2026-11-17 · should-you-resign thumbnail A, published · *"The masking is a little off. That ear is coming off."*
+Cause: the frame-left ear is out of focus against a pink wall and a brown plant. Vision cut it as a lumpy blob with a
+straight diagonal across its top and a speckled lobe, and the light rim then outlined that shape, so it read as a pasted
+piece. M063's colour fill had fixed the stripes, not the shape. Fix: the ear traced by hand on a 4x grid of the source
+(`EAR` in the episode's `build/thumbnails.py`), replacing Vision's mask only below the hair, and no rim on skin.
+Check: `READ R14` now asks whether each ear's SHAPE is an ear (a helix curve meeting the hair), not only whether its edge is clean.
 
 **M040** · Episode 1 (talking-head series) · *95% → 52% retention in 8 s of silent black at the
 open.* Check: `AUTO T6` (black or silence in the first 2 s).
@@ -344,9 +351,9 @@ said by ~0:10?).
   message.
 - **R10** Retakes (M045): for every line said more than once, list the candidates, pick the
   best (complete sentence, no restart, fewest fillers, delivery), and write the reason down.
-- **R11** Thumbnails (M063): before building, read channel-kb's `design-system/components/Thumbnail/README.md`, `tokens.json`
+- **R14** Thumbnails (M063, M064): before building, read channel-kb's `design-system/components/Thumbnail/README.md`, `tokens.json`
   and the newest `01-roadmap/thumbnail-shoot-*.md`, and tick each rule in `packaging.md`. Before delivering, zoom every cut-out edge at 3x, ears and hair especially: no stripes, no halo, no
-  rim that outlines him like a sticker. Compare it beside his last approved thumbnail at full size and at 168 px.
+  rim that outlines him like a sticker, and an ear SHAPED like an ear (Vision cuts a soft, out-of-focus ear as a lump: trace it, M064). Compare it beside his last approved thumbnail at full size and at 168 px.
 - **R11** Every cutaway, photo and card shows or says what the line says (M049); none fills time.
   Ask what the line MEANS: a shot that only matches a noun in it is filler (M060).
 - **R12** Shorts and other derived cuts (M053): list every card, mgx cue, effect and music cue
